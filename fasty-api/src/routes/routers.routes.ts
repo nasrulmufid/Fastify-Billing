@@ -193,6 +193,7 @@ export async function routersRoutes(app: FastifyInstance) {
   })
 
   // POST /routers/:id/sync — sinkron secret PPPoE pelanggan ke router
+  // Logic baru: user Active = profile paket, user Isolated = profile ISOLIR (bukan disabled)
   app.post("/routers/:id/sync", techAuth, async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string }
     const [row] = (await app.db.query("SELECT * FROM routers WHERE id = ?", [
@@ -202,7 +203,8 @@ export async function routersRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Router tidak ditemukan" } })
     }
     const customers = (await app.db.query(
-      `SELECT c.pppoe_username, c.pppoe_password, c.status, c.ip_address, p.download_speed, p.upload_speed
+      `SELECT c.pppoe_username, c.pppoe_password, c.status, c.ip_address, c.package_id,
+              p.download_speed, p.upload_speed
        FROM customers c LEFT JOIN packages p ON p.id = c.package_id
        WHERE c.router_id = ? AND c.pppoe_username IS NOT NULL AND c.pppoe_username <> ''`,
       [id],
@@ -211,23 +213,37 @@ export async function routersRoutes(app: FastifyInstance) {
     const { withRouter } = await import("../services/router.service.js")
     const res = await withRouter(app, Number(id), async (client) => {
       // Pastikan profile ISOLIR ada (auto-create jika belum ada)
-      await client.ensureIsolirProfile()
+      const isolirProfile = await client.ensureIsolirProfile()
       
-      const secrets = []
+      let synced = 0
       for (const c of customers) {
-        let profile: string | undefined
-        if (c.download_speed && c.upload_speed) {
-          profile = await client.ensurePppProfile(Number(c.download_speed), Number(c.upload_speed))
+        const username = String(c.pppoe_username)
+        const password = String(c.pppoe_password ?? "")
+        const status = String(c.status)
+        const ip = c.ip_address ? String(c.ip_address) : undefined
+        
+        if (status === "Active") {
+          // User aktif: gunakan profile paket (dl{down}-ul{up})
+          let profile: string | undefined
+          if (c.download_speed && c.upload_speed) {
+            profile = await client.ensurePppProfile(Number(c.download_speed), Number(c.upload_speed))
+          }
+          await client.changePppProfile({
+            name: username,
+            password,
+            profile: profile ?? "ISOLIR",
+          })
+        } else {
+          // User isolir: gunakan profile ISOLIR
+          await client.changePppProfile({
+            name: username,
+            password,
+            profile: isolirProfile,
+          })
         }
-        secrets.push({
-          name: String(c.pppoe_username),
-          password: String(c.pppoe_password ?? ""),
-          profile,
-          disabled: c.status !== "Active",
-          localAddress: c.ip_address ? String(c.ip_address) : undefined,
-        })
+        synced++
       }
-      return client.syncSecrets(secrets)
+      return synced
     })
 
     if (res.ok) {
