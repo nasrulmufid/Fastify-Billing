@@ -617,6 +617,18 @@ export async function customersRoutes(app: FastifyInstance) {
 
     for (const [routerId, list] of byRouter) {
       const res = await withRouter(app, routerId, async (client) => {
+        // Pastikan SEMUA paket PPPoE punya profile di Mikrotik (bahkan yang belum ada pelanggan)
+        const pppoePackages = (await app.db.query(
+          "SELECT name, download_speed, upload_speed FROM packages WHERE type = 'PPPoE' AND status = 'Aktif'",
+        )) as Record<string, unknown>[]
+        for (const pkg of pppoePackages) {
+          await client.ensurePppProfile({
+            name: String(pkg.name),
+            downloadSpeed: Number(pkg.download_speed),
+            uploadSpeed: Number(pkg.upload_speed),
+          })
+        }
+
         const secrets: Array<{ name: string; password: string; profile?: string; disabled: boolean }> = []
         for (const c of list) {
           // Paket non-PPPoE (Hotspot/Static IP) tidak punya profile rate-limit PPPoE —

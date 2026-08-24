@@ -194,6 +194,7 @@ export async function routersRoutes(app: FastifyInstance) {
 
   // POST /routers/:id/sync — sinkron secret PPPoE pelanggan ke router
   // Logic baru: user Active = profile paket, user Isolated = profile ISOLIR (bukan disabled)
+  // Pastikan SEMUA profile paket PPPoE ada di Mikrotik (bahkan yang belum ada pelanggan)
   app.post("/routers/:id/sync", techAuth, async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string }
     const [row] = (await app.db.query("SELECT * FROM routers WHERE id = ?", [
@@ -202,26 +203,39 @@ export async function routersRoutes(app: FastifyInstance) {
     if (!row) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Router tidak ditemukan" } })
     }
-    const customers = (await app.db.query(
-      `SELECT c.pppoe_username, c.pppoe_password, c.status, c.ip_address, p.name AS package_name,
-              p.download_speed, p.upload_speed
-       FROM customers c LEFT JOIN packages p ON p.id = c.package_id
-       WHERE c.router_id = ? AND c.pppoe_username IS NOT NULL AND c.pppoe_username <> ''`,
-      [id],
-    )) as Record<string, unknown>[]
 
     const { withRouter } = await import("../services/router.service.js")
     const res = await withRouter(app, Number(id), async (client) => {
       // Pastikan profile ISOLIR ada (auto-create jika belum ada)
       const isolirProfile = await client.ensureIsolirProfile()
-      
+
+      // 1. Pastikan SEMUA paket PPPoE punya profile di Mikrotik (bahkan yang belum ada pelanggan)
+      const pppoePackages = (await app.db.query(
+        "SELECT name, download_speed, upload_speed FROM packages WHERE type = 'PPPoE' AND status = 'Aktif'",
+      )) as Record<string, unknown>[]
+      for (const pkg of pppoePackages) {
+        await client.ensurePppProfile({
+          name: String(pkg.name),
+          downloadSpeed: Number(pkg.download_speed),
+          uploadSpeed: Number(pkg.upload_speed),
+        })
+      }
+
+      // 2. Sinkron secret setiap pelanggan ke router
+      const customers = (await app.db.query(
+        `SELECT c.pppoe_username, c.pppoe_password, c.status, c.ip_address, p.name AS package_name,
+                p.download_speed, p.upload_speed
+         FROM customers c LEFT JOIN packages p ON p.id = c.package_id
+         WHERE c.router_id = ? AND c.pppoe_username IS NOT NULL AND c.pppoe_username <> ''`,
+        [id],
+      )) as Record<string, unknown>[]
+
       let synced = 0
       for (const c of customers) {
         const username = String(c.pppoe_username)
         const password = String(c.pppoe_password ?? "")
         const status = String(c.status)
-        const ip = c.ip_address ? String(c.ip_address) : undefined
-        
+
         if (status === "Active") {
           // User aktif: gunakan profile paket (nama paket dari dashboard)
           let profile: string | undefined
