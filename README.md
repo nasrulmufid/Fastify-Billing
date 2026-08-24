@@ -1,11 +1,11 @@
 # Fastify Billing
 
-Aplikasi billing dan manajemen jaringan berbasis web yang terdiri dari:
+A web-based billing and network management application consisting of:
 
-- Backend API menggunakan Fastify + TypeScript
-- Frontend dashboard/admin dan portal pelanggan menggunakan React + Vite + shadcn/ui
-- Integrasi pembayaran menggunakan SumoPod
-- Manajemen pelanggan, paket, router, invoice, tagihan, tiket, dashboard, dan notifikasi
+- Backend API built with Fastify + TypeScript
+- Frontend admin dashboard and customer portal built with React + Vite + shadcn/ui
+- Payment integration with SumoPod
+- Management for customers, packages, routers, invoices, bills, tickets, dashboard, and notifications
 
 ## Tech Stack
 
@@ -53,23 +53,23 @@ Fastify Billing/
 - Node.js 20 or newer
 - MySQL 8 / MariaDB 10.6+
 - Git
-- Browser for frontend
+- Browser for frontend access
 
 ## Backend Setup
 
-1. Open folder backend:
+1. Open the backend folder:
 
 ```bash
 cd fasty-api
 ```
 
-2. Copy environment file:
+2. Copy the environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Update values in `.env` according to your local database and credentials.
+3. Update the values in `.env` according to your local database and credentials.
 
 4. Install dependencies:
 
@@ -83,7 +83,7 @@ npm install
 npm run db:migrate
 ```
 
-6. Start development server:
+6. Start the development server:
 
 ```bash
 npm run dev
@@ -96,13 +96,13 @@ The API will run at:
 
 ## Frontend Setup
 
-1. Open folder frontend:
+1. Open the frontend folder:
 
 ```bash
 cd fasty-bill
 ```
 
-2. Copy environment file:
+2. Copy the environment file:
 
 ```bash
 cp .env.example .env
@@ -114,7 +114,7 @@ cp .env.example .env
 npm install
 ```
 
-4. Run frontend:
+4. Run the frontend:
 
 ```bash
 npm run dev
@@ -164,15 +164,15 @@ VITE_API_URL=http://localhost:3000/api
 - Package and pricing management
 - Router and hotspot management
 - Invoice and payment processing
-- Payment review/approval flow
+- Payment review and approval flow
 - Ticket management
 - Notification system
 - Activity log tracking
-- Portal for customer self-service
+- Customer self-service portal
 
 ## Default Admin Login
 
-After migration, default login credentials are usually:
+After migration, the default login credentials are usually:
 
 ```text
 Email: admin@rtrw.net
@@ -207,4 +207,4 @@ npm run preview
 
 ## License
 
-This project is for internal/project use unless a separate license is provided.
+This project is intended for internal or project-specific use unless a separate license is provided.
