@@ -152,9 +152,12 @@ class MikrotikClient {
     }
   }
 
-  /** Pastikan profile PPPoE ada (dl{down}-ul{up}); buat bila belum. Return nama profile. */
-  async ensurePppProfile(downloadSpeed: number, uploadSpeed: number): Promise<string> {
-    const name = `dl${downloadSpeed}-ul${uploadSpeed}`
+  /**
+   * Pastikan profile PPPoE ada di Mikrotik.
+   * Nama profile = nama paket (misal "Paket 10 Mbps"), rate-limit = kecepatan paket.
+   */
+  async ensurePppProfile(opts: { name: string; downloadSpeed: number; uploadSpeed: number }): Promise<string> {
+    const name = opts.name
     const existing = (await this.request<Array<{ name: string }>>(
       "GET",
       `/ppp/profile?name=${encodeURIComponent(name)}`,
@@ -162,9 +165,17 @@ class MikrotikClient {
     if (existing.length > 0) return name
     await this.createResource("ppp/profile", {
       name,
-      "rate-limit": `${downloadSpeed}M/${uploadSpeed}M`,
+      "rate-limit": `${opts.downloadSpeed}M/${opts.uploadSpeed}M`,
     })
     return name
+  }
+
+  /**
+   * Pastikan profile PPPoE ada di Mikrotik (backward-compat: pakai nama paket).
+   * Return nama profile.
+   */
+  async ensurePppProfileByName(name: string, downloadSpeed: number, uploadSpeed: number): Promise<string> {
+    return this.ensurePppProfile({ name, downloadSpeed, uploadSpeed })
   }
 
   /** Pastikan profile ISOLIR ada; buat bila belum. Return nama profile. */

@@ -248,16 +248,16 @@ export async function customersRoutes(app: FastifyInstance) {
     ])) as Record<string, unknown>[]
 
     // Sinkron ke Mikrotik: buat secret PPPoE (disabled, karena status Isolated)
-    // + pastikan profile (dl{down}-ul{up}) ada. Kegagalan -> warning, bukan error.
+    // + pastikan profile (nama paket) ada. Kegagalan -> warning, bukan error.
     const warnings: RouterWarning[] = []
     if (body.routerId && body.pppoeUsername) {
-      const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+      const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
         body.packageId,
       ])) as Record<string, unknown>[]
       const res = await withRouter(app, body.routerId, async (client) => {
         let profile: string | undefined
         if (pkg?.download_speed && pkg?.upload_speed) {
-          profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+          profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
         }
         await client.ensurePppSecret({
           name: body.pppoeUsername,
@@ -298,11 +298,11 @@ export async function customersRoutes(app: FastifyInstance) {
     const warnings: RouterWarning[] = []
     if (row.router_id && row.pppoe_username) {
       const res = await withRouter(app, Number(row.router_id), async (client) => {
-        const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+        const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
           row.package_id,
         ])) as Record<string, unknown>[]
         if (pkg?.download_speed && pkg?.upload_speed) {
-          const profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+          const profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
           await client.changePppProfile({
             name: String(row.pppoe_username),
             password: String(row.pppoe_password ?? ""),
@@ -405,12 +405,12 @@ export async function customersRoutes(app: FastifyInstance) {
     const warnings: RouterWarning[] = []
     const newPackageId = body.packageId ? Number(body.packageId) : null
     if (row.router_id && row.pppoe_username && newPackageId && newPackageId !== prevPackageId) {
-      const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+      const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
         newPackageId,
       ])) as Record<string, unknown>[]
       if (pkg?.download_speed && pkg?.upload_speed) {
         const res = await withRouter(app, Number(row.router_id), async (client) => {
-          const profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+          const profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
           await client.ensurePppSecret({
             name: String(row.pppoe_username),
             password: String(row.pppoe_password ?? ""),
@@ -434,13 +434,13 @@ export async function customersRoutes(app: FastifyInstance) {
     // Jika IP berubah (mis. sebelumnya statis lalu dihapus), pastikan secret PPP di router
     // memakai `local-address` yang baru. Lakukan ini juga bila paket tidak berubah.
     if (row.router_id && row.pppoe_username && String(prevIp) !== String(row.ip_address)) {
-      const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+      const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
         row.package_id,
       ])) as Record<string, unknown>[]
       const res = await withRouter(app, Number(row.router_id), async (client) => {
         let profile: string | undefined
         if (pkg?.download_speed && pkg?.upload_speed) {
-          profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+          profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
         }
         await client.ensurePppSecret({
           name: String(row.pppoe_username),
@@ -542,11 +542,11 @@ export async function customersRoutes(app: FastifyInstance) {
           })
         } else {
           // Unisolir: kembalikan ke profile paket pelanggan
-          const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+          const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
             row.package_id,
           ])) as Record<string, unknown>[]
           if (pkg?.download_speed && pkg?.upload_speed) {
-            const profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+            const profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
             await client.changePppProfile({
               name: String(row.pppoe_username),
               password: String(row.pppoe_password ?? ""),
@@ -623,7 +623,7 @@ export async function customersRoutes(app: FastifyInstance) {
           // tetap buat secret tanpa profile agar username bisa login (service default).
           let profile: string | undefined
           if (c.package_type === "PPPoE" && c.download_speed && c.upload_speed) {
-            profile = await client.ensurePppProfile(Number(c.download_speed), Number(c.upload_speed))
+            profile = await client.ensurePppProfile({ name: String(c.package_name ?? "PPPoE"), downloadSpeed: Number(c.download_speed), uploadSpeed: Number(c.upload_speed) })
           }
           secrets.push({
             name: String(c.pppoe_username),

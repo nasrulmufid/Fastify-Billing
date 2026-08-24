@@ -203,7 +203,7 @@ export async function routersRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Router tidak ditemukan" } })
     }
     const customers = (await app.db.query(
-      `SELECT c.pppoe_username, c.pppoe_password, c.status, c.ip_address, c.package_id,
+      `SELECT c.pppoe_username, c.pppoe_password, c.status, c.ip_address, p.name AS package_name,
               p.download_speed, p.upload_speed
        FROM customers c LEFT JOIN packages p ON p.id = c.package_id
        WHERE c.router_id = ? AND c.pppoe_username IS NOT NULL AND c.pppoe_username <> ''`,
@@ -223,10 +223,10 @@ export async function routersRoutes(app: FastifyInstance) {
         const ip = c.ip_address ? String(c.ip_address) : undefined
         
         if (status === "Active") {
-          // User aktif: gunakan profile paket (dl{down}-ul{up})
+          // User aktif: gunakan profile paket (nama paket dari dashboard)
           let profile: string | undefined
           if (c.download_speed && c.upload_speed) {
-            profile = await client.ensurePppProfile(Number(c.download_speed), Number(c.upload_speed))
+            profile = await client.ensurePppProfile({ name: String(c.package_name ?? "PPPoE"), downloadSpeed: Number(c.download_speed), uploadSpeed: Number(c.upload_speed) })
           }
           await client.changePppProfile({
             name: username,
