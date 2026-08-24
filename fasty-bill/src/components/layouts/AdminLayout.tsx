@@ -57,11 +57,17 @@ const navGroups: NavGroup[] = [
     items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    title: "Manajemen",
+    title: "PPPoE",
     items: [
-      { to: "/admin/customers", label: "Pelanggan", icon: Users },
-      { to: "/admin/packages", label: "Paket", icon: Package },
-      { to: "/admin/hotspot", label: "Hotspot", icon: Router },
+      { to: "/admin/pppoe/customers", label: "Pelanggan", icon: Users },
+      { to: "/admin/pppoe/packages", label: "Paket PPPoE", icon: Package },
+    ],
+  },
+  {
+    title: "Hotspot",
+    items: [
+      { to: "/admin/hotspot/profiles", label: "Profil Hotspot", icon: Router },
+      { to: "/admin/hotspot/vouchers", label: "Voucher", icon: FileText },
     ],
   },
   {

@@ -23,6 +23,10 @@ import { WAGatewayPage } from "@/pages/admin/WAGatewayPage"
 import { SettingsPage } from "@/pages/admin/SettingsPage"
 import { TicketDetailPage } from "@/pages/admin/TicketDetail"
 import { TicketsPage } from "@/pages/admin/TicketsPage"
+import { PppoeCustomersPage } from "@/pages/admin/pppoe/CustomersPage"
+import { PppoePackagesPage } from "@/pages/admin/pppoe/PackagesPage"
+import { ProfilesPage } from "@/pages/admin/hotspot/ProfilesPage"
+import { VouchersPage } from "@/pages/admin/hotspot/VouchersPage"
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage"
 import { LoginPage } from "@/pages/auth/LoginPage"
 import { PortalLoginPage } from "@/pages/auth/PortalLoginPage"
@@ -66,10 +70,18 @@ export function App() {
             {/* Admin routes */}
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="customers/:id/*" element={<CustomerLayout />} />
-              <Route path="packages" element={<PackagesPage />} />
-              <Route path="hotspot" element={<HotspotPage />} />
+                {/* PPPoE routes */}
+                <Route path="pppoe/customers" element={<PppoeCustomersPage />} />
+                <Route path="pppoe/customers/:id/*" element={<CustomerLayout />} />
+                <Route path="pppoe/packages" element={<PppoePackagesPage />} />
+                {/* Hotspot routes */}
+                <Route path="hotspot/profiles" element={<ProfilesPage />} />
+                <Route path="hotspot/vouchers" element={<VouchersPage />} />
+                {/* Legacy routes (redirect) */}
+                <Route path="customers" element={<Navigate to="/admin/pppoe/customers" replace />} />
+                <Route path="packages" element={<Navigate to="/admin/pppoe/packages" replace />} />
+                <Route path="hotspot" element={<Navigate to="/admin/hotspot/profiles" replace />} />
+                {/* Other routes */}
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/new" element={<InvoiceCreatePage />} />
               <Route path="invoices/:id" element={<InvoiceDetailPage />} />

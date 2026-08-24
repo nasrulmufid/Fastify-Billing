@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
+import { syncHotspotProfilesToRouter, syncHotspotUsersToRouter, recordRouterWarning } from "../services/router.service.js"
+
 const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ" // tanpa I/O
 const LOWER = "abcdefghjkmnpqrstuvwxyz" // tanpa i/l/o
 const DIGIT = "0123456789"
@@ -153,6 +155,25 @@ export async function hotspotRoutes(app: FastifyInstance) {
       return created.map((c) => ({ ...c, status: "Belum Terpakai" }))
     })
 
+    // Sync semua user hotspot ke router yang terhubung
+    const allUsers = (await app.db.query(
+      `SELECT u.username, u.password, p.name AS profile_name 
+       FROM hotspot_users u 
+       LEFT JOIN hotspot_profiles p ON p.id = u.profile_id`,
+    )) as Record<string, unknown>[]
+
+    const routers = (await app.db.query("SELECT id FROM routers WHERE status = 'Connected'")) as Record<string, unknown>[]
+    for (const router of routers) {
+      const res = await syncHotspotUsersToRouter(app, Number(router.id), allUsers.map((u: Record<string, unknown>) => ({
+        username: String(u.username),
+        password: String(u.password),
+        profileName: String(u.profile_name || "default"),
+      })))
+      if (!res.ok) {
+        await recordRouterWarning(app, { routerId: Number(router.id), action: "sync hotspot user", warning: res.warning })
+      }
+    }
+
     return reply.code(201).send({ data: result })
   })
 
@@ -203,6 +224,23 @@ export async function hotspotRoutes(app: FastifyInstance) {
       "INSERT INTO hotspot_profiles (name, duration_hours, duration_label, price, download_speed, upload_speed, shared_users, session_timeout, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [body.name, body.durationHours, body.durationLabel || `${body.durationHours} Jam`, body.price, body.downloadSpeed, body.uploadSpeed, body.sharedUsers, body.sessionTimeout, body.status],
     )) as unknown as { insertId: number }
+
+    // Sync profile baru ke semua router yang terhubung
+    const routers = (await app.db.query("SELECT id FROM routers WHERE status = 'Connected'")) as Record<string, unknown>[]
+    for (const router of routers) {
+      const allProfiles = (await app.db.query("SELECT name, shared_users, session_timeout, download_speed, upload_speed FROM hotspot_profiles WHERE status = 'Aktif'")) as Record<string, unknown>[]
+      const res = await syncHotspotProfilesToRouter(app, Number(router.id), allProfiles.map((p: Record<string, unknown>) => ({
+        name: String(p.name),
+        sharedUsers: Number(p.shared_users),
+        sessionTimeout: Number(p.session_timeout),
+        downloadSpeed: Number(p.download_speed),
+        uploadSpeed: Number(p.upload_speed),
+      })))
+      if (!res.ok) {
+        await recordRouterWarning(app, { routerId: Number(router.id), action: "sync hotspot profile", warning: res.warning })
+      }
+    }
+
     return reply.code(201).send({ data: { id: result.insertId, ...body } })
   })
 
@@ -217,12 +255,46 @@ export async function hotspotRoutes(app: FastifyInstance) {
        WHERE id = ?`,
       [body.name ?? null, body.durationHours ?? null, body.durationLabel ?? null, body.price ?? null, body.downloadSpeed ?? null, body.uploadSpeed ?? null, body.sharedUsers ?? null, body.sessionTimeout ?? null, body.status ?? null, id],
     )
+
+    // Sync semua profile ke router yang terhubung
+    const routers = (await app.db.query("SELECT id FROM routers WHERE status = 'Connected'")) as Record<string, unknown>[]
+    for (const router of routers) {
+      const allProfiles = (await app.db.query("SELECT name, shared_users, session_timeout, download_speed, upload_speed FROM hotspot_profiles WHERE status = 'Aktif'")) as Record<string, unknown>[]
+      const res = await syncHotspotProfilesToRouter(app, Number(router.id), allProfiles.map((p: Record<string, unknown>) => ({
+        name: String(p.name),
+        sharedUsers: Number(p.shared_users),
+        sessionTimeout: Number(p.session_timeout),
+        downloadSpeed: Number(p.download_speed),
+        uploadSpeed: Number(p.upload_speed),
+      })))
+      if (!res.ok) {
+        await recordRouterWarning(app, { routerId: Number(router.id), action: "sync hotspot profile", warning: res.warning })
+      }
+    }
+
     return reply.send({ data: { message: "Profile diperbarui" } })
   })
 
   app.delete("/hotspot/profiles/:id", techAuth, async (req, reply) => {
     const { id } = req.params as { id: string }
     await app.db.query("DELETE FROM hotspot_profiles WHERE id = ?", [id])
+
+    // Sync semua profile ke router yang terhubung
+    const routers = (await app.db.query("SELECT id FROM routers WHERE status = 'Connected'")) as Record<string, unknown>[]
+    for (const router of routers) {
+      const allProfiles = (await app.db.query("SELECT name, shared_users, session_timeout, download_speed, upload_speed FROM hotspot_profiles WHERE status = 'Aktif'")) as Record<string, unknown>[]
+      const res = await syncHotspotProfilesToRouter(app, Number(router.id), allProfiles.map((p: Record<string, unknown>) => ({
+        name: String(p.name),
+        sharedUsers: Number(p.shared_users),
+        sessionTimeout: Number(p.session_timeout),
+        downloadSpeed: Number(p.download_speed),
+        uploadSpeed: Number(p.upload_speed),
+      })))
+      if (!res.ok) {
+        await recordRouterWarning(app, { routerId: Number(router.id), action: "sync hotspot profile", warning: res.warning })
+      }
+    }
+
     return reply.send({ data: { message: "Profile dihapus" } })
   })
 
