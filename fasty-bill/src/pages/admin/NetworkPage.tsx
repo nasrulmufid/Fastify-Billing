@@ -442,14 +442,6 @@ export function NetworkPage() {
         editing={editing}
       />
 
-      {/* Dialog set pool IP PPPoE */}
-      <RouterIpPoolDialog
-        open={ipPoolOpen}
-        onOpenChange={setIpPoolOpen}
-        router={ipPoolTarget}
-        onSaved={loadRouters}
-      />
-
       {/* Dialog setting IP Pool PPPOE & Isolir */}
       <RouterSettingsDialog
         open={settingsOpen}
