@@ -167,6 +167,21 @@ class MikrotikClient {
     return name
   }
 
+  /** Pastikan profile ISOLIR ada; buat bila belum. Return nama profile. */
+  async ensureIsolirProfile(): Promise<string> {
+    const name = "ISOLIR"
+    const existing = (await this.request<Array<{ name: string }>>(
+      "GET",
+      `/ppp/profile?name=${encodeURIComponent(name)}`,
+    )) as Array<{ name: string }>
+    if (existing.length > 0) return name
+    await this.createResource("ppp/profile", {
+      name,
+      "rate-limit": "0M/0M", // Isolir = tidak ada bandwidth
+    })
+    return name
+  }
+
   /** Cari secret berdasarkan name. Return id bila ada, null bila tidak. */
   private async findSecretId(name: string): Promise<string | null> {
     const rows = (await this.request<Array<{ ".id": string }>>(

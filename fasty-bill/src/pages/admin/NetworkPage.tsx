@@ -391,7 +391,7 @@ export function NetworkPage() {
                   ) : (
                     <RefreshCw className="mr-1.5 size-4" />
                   )}
-                  {syncing === router.name ? "Menyinkronkan…" : "Sync user"}
+                  {syncing === router.name ? "Menyinkronkan…" : "Sync"}
                 </Button>
                 {/* Setting IP Pool PPPOE & Isolir */}
                 <Button

@@ -532,11 +532,12 @@ export async function customersRoutes(app: FastifyInstance) {
         )) as Record<string, unknown>[]
         const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : undefined
         if (body.isolate) {
-          // Isolir: ubah profile ke ISOLIR dengan ip-pool isolir
+          // Isolir: ubah profile ke ISOLIR dengan ip-pool isolir (auto-create jika belum ada)
+          const isolirProfile = await client.ensureIsolirProfile()
           await client.changePppProfile({
             name: String(row.pppoe_username),
             password: String(row.pppoe_password ?? ""),
-            profile: "ISOLIR",
+            profile: isolirProfile,
             ipPool: ipPoolIsolir,
           })
         } else {
