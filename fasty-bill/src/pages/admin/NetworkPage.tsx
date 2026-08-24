@@ -29,7 +29,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { RouterFormDialog } from "@/components/routers/RouterFormDialog"
-import { RouterIpPoolDialog } from "@/components/routers/RouterIpPoolDialog"
 import { RouterSettingsDialog } from "@/components/routers/RouterSettingsDialog"
 import { cn } from "@/lib/utils"
 import api from "@/lib/axios"
@@ -69,8 +68,6 @@ export function NetworkPage() {
   const [editing, setEditing] = useState<(NetworkRouter & { apiPort?: number; apiUseHttps?: boolean; apiUser?: string; apiPassword?: string }) | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<NetworkRouter | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [ipPoolTarget, setIpPoolTarget] = useState<NetworkRouter | null>(null)
-  const [ipPoolOpen, setIpPoolOpen] = useState(false)
   const [settingsTarget, setSettingsTarget] = useState<NetworkRouter | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -395,19 +392,6 @@ export function NetworkPage() {
                     <RefreshCw className="mr-1.5 size-4" />
                   )}
                   {syncing === router.name ? "Menyinkronkan…" : "Sync user"}
-                </Button>
-                {/* Set IP Pool — selalu berlabel (tidak hanya ikon) agar mudah ditemukan */}
-                <Button
-                  variant="outline"
-                  className="flex-1 justify-center text-sky-600 hover:bg-sky-500/10 hover:text-sky-600"
-                  onClick={() => {
-                    setIpPoolTarget(router)
-                    setIpPoolOpen(true)
-                  }}
-                  disabled={busy}
-                >
-                  <Server className="mr-1.5 size-4" />
-                  Set IP Pool PPPoE
                 </Button>
                 {/* Setting IP Pool PPPOE & Isolir */}
                 <Button
