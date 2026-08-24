@@ -214,6 +214,33 @@ class MikrotikClient {
     await this.updateResource("ppp/secret", id, { disabled })
   }
 
+  /**
+   * Ubah profile secret PPPoE ke ISOLIR (dengan ip-pool isolir) atau kembali ke profile normal.
+   * Tidak mengubah disabled — hanya mengganti profile dan local-address.
+   */
+  async changePppProfile(opts: {
+    name: string
+    password: string
+    profile: string
+    ipPool?: string
+  }): Promise<void> {
+    const id = await this.findSecretId(opts.name)
+    const payload: Record<string, unknown> = {
+      name: opts.name,
+      password: opts.password,
+      service: "ppp",
+      profile: opts.profile,
+      disabled: false,
+    }
+    // Bila ada ip_pool_isolir, tambahkan remote-address untuk membatasi IP pelanggan isolir
+    if (opts.ipPool) payload["remote-address"] = opts.ipPool
+    if (id) {
+      await this.updateResource("ppp/secret", id, payload)
+    } else {
+      await this.createResource("ppp/secret", payload)
+    }
+  }
+
   /** Sinkronisasi semua secret pelanggan dari DB ke router (add bila belum ada). */
   async syncSecrets(
     secrets: Array<{ name: string; password: string; profile?: string; disabled: boolean }>,

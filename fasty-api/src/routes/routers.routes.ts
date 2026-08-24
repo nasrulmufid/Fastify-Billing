@@ -32,6 +32,22 @@ const createRouterSchema = z.object({
     )
     .optional()
     .or(z.literal("")),
+  ipPoolPppoe: z
+    .string()
+    .regex(
+      /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\/\d{1,2}$/,
+      "Format CIDR tidak valid. Contoh: 192.168.200.0/24",
+    )
+    .optional()
+    .or(z.literal("")),
+  ipPoolIsolir: z
+    .string()
+    .regex(
+      /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\/\d{1,2}$/,
+      "Format CIDR tidak valid. Contoh: 10.99.0.0/24",
+    )
+    .optional()
+    .or(z.literal("")),
 })
 
 const updateRouterSchema = createRouterSchema.partial()
@@ -47,6 +63,8 @@ function mapRouter(row: Record<string, unknown>) {
     apiUser: row.api_user,
     apiPassword: row.api_password ? maskSecret(decryptSecret(String(row.api_password))) : "",
     ipPool: row.ip_pool ?? "",
+    ipPoolPppoe: row.ip_pool_pppoe ?? "",
+    ipPoolIsolir: row.ip_pool_isolir ?? "",
     status: row.status,
     clientCount: row.client_count,
     uptime: row.uptime,
@@ -69,8 +87,8 @@ export async function routersRoutes(app: FastifyInstance) {
   app.post("/routers", techAuth, async (req, reply) => {
     const body = createRouterSchema.parse(req.body)
     const result = (await app.db.query(
-      `INSERT INTO routers (name, host, provider, api_port, api_use_https, api_user, api_password, ip_pool)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO routers (name, host, provider, api_port, api_use_https, api_user, api_password, ip_pool, ip_pool_pppoe, ip_pool_isolir)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         body.name.trim(),
         body.host.trim(),
@@ -80,6 +98,8 @@ export async function routersRoutes(app: FastifyInstance) {
         body.apiUser ?? "admin",
         body.apiPassword ? encryptSecret(body.apiPassword) : null,
         body.ipPool ? body.ipPool.trim() : null,
+        body.ipPoolPppoe ? body.ipPoolPppoe.trim() : null,
+        body.ipPoolIsolir ? body.ipPoolIsolir.trim() : null,
       ],
     )) as unknown as { insertId: number }
     const [row] = (await app.db.query("SELECT * FROM routers WHERE id = ?", [
@@ -98,7 +118,8 @@ export async function routersRoutes(app: FastifyInstance) {
         `UPDATE routers SET name = COALESCE(?, name), host = COALESCE(?, host),
            provider = COALESCE(?, provider), api_port = COALESCE(?, api_port),
            api_use_https = COALESCE(?, api_use_https), api_user = COALESCE(?, api_user),
-           api_password = ?, ip_pool = COALESCE(?, ip_pool)
+           api_password = ?, ip_pool = COALESCE(?, ip_pool),
+           ip_pool_pppoe = COALESCE(?, ip_pool_pppoe), ip_pool_isolir = COALESCE(?, ip_pool_isolir)
          WHERE id = ?`,
         [
           body.name ? body.name.trim() : null,
@@ -109,6 +130,8 @@ export async function routersRoutes(app: FastifyInstance) {
           body.apiUser ?? null,
           encryptSecret(body.apiPassword),
           body.ipPool !== undefined ? (body.ipPool ? body.ipPool.trim() : null) : null,
+          body.ipPoolPppoe !== undefined ? (body.ipPoolPppoe ? body.ipPoolPppoe.trim() : null) : null,
+          body.ipPoolIsolir !== undefined ? (body.ipPoolIsolir ? body.ipPoolIsolir.trim() : null) : null,
           id,
         ],
       )
@@ -117,7 +140,8 @@ export async function routersRoutes(app: FastifyInstance) {
         `UPDATE routers SET name = COALESCE(?, name), host = COALESCE(?, host),
            provider = COALESCE(?, provider), api_port = COALESCE(?, api_port),
            api_use_https = COALESCE(?, api_use_https), api_user = COALESCE(?, api_user),
-           ip_pool = COALESCE(?, ip_pool)
+           ip_pool = COALESCE(?, ip_pool),
+           ip_pool_pppoe = COALESCE(?, ip_pool_pppoe), ip_pool_isolir = COALESCE(?, ip_pool_isolir)
          WHERE id = ?`,
         [
           body.name ? body.name.trim() : null,
@@ -127,6 +151,8 @@ export async function routersRoutes(app: FastifyInstance) {
           body.apiUseHttps !== undefined ? (body.apiUseHttps ? 1 : 0) : null,
           body.apiUser ?? null,
           body.ipPool !== undefined ? (body.ipPool ? body.ipPool.trim() : null) : null,
+          body.ipPoolPppoe !== undefined ? (body.ipPoolPppoe ? body.ipPoolPppoe.trim() : null) : null,
+          body.ipPoolIsolir !== undefined ? (body.ipPoolIsolir ? body.ipPoolIsolir.trim() : null) : null,
           id,
         ],
       )

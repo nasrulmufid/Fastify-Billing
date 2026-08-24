@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCw,
   Server,
+  Settings2,
   Trash2,
   Users,
   Wifi,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { RouterFormDialog } from "@/components/routers/RouterFormDialog"
 import { RouterIpPoolDialog } from "@/components/routers/RouterIpPoolDialog"
+import { RouterSettingsDialog } from "@/components/routers/RouterSettingsDialog"
 import { cn } from "@/lib/utils"
 import api from "@/lib/axios"
 
@@ -42,6 +44,9 @@ type NetworkRouter = {
   status: RouterStatus
   clientCount: number
   uptime: string
+  ipPool?: string
+  ipPoolPppoe?: string
+  ipPoolIsolir?: string
 }
 
 const statusBadge: Record<RouterStatus, string> = {
@@ -66,6 +71,8 @@ export function NetworkPage() {
   const [deleting, setDeleting] = useState(false)
   const [ipPoolTarget, setIpPoolTarget] = useState<NetworkRouter | null>(null)
   const [ipPoolOpen, setIpPoolOpen] = useState(false)
+  const [settingsTarget, setSettingsTarget] = useState<NetworkRouter | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const busy = testing !== null || syncing !== null
   const online = routers.filter((r) => r.status === "Connected").length
@@ -400,7 +407,20 @@ export function NetworkPage() {
                   disabled={busy}
                 >
                   <Server className="mr-1.5 size-4" />
-                  Set IP Pool
+                  Set IP Pool PPPoE
+                </Button>
+                {/* Setting IP Pool PPPOE & Isolir */}
+                <Button
+                  variant="outline"
+                  className="flex-1 justify-center text-violet-600 hover:bg-violet-500/10 hover:text-violet-600"
+                  onClick={() => {
+                    setSettingsTarget(router)
+                    setSettingsOpen(true)
+                  }}
+                  disabled={busy}
+                >
+                  <Settings2 className="mr-1.5 size-4" />
+                  Setting IP Pool
                 </Button>
                 {/* Mobile: tombol berlabel lebar penuh. Desktop: ikon di ujung kanan. */}
                 <Button
@@ -443,6 +463,14 @@ export function NetworkPage() {
         open={ipPoolOpen}
         onOpenChange={setIpPoolOpen}
         router={ipPoolTarget}
+        onSaved={loadRouters}
+      />
+
+      {/* Dialog setting IP Pool PPPOE & Isolir */}
+      <RouterSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        router={settingsTarget}
         onSaved={loadRouters}
       />
 

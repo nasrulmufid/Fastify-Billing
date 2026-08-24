@@ -294,11 +294,21 @@ export async function customersRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Pelanggan tidak ditemukan" } })
     }
 
-    // Sinkron ke Mikrotik: enable secret PPPoE
+    // Sinkron ke Mikrotik: enable secret PPPoE (kembalikan ke profile paket)
     const warnings: RouterWarning[] = []
     if (row.router_id && row.pppoe_username) {
       const res = await withRouter(app, Number(row.router_id), async (client) => {
-        await client.setSecretDisabled(String(row.pppoe_username), false)
+        const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+          row.package_id,
+        ])) as Record<string, unknown>[]
+        if (pkg?.download_speed && pkg?.upload_speed) {
+          const profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+          await client.changePppProfile({
+            name: String(row.pppoe_username),
+            password: String(row.pppoe_password ?? ""),
+            profile,
+          })
+        }
       })
       if (!res.ok) {
         warnings.push(res.warning)
@@ -511,11 +521,38 @@ export async function customersRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Pelanggan tidak ditemukan" } })
     }
 
-    // Sinkron ke Mikrotik: disable/enable secret PPPoE
+    // Sinkron ke Mikrotik: ubah profile PPPoE ke ISOLIR (dengan ip-pool isolir) atau kembali ke profile normal.
+    // Tidak mengubah disabled — hanya mengganti profile dan remote-address.
     const warnings: RouterWarning[] = []
     if (row.router_id && row.pppoe_username) {
       const res = await withRouter(app, Number(row.router_id), async (client) => {
-        await client.setSecretDisabled(String(row.pppoe_username), body.isolate)
+        const [routerRow] = (await app.db.query(
+          "SELECT ip_pool_isolir FROM routers WHERE id = ?",
+          [row.router_id],
+        )) as Record<string, unknown>[]
+        const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : undefined
+        if (body.isolate) {
+          // Isolir: ubah profile ke ISOLIR dengan ip-pool isolir
+          await client.changePppProfile({
+            name: String(row.pppoe_username),
+            password: String(row.pppoe_password ?? ""),
+            profile: "ISOLIR",
+            ipPool: ipPoolIsolir,
+          })
+        } else {
+          // Unisolir: kembalikan ke profile paket pelanggan
+          const [pkg] = (await app.db.query("SELECT download_speed, upload_speed FROM packages WHERE id = ?", [
+            row.package_id,
+          ])) as Record<string, unknown>[]
+          if (pkg?.download_speed && pkg?.upload_speed) {
+            const profile = await client.ensurePppProfile(Number(pkg.download_speed), Number(pkg.upload_speed))
+            await client.changePppProfile({
+              name: String(row.pppoe_username),
+              password: String(row.pppoe_password ?? ""),
+              profile,
+            })
+          }
+        }
       })
       if (!res.ok) {
         warnings.push(res.warning)

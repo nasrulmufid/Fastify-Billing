@@ -60,9 +60,9 @@ export function registerJobs(app: FastifyInstance) {
         await app.db.query("INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Isolir otomatis', ?)", [
           `${result.affectedRows} pelanggan`,
         ])
-        // Buat notifikasi untuk setiap customer yang terisolir + disable secret di router
+        // Buat notifikasi untuk setiap customer yang terisolir + ubah profile ke ISOLIR di router
         const isolated = (await app.db.query(
-          `SELECT c.id AS customer_id, c.name AS customer_name, c.router_id, c.pppoe_username
+          `SELECT c.id AS customer_id, c.name AS customer_name, c.router_id, c.pppoe_username, c.pppoe_password
            FROM customers WHERE status = 'Isolated' AND expiry_at < DATE_SUB(CURRENT_DATE(), INTERVAL ? DAY)`,
           [grace],
         )) as Record<string, unknown>[]
@@ -74,10 +74,20 @@ export function registerJobs(app: FastifyInstance) {
             "INSERT INTO notification_logs (code, type, customer_id, channel, status) VALUES (?, 'isolir', ?, 'WhatsApp', 'Terkirim')",
             [ntCode, cust.customer_id],
           )
-          // Sinkron ke Mikrotik: disable secret PPPoE
+          // Sinkron ke Mikrotik: ubah profile ke ISOLIR dengan ip-pool isolir
           if (cust.router_id && cust.pppoe_username) {
             const res = await withRouter(app, cust.router_id as number, async (client) => {
-              await client.setSecretDisabled(String(cust.pppoe_username), true)
+              const [routerRow] = (await app.db.query(
+                "SELECT ip_pool_isolir FROM routers WHERE id = ?",
+                [cust.router_id],
+              )) as Record<string, unknown>[]
+              const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : undefined
+              await client.changePppProfile({
+                name: String(cust.pppoe_username),
+                password: String(cust.pppoe_password ?? ""),
+                profile: "ISOLIR",
+                ipPool: ipPoolIsolir,
+              })
             })
             if (!res.ok) {
               await recordRouterWarning(app, {
