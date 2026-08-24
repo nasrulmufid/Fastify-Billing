@@ -210,6 +210,9 @@ export async function routersRoutes(app: FastifyInstance) {
 
     const { withRouter } = await import("../services/router.service.js")
     const res = await withRouter(app, Number(id), async (client) => {
+      // Pastikan profile ISOLIR ada (auto-create jika belum ada)
+      await client.ensureIsolirProfile()
+      
       const secrets = []
       for (const c of customers) {
         let profile: string | undefined

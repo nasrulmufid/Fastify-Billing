@@ -170,16 +170,41 @@ class MikrotikClient {
   /** Pastikan profile ISOLIR ada; buat bila belum. Return nama profile. */
   async ensureIsolirProfile(): Promise<string> {
     const name = "ISOLIR"
+    
+    // Cek apakah profile sudah ada
     const existing = (await this.request<Array<{ name: string }>>(
       "GET",
       `/ppp/profile?name=${encodeURIComponent(name)}`,
     )) as Array<{ name: string }>
-    if (existing.length > 0) return name
-    await this.createResource("ppp/profile", {
-      name,
-      "rate-limit": "0M/0M", // Isolir = tidak ada bandwidth
-    })
-    return name
+    
+    if (existing.length > 0) {
+      return name
+    }
+    
+    // Profile belum ada, coba buat
+    try {
+      await this.createResource("ppp/profile", {
+        name,
+        "rate-limit": "0M/0M", // Isolir = tidak ada bandwidth
+      })
+      
+      // Verifikasi bahwa profile sudah dibuat
+      const verified = (await this.request<Array<{ name: string }>>(
+        "GET",
+        `/ppp/profile?name=${encodeURIComponent(name)}`,
+      )) as Array<{ name: string }>
+      
+      if (verified.length > 0) {
+        return name
+      }
+      
+      // Jika verifikasi gagal, throw error
+      throw new MikrotikError(`Profile ISOLIR berhasil dibuat tapi verifikasi gagal`)
+    } catch (err) {
+      // Throw error agar bisa ditangani oleh caller (withRouter)
+      console.error(`[Mikrotik] Gagal membuat profile ISOLIR di ${this.base}:`, (err as Error).message)
+      throw new MikrotikError(`Gagal membuat profile ISOLIR: ${(err as Error).message}`)
+    }
   }
 
   /** Cari secret berdasarkan name. Return id bila ada, null bila tidak. */
