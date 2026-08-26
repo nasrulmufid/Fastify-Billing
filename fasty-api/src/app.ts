@@ -43,6 +43,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     timeWindow: "1 minute",
   })
 
+  // Multipart for file uploads
+  await app.register(import("@fastify/multipart"))
+
   // Plugins
   await app.register(corsPlugin)
   await app.register(dbPlugin)

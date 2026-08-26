@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   Calendar,
@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Upload,
   UserCheck,
   Wifi,
   WifiOff,
@@ -218,6 +219,7 @@ export function CustomersPage() {
 
   // Sinkronisasi secret PPPoE ke Mikrotik
   const [syncing, setSyncing] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleSyncCustomers = async () => {
     setSyncing(true)
@@ -242,6 +244,117 @@ export function CustomersPage() {
     } finally {
       setSyncing(false)
     }
+  }
+
+  // Export Excel
+  const handleExportExcel = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/customers/export`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      })
+      if (!response.ok) throw new Error("Export gagal")
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `pelanggan_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success("Export Excel berhasil", {
+        description: `${filtered.length} pelanggan diexport ke file Excel.`,
+      })
+    } catch {
+      toast.error("Gagal export Excel", {
+        description: "Terjadi kesalahan saat mengekspor data.",
+      })
+    }
+  }
+
+  // Download template
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/customers/template`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      })
+      if (!response.ok) throw new Error("Download template gagal")
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "template-import-pelanggan.xlsx"
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success("Template berhasil didownload", {
+        description: "Isi data mulai baris ke-3 sesuai instruksi di template.",
+      })
+    } catch {
+      toast.error("Gagal download template", {
+        description: "Terjadi kesalahan saat mendownload template.",
+      })
+    }
+  }
+
+  // Import Excel
+  const handleImportExcel = async (file: File) => {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/customers/import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (response.status === 422) {
+        // Validation errors
+        const errorList = result.errors?.map((e: any) => `Baris ${e.row}: ${e.message}`).join("\n")
+        toast.error("Validasi gagal", {
+          description: `Terdapat ${result.errors?.length || 0} error:\n${errorList}`,
+        })
+        return
+      }
+
+      if (response.status === 207) {
+        // Partial success
+        toast.warning("Import sebagian berhasil", {
+          description: `${result.data.successCount} berhasil, ${result.data.errorCount} gagal.`,
+        })
+        return
+      }
+
+      if (response.ok) {
+        toast.success("Import berhasil", {
+          description: `${result.data.successCount} pelanggan berhasil ditambahkan.`,
+        })
+        // Refresh data
+        window.location.reload()
+      } else {
+        toast.error("Import gagal", {
+          description: result.error?.message ?? "Terjadi kesalahan saat mengimport data.",
+        })
+      }
+    } catch {
+      toast.error("Gagal import Excel", {
+        description: "Terjadi kesalahan saat mengupload file.",
+      })
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+      toast.error("Format file tidak didukung", {
+        description: "Hanya file Excel (.xlsx atau .xls) yang diperbolehkan.",
+      })
+      return
+    }
+    handleImportExcel(file)
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const openExpiryDialog = (cust: Customer) => {
@@ -437,6 +550,40 @@ export function CustomersPage() {
             <Download className="mr-1.5 size-4" />
             Export CSV
           </Button>
+
+          {/* Dropdown Export/Import Excel */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-1.5 size-4" />
+                Excel
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Excel Operations</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <Download className="mr-2 size-4" />
+                Export Pelanggan (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadTemplate}>
+                <Download className="mr-2 size-4" />
+                Download Template Import
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 size-4" />
+                Import Pelanggan (.xlsx)
+              </DropdownMenuItem>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

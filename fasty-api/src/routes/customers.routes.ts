@@ -4,6 +4,12 @@ import { z } from "zod"
 import { nextCode, nextCustomerCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, MONTHS_ID } from "../utils/date.js"
 import { recordRouterWarning, withRouter, type RouterWarning } from "../services/router.service.js"
+import {
+  generateCustomerWorkbook,
+  generateTemplateWorkbook,
+  parseImportWorkbook,
+  executeImport,
+} from "../utils/excel.js"
 
 const CUSTOMER_STATUS_ENUM = z.enum(["Active", "Isolated", "Pending"])
 
@@ -668,4 +674,91 @@ export async function customersRoutes(app: FastifyInstance) {
     if (warnings.length) payload.warning = warnings[0]
     return reply.send(payload)
   })
+
+  // GET /customers/export — download semua pelanggan sebagai .xlsx
+  app.get("/customers/export", adminAuth, async (req: FastifyRequest, reply: FastifyReply) => {
+    const rows = (await app.db.query(SQL_SELECT)) as Record<string, unknown>[]
+    const buffer = await generateCustomerWorkbook(rows)
+    const filename = `pelanggan_${new Date().toISOString().slice(0, 10)}.xlsx`
+    return reply
+      .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .header("Content-Length", buffer.length.toString())
+      .send(buffer)
+  })
+
+  // GET /customers/template — download template import .xlsx
+  app.get("/customers/template", adminAuth, async (req: FastifyRequest, reply: FastifyReply) => {
+    const buffer = await generateTemplateWorkbook()
+    return reply
+      .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .header("Content-Disposition", 'attachment; filename="template-import-pelanggan.xlsx"')
+      .header("Content-Length", buffer.length.toString())
+      .send(buffer)
+  })
+
+  // POST /customers/import — import pelanggan dari file .xlsx
+  app.post(
+    "/customers/import",
+    {
+      onRequest: [app.authenticate],
+      preHandler: [app.requireRoles(["super_admin", "admin"])],
+    },
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const fastifyMultipart = await import("@fastify/multipart")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payload = await req.file() as any
+
+        if (!payload) {
+          return reply.code(400).send({
+            error: { code: "BAD_REQUEST", message: "File Excel wajib diupload" },
+          })
+        }
+
+        const buffer = Buffer.from(await payload.toBuffer())
+        const { rows: parsedRows, errors: parseErrors } = await parseImportWorkbook(buffer)
+
+        if (parseErrors.length > 0) {
+          return reply.code(422).send({
+            error: { code: "VALIDATION_ERROR", message: `${parseErrors.length} error validasi` },
+            errors: parseErrors,
+          })
+        }
+
+        if (parsedRows.length === 0) {
+          return reply.code(400).send({
+            error: { code: "BAD_REQUEST", message: "Tidak ada data valid untuk diimport" },
+          })
+        }
+
+        const result = await executeImport(app, parsedRows)
+
+        if (result.errorCount > 0) {
+          return reply.code(207).send({
+            data: {
+              successCount: result.successCount,
+              errorCount: result.errorCount,
+              totalRows: result.totalRows,
+              insertedIds: result.insertedIds,
+            },
+            errors: result.errors,
+          })
+        }
+
+        return reply.code(200).send({
+          data: {
+            successCount: result.successCount,
+            errorCount: result.errorCount,
+            totalRows: result.totalRows,
+            insertedIds: result.insertedIds,
+          },
+        })
+      } catch (err: any) {
+        return reply.code(500).send({
+          error: { code: "INTERNAL_ERROR", message: err.message ?? "Gagal memproses import" },
+        })
+      }
+    },
+  )
 }
