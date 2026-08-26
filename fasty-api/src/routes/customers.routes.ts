@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
-import { nextCode } from "../utils/codegen.js"
+import { nextCode, nextCustomerCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, MONTHS_ID } from "../utils/date.js"
 import { recordRouterWarning, withRouter, type RouterWarning } from "../services/router.service.js"
 
@@ -178,8 +178,8 @@ export async function customersRoutes(app: FastifyInstance) {
     // Alokasi IP otomatis: bila IP tidak diisi, ambil IP berikutnya dari pool
     // router (ip_pool CIDR, contoh 192.168.200.0/24). Fallback ke 192.168.1.x
     // bila router tidak punya pool.
-    const { code, nextIp } = await app.db.transaction(async (q) => {
-      const c = await nextCode(q.query, "customers", "CUST-")
+    const { nextIp } = await app.db.transaction(async (q) => {
+      const code = await nextCustomerCode(q.query)
       let allocated = body.ipAddress || ""
       if (!allocated && body.routerId) {
         const [routerRow] = (await q.query("SELECT ip_pool FROM routers WHERE id = ?", [
