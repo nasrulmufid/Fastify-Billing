@@ -546,48 +546,56 @@ export function CustomersPage() {
             Sync Pelanggan ke Router
           </Button>
 
-          <Button variant="outline" onClick={handleExportCsv}>
-            <Download className="mr-1.5 size-4" />
-            Export CSV
-          </Button>
-
-          {/* Dropdown Export/Import Excel */}
+          {/* Dropdown Export */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
                 <Download className="mr-1.5 size-4" />
-                Excel
+                Export
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Excel Operations</DropdownMenuLabel>
+              <DropdownMenuLabel>Export Operations</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleExportExcel}>
                 <Download className="mr-2 size-4" />
                 Export Pelanggan (.xlsx)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDownloadTemplate}>
-                <Download className="mr-2 size-4" />
-                Download Template Import
-              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Dropdown Import */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-1.5 size-4" />
+                Import
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Import Operations</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                 <Upload className="mr-2 size-4" />
                 Import Pelanggan (.xlsx)
               </DropdownMenuItem>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleFileChange}
-              />
+              <DropdownMenuItem onClick={handleDownloadTemplate}>
+                <Download className="mr-2 size-4" />
+                Download Template Import
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
       </div>
-
-      {/* ---------- Data Table ---------- */}
+            onChange={handleFileChange}
+          /a Table ---------- */}
       <div className="rounded-xl border border-border bg-card">
         {/* ===== Mobile: kartu per pelanggan ===== */}
         <div className="divide-y divide-border sm:hidden">
