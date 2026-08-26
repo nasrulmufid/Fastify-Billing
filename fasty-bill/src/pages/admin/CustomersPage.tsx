@@ -443,32 +443,6 @@ export function CustomersPage() {
     setDeleteTarget(null)
   }
 
-  const handleExportCsv = () => {
-    if (filtered.length === 0) {
-      toast.error("Tidak ada data untuk diexport")
-      return
-    }
-    const header = ["ID", "Nama", "No. HP", "Paket", "IP Address", "Status", "Masa Aktif"]
-    const rows = filtered.map((c) => [
-      c.code,
-      c.name,
-      c.phone,
-      c.packageName,
-      c.ipAddress,
-      statusLabel[c.status] ?? c.status,
-      c.expiryDate,
-    ])
-    const csv = "\uFEFF" + [header, ...rows].map((r) => r.join(",")).join("\n")
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "daftar-pelanggan.csv"
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Export CSV berhasil", { description: `${filtered.length} pelanggan diexport.` })
-  }
-
   return (
     <div className="space-y-6">
       {/* ---------- Header ---------- */}
