@@ -64,13 +64,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Hotspot",
-    items: [
-      { to: "/admin/hotspot/profiles", label: "Profil Hotspot", icon: Router },
-      { to: "/admin/hotspot/vouchers", label: "Voucher", icon: FileText },
-    ],
-  },
-  {
     title: "Transaksi",
     items: [
       { to: "/admin/invoices", label: "Invoice", icon: FileText },
@@ -167,11 +160,8 @@ function NavGroupSection({
   )
 }
 
-const mockNotifications = [
-  { id: 1, title: "Pembayaran diterima", desc: "Invoice #INV-1042 telah dibayar", time: "2 mnt lalu", unread: true },
-  { id: 2, title: "Isolir otomatis", desc: "3 pelanggan melewati grace period", time: "15 mnt lalu", unread: true },
-  { id: 3, title: "Invoice terbit", desc: "12 invoice untuk periode Agustus", time: "1 jam lalu", unread: false },
-]
+/* ---------- initial notifications (kosong — dimuat dari API) ---------- */
+const mockNotifications: NotificationItem[] = []
 
 export function AdminLayout() {
   const { sidebarOpen, setSidebarOpen, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } =

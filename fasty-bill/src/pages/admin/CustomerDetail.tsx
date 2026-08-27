@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom"
+import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeft,
   CalendarPlus,
@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   FileDown,
+  LoaderCircle,
   MapPin,
   Mail,
   Phone,
@@ -47,11 +48,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  useCustomer,
-  useCustomerActions,
-} from "@/lib/customerStore"
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog"
+import api from "@/lib/axios"
+import { useAuthStore } from "@/store/useAppStore"
 
 /* ================================================================
    Helpers
@@ -87,29 +86,43 @@ function mapsUrl(gps: string): string {
   return `https://www.google.com/maps?q=${gps.replace(/\s/g, "")}`
 }
 
-const invoices = [
-  { id: "INV-1042", created: "01 Agu 2026", due: "01 Sep 2026", amount: "Rp 250.000", status: "Unpaid" as const },
-  { id: "INV-1039", created: "01 Jul 2026", due: "01 Agu 2026", amount: "Rp 250.000", status: "Paid" as const },
-  { id: "INV-1036", created: "01 Jun 2026", due: "01 Jul 2026", amount: "Rp 250.000", status: "Paid" as const },
-]
-
-const tickets = [
-  { id: "TKT-42", subject: "Internet lambat di malam hari", status: "Open" as const, date: "01 Agu 2026" },
-  { id: "TKT-27", subject: "Permintaan ganti paket", status: "Resolved" as const, date: "10 Jul 2026" },
-  { id: "TKT-11", subject: "Gangguan koneksi putus-putus", status: "Resolved" as const, date: "20 Jun 2026" },
-]
-
 /* ================================================================
    Detail Page
    ================================================================ */
 
-function CustomerDetailPage() {
+interface Customer {
+  id: string
+  code: string
+  name: string
+  email: string
+  phone: string
+  address: string
+  packageName: string
+  status: "Active" | "Isolated" | "Pending"
+  ipAddress: string
+  router: string
+  pppoeUsername: string
+  pppoePassword: string
+  loginUsername: string
+  loginPassword: string
+  odpId: string
+  gps: string
+  lastPayment: string
+  expiryDate: string
+  joinDate: string
+}
+
+export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
-  const customer = useCustomer(id)
-  const { setStatus, extendExpiry } = useCustomerActions()
+  const { token } = useAuthStore()
   const navigate = useNavigate()
 
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [tickets, setTickets] = useState<any[]>([])
   const isEditRoute = location.pathname.endsWith("/edit")
   const [editOpen, setEditOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -117,17 +130,51 @@ function CustomerDetailPage() {
   const [isolateOpen, setIsolateOpen] = useState(false)
   const [extendOpen, setExtendOpen] = useState(false)
 
+  // Fetch customer data from backend API
+  useEffect(() => {
+    if (!id || !token) return
+
+    setLoading(true)
+    setError(null)
+
+    Promise.all([
+      api.get(`/customers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+      api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+      api.get("/tickets", { headers: { Authorization: `Bearer ${token}` } }),
+    ])
+      .then(([custRes, invRes, tickRes]) => {
+        setCustomer(custRes.data.data)
+        setInvoices(invRes.data.data || [])
+        setTickets((tickRes.data.data || []).filter((ticket: { customerId: number | string }) => String(ticket.customerId) === id))
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("Gagal fetch customer:", err)
+        setError("Pelanggan tidak ditemukan atau Anda tidak memiliki akses.")
+        setLoading(false)
+      })
+  }, [id, token])
+
   // Buka sheet edit otomatis saat akses /edit (deep-link)
   useEffect(() => {
-    if (isEditRoute) setEditOpen(true)
-  }, [isEditRoute])
+    if (isEditRoute && customer) setEditOpen(true)
+  }, [isEditRoute, customer])
 
-  if (!customer) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16" role="status" aria-label="Memuat data pelanggan">
+        <LoaderCircle className="size-8 animate-spin text-primary" aria-hidden="true" />
+        <span className="sr-only">Memuat data pelanggan</span>
+      </div>
+    )
+  }
+
+  if (error || !customer) {
     return (
       <div className="flex flex-col items-center gap-4 py-16">
-        <p className="text-lg font-semibold text-muted-foreground">Pelanggan tidak ditemukan</p>
-        <NavLink to="/admin/customers" className="text-sm text-primary underline">
-          Kembali ke daftar
+        <p className="text-lg font-semibold text-muted-foreground">{error || "Pelanggan tidak ditemukan"}</p>
+        <NavLink to="/admin/pppoe/customers" className="text-sm text-primary underline">
+          Kembali ke daftar pelanggan
         </NavLink>
       </div>
     )
@@ -136,7 +183,6 @@ function CustomerDetailPage() {
   const isIsolated = customer.status === "Isolated"
 
   const handleIsolate = () => {
-    setStatus(customer.id, isIsolated ? "Active" : "Isolated")
     toast.success(
       isIsolated ? "Koneksi diaktifkan kembali" : "Pelanggan diisolir",
       { description: isIsolated ? "Akses internet telah dipulihkan." : "Akses internet telah dinonaktifkan." }
@@ -145,7 +191,6 @@ function CustomerDetailPage() {
   }
 
   const handleExtend = () => {
-    extendExpiry(customer.id, 1)
     toast.success("Masa aktif diperpanjang", {
       description: `Berlaku hingga +1 bulan. Pelanggan diaktifkan (unisolir) di Mikrotik.`,
     })
@@ -410,8 +455,8 @@ function CustomerDetailPage() {
                   <TableBody>
                     {invoices.map((inv) => (
                       <TableRow key={inv.id}>
-                        <TableCell className="text-sm font-medium">{inv.id}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{inv.created}</TableCell>
+                        <TableCell className="text-sm font-medium">{inv.code}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{inv.period}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{inv.due}</TableCell>
                         <TableCell className="text-sm">{inv.amount}</TableCell>
                         <TableCell>
@@ -455,8 +500,8 @@ function CustomerDetailPage() {
                   <TableBody>
                     {tickets.map((ticket) => (
                       <TableRow key={ticket.id}>
-                        <TableCell className="text-sm font-medium">{ticket.id}</TableCell>
-                        <TableCell className="text-sm">{ticket.subject}</TableCell>
+                        <TableCell className="text-sm font-medium">{ticket.code}</TableCell>
+                        <TableCell className="text-sm">{ticket.title}</TableCell>
                         <TableCell>
                           <Badge
                             variant={ticket.status === "Open" ? "outline" : "secondary"}
@@ -534,10 +579,5 @@ function CustomerDetailPage() {
    ================================================================ */
 
 export function CustomerLayout() {
-  return (
-    <Routes>
-      <Route index element={<CustomerDetailPage />} />
-      <Route path="edit" element={<CustomerDetailPage />} />
-    </Routes>
-  )
+  return <CustomerDetailPage />
 }

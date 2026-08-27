@@ -69,7 +69,7 @@ const statusBadgeClass: Record<string, string> = {
   Nonaktif: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400",
 }
 
-const TYPE_OPTIONS = ["Hotspot", "PPPoE", "Static IP"]
+const TYPE_OPTIONS = ["PPPoE"]
 const PAGE_SIZE = 8
 
 function formatPrice(n: number): string {

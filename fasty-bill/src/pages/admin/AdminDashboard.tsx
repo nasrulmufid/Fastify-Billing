@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import {
   Area,
   AreaChart,
@@ -10,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { Users, FileText, AlertTriangle, Wallet, Clock } from "lucide-react"
+import { Users, FileText, AlertTriangle, Wallet, Clock, Loader2 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -23,77 +24,47 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useCustomers } from "@/lib/customerStore"
+import api from "@/lib/axios"
+import { useAuthStore } from "@/store/useAppStore"
 
 /* ================================================================
-   Data
+   Types
    ================================================================ */
 
-const stats = [
-  {
-    label: "Total Pelanggan",
-    value: "248",
-    change: "+12% vs bulan lalu",
-    icon: Users,
-    gradient: "from-indigo-500/10 via-indigo-500/5 to-transparent",
-    iconBg: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300",
-  },
-  {
-    label: "Tagihan Tertunggak",
-    value: "31",
-    change: "Rp 4.2 jt overdue",
-    icon: FileText,
-    gradient: "from-amber-500/10 via-amber-500/5 to-transparent",
-    iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300",
-  },
-  {
-    label: "Pelanggan Isolir",
-    value: "9",
-    change: "2 perlu tindakan",
-    icon: AlertTriangle,
-    gradient: "from-rose-500/10 via-rose-500/5 to-transparent",
-    iconBg: "bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300",
-  },
-  {
-    label: "Pemasukan Bulan Ini",
-    value: "Rp 18.4 jt",
-    change: "+8% YoY",
-    icon: Wallet,
-    gradient: "from-emerald-500/10 via-emerald-500/5 to-transparent",
-    iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300",
-  },
-]
+interface DashboardStats {
+  totalCustomers: number
+  unpaidInvoices: number
+  unpaidAmount: number
+  isolatedCustomers: number
+  monthRevenue: number
+}
 
-const revenueTrend = [
-  { date: "1 Ags", revenue: 0.6 },
-  { date: "5 Ags", revenue: 1.4 },
-  { date: "10 Ags", revenue: 3.1 },
-  { date: "15 Ags", revenue: 5.8 },
-  { date: "20 Ags", revenue: 9.2 },
-  { date: "25 Ags", revenue: 13.5 },
-  { date: "30 Ags", revenue: 18.4 },
-]
+interface RevenuePoint {
+  date: string
+  revenue: number
+}
 
-const recentActivity = [
-  { time: "2 menit lalu", activity: "Pembayaran sukses", detail: "Budi Santoso — invoice #INV-1042", status: "success" as const },
-  { time: "12 menit lalu", activity: "Isolir otomatis", detail: "3 pelanggan melewati grace period", status: "warning" as const },
-  { time: "1 jam lalu", activity: "Invoice terbit", detail: "12 invoice bulan Agustus dibuat", status: "info" as const },
-  { time: "3 jam lalu", activity: "Pelanggan baru", detail: "Ahmad Dahlan — Paket 20 Mbps", status: "info" as const },
-  { time: "5 jam lalu", activity: "Pembayaran diterima", detail: "Rizki — invoice #INV-1041", status: "success" as const },
-]
+interface ActivityItem {
+  time: string
+  activity: string
+  detail: string
+  status: "success" | "warning" | "info"
+}
+
+interface InvoiceNearDue {
+  no: string
+  customer: string
+  amount: string
+  due: string
+  daysLeft: number
+  status: "critical" | "warning" | "normal"
+}
 
 const statusVariant: Record<string, string> = {
   success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   info: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
 }
-
-const invoicesNearDue = [
-  { no: "INV-1042", customer: "Budi Santoso", amount: "Rp 250.000", due: "08 Agu 2026", daysLeft: 2, status: "critical" as const },
-  { no: "INV-1041", customer: "Rizki Ramadhan", amount: "Rp 450.000", due: "09 Agu 2026", daysLeft: 3, status: "warning" as const },
-  { no: "INV-1040", customer: "Siti Aminah", amount: "Rp 200.000", due: "12 Agu 2026", daysLeft: 6, status: "warning" as const },
-  { no: "INV-1039", customer: "Ahmad Dahlan", amount: "Rp 300.000", due: "15 Agu 2026", daysLeft: 9, status: "normal" as const },
-  { no: "INV-1038", customer: "Dewi Lestari", amount: "Rp 500.000", due: "18 Agu 2026", daysLeft: 12, status: "normal" as const },
-]
 
 const dueStatusVariant: Record<string, string> = {
   critical: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
@@ -141,6 +112,37 @@ function PieTooltip({ active, payload, total }: any) {
 
 export function AdminDashboard() {
   const customers = useCustomers()
+  const token = useAuthStore((s) => s.token)
+
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [revenueTrend, setRevenueTrend] = useState<RevenuePoint[]>([])
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+  const [invoicesNearDue, setInvoicesNearDue] = useState<InvoiceNearDue[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!token) return
+    const fetchAll = async () => {
+      try {
+        const [statsRes, revRes, actRes] = await Promise.all([
+          api.get("/dashboard/stats", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/dashboard/revenue", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/dashboard/activity", { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+        setStats(statsRes.data.data)
+        setRevenueTrend(revRes.data.data || [])
+        setRecentActivity((actRes.data.data || []).map((a: any) => ({
+          ...a,
+          status: a.action?.includes("isolir") ? "warning" as const : "info" as const,
+        })))
+      } catch (err) {
+        console.error("Gagal memuat dashboard:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchAll()
+  }, [token])
 
   const customerStatusDist = [
     {
@@ -160,6 +162,51 @@ export function AdminDashboard() {
     },
   ]
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16" role="status" aria-label="Memuat dashboard">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  const statCards = stats
+    ? [
+        {
+          label: "Total Pelanggan",
+          value: String(stats.totalCustomers),
+          change: "+12% vs bulan lalu",
+          icon: Users,
+          gradient: "from-indigo-500/10 via-indigo-500/5 to-transparent",
+          iconBg: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300",
+        },
+        {
+          label: "Tagihan Tertunggak",
+          value: String(stats.unpaidInvoices),
+          change: `Rp ${(stats.unpaidAmount / 1_000).toFixed(1)} jt overdue`,
+          icon: FileText,
+          gradient: "from-amber-500/10 via-amber-500/5 to-transparent",
+          iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300",
+        },
+        {
+          label: "Pelanggan Isolir",
+          value: String(stats.isolatedCustomers),
+          change: `${stats.isolatedCustomers} perlu tindakan`,
+          icon: AlertTriangle,
+          gradient: "from-rose-500/10 via-rose-500/5 to-transparent",
+          iconBg: "bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300",
+        },
+        {
+          label: "Pemasukan Bulan Ini",
+          value: `Rp ${(stats.monthRevenue / 1_000_000).toFixed(1)} jt`,
+          change: "+8% YoY",
+          icon: Wallet,
+          gradient: "from-emerald-500/10 via-emerald-500/5 to-transparent",
+          iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300",
+        },
+      ]
+    : []
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -172,7 +219,7 @@ export function AdminDashboard() {
 
       {/* Stat cards */}
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((item) => {
+        {statCards.map((item) => {
           const Icon = item.icon
           return (
             <Card
@@ -208,37 +255,43 @@ export function AdminDashboard() {
             </Badge>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={revenueTrend} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
-                  tickFormatter={(v) => `${v} jt`}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="var(--color-primary)"
-                  strokeWidth={2}
-                  fill="url(#revenueGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {revenueTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={revenueTrend} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+                    tickFormatter={(v) => `${v} jt`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2}
+                    fill="url(#revenueGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                Belum ada data pemasukan
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -296,61 +349,69 @@ export function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* ===== Mobile: kartu per invoice ===== */}
-          <div className="divide-y divide-border sm:hidden">
-            {invoicesNearDue.map((inv) => (
-              <div key={inv.no} className="py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-sm font-medium">{inv.no}</span>
-                  <Badge className={`text-xs ${dueStatusVariant[inv.status] ?? ""}`}>
-                    {inv.status === "critical"
-                      ? `Sisa ${inv.daysLeft} hari`
-                      : `${inv.daysLeft} hari lagi`}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">{inv.customer}</p>
-                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-dashed border-border pt-2 text-sm">
-                  <dt className="text-muted-foreground">Jumlah</dt>
-                  <dd className="text-right font-medium">{inv.amount}</dd>
-                  <dt className="text-muted-foreground">Jatuh Tempo</dt>
-                  <dd className="text-right text-muted-foreground">{inv.due}</dd>
-                </dl>
-              </div>
-            ))}
-          </div>
-          {/* ===== Desktop: tabel ===== */}
-          <div className="hidden sm:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px] text-sm">No. Invoice</TableHead>
-                <TableHead className="text-sm">Pelanggan</TableHead>
-                <TableHead className="w-[120px] text-sm">Jumlah</TableHead>
-                <TableHead className="w-[130px] text-sm">Jatuh Tempo</TableHead>
-                <TableHead className="w-[130px] text-sm">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoicesNearDue.map((inv) => (
-                <TableRow key={inv.no}>
-                  <TableCell className="text-sm font-medium">{inv.no}</TableCell>
-                  <TableCell className="text-sm">{inv.customer}</TableCell>
-                  <TableCell className="text-sm">{inv.amount}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{inv.due}</TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${dueStatusVariant[inv.status] ?? ""}`}>
-                      {inv.status === "critical"
-                        ? `Sisa ${inv.daysLeft} hari`
-                        : inv.status === "warning"
-                          ? `${inv.daysLeft} hari lagi`
+          {invoicesNearDue.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Tidak ada invoice yang mendekati jatuh tempo
+            </div>
+          ) : (
+            <>
+              {/* ===== Mobile: kartu per invoice ===== */}
+              <div className="divide-y divide-border sm:hidden">
+                {invoicesNearDue.map((inv) => (
+                  <div key={inv.no} className="py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium">{inv.no}</span>
+                      <Badge className={`text-xs ${dueStatusVariant[inv.status] ?? ""}`}>
+                        {inv.status === "critical"
+                          ? `Sisa ${inv.daysLeft} hari`
                           : `${inv.daysLeft} hari lagi`}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          </div>
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{inv.customer}</p>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-dashed border-border pt-2 text-sm">
+                      <dt className="text-muted-foreground">Jumlah</dt>
+                      <dd className="text-right font-medium">{inv.amount}</dd>
+                      <dt className="text-muted-foreground">Jatuh Tempo</dt>
+                      <dd className="text-right text-muted-foreground">{inv.due}</dd>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+              {/* ===== Desktop: tabel ===== */}
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[120px] text-sm">No. Invoice</TableHead>
+                      <TableHead className="text-sm">Pelanggan</TableHead>
+                      <TableHead className="w-[120px] text-sm">Jumlah</TableHead>
+                      <TableHead className="w-[130px] text-sm">Jatuh Tempo</TableHead>
+                      <TableHead className="w-[130px] text-sm">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoicesNearDue.map((inv) => (
+                      <TableRow key={inv.no}>
+                        <TableCell className="text-sm font-medium">{inv.no}</TableCell>
+                        <TableCell className="text-sm">{inv.customer}</TableCell>
+                        <TableCell className="text-sm">{inv.amount}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{inv.due}</TableCell>
+                        <TableCell>
+                          <Badge className={`text-xs ${dueStatusVariant[inv.status] ?? ""}`}>
+                            {inv.status === "critical"
+                              ? `Sisa ${inv.daysLeft} hari`
+                              : inv.status === "warning"
+                                ? `${inv.daysLeft} hari lagi`
+                                : `${inv.daysLeft} hari lagi`}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -363,52 +424,60 @@ export function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* ===== Mobile: kartu per aktivitas ===== */}
-          <div className="divide-y divide-border sm:hidden">
-            {recentActivity.map((row, i) => (
-              <div key={i} className="py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-sm font-medium">{row.activity}</span>
-                  <Badge className={`text-xs ${statusVariant[row.status] ?? ""}`}>
-                    {row.status === "success"
-                      ? "Sukses"
-                      : row.status === "warning"
-                        ? "Peringatan"
-                        : "Info"}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">{row.detail}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground/70">{row.time}</p>
+          {recentActivity.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Belum ada aktivitas terkini
+            </div>
+          ) : (
+            <>
+              {/* ===== Mobile: kartu per aktivitas ===== */}
+              <div className="divide-y divide-border sm:hidden">
+                {recentActivity.map((row, i) => (
+                  <div key={i} className="py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium">{row.activity}</span>
+                      <Badge className={`text-xs ${statusVariant[row.status] ?? ""}`}>
+                        {row.status === "success"
+                          ? "Sukses"
+                          : row.status === "warning"
+                            ? "Peringatan"
+                            : "Info"}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{row.detail}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground/70">{row.time}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {/* ===== Desktop: tabel ===== */}
-          <div className="hidden sm:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[140px] text-sm">Waktu</TableHead>
-                <TableHead className="text-sm">Aktivitas</TableHead>
-                <TableHead className="text-sm">Detail</TableHead>
-                <TableHead className="w-[110px] text-sm">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentActivity.map((row, i) => (
-                <TableRow key={i}>
-                  <TableCell className="text-xs text-muted-foreground">{row.time}</TableCell>
-                  <TableCell className="text-sm font-medium">{row.activity}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{row.detail}</TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${statusVariant[row.status] ?? ""}`}>
-                      {row.status === "success" ? "Sukses" : row.status === "warning" ? "Peringatan" : "Info"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          </div>
+              {/* ===== Desktop: tabel ===== */}
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[140px] text-sm">Waktu</TableHead>
+                      <TableHead className="text-sm">Aktivitas</TableHead>
+                      <TableHead className="text-sm">Detail</TableHead>
+                      <TableHead className="w-[110px] text-sm">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentActivity.map((row, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs text-muted-foreground">{row.time}</TableCell>
+                        <TableCell className="text-sm font-medium">{row.activity}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{row.detail}</TableCell>
+                        <TableCell>
+                          <Badge className={`text-xs ${statusVariant[row.status] ?? ""}`}>
+                            {row.status === "success" ? "Sukses" : row.status === "warning" ? "Peringatan" : "Info"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

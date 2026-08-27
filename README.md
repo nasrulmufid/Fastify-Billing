@@ -3,13 +3,16 @@
 A web-based billing and network management application consisting of:
 
 - Backend API built with Fastify + TypeScript
-- Frontend admin dashboard and customer portal built with React + Vite + shadcn/ui
+- Frontend admin dashboard and customer portal built with React + Vite +
+  shadcn/ui
 - Payment integration with SumoPod
-- Management for customers, packages, routers, invoices, bills, tickets, dashboard, and notifications
+- Management for customers, packages, routers, invoices, bills, tickets,
+  dashboard, and notifications
 
 ## Tech Stack
 
 ### Backend
+
 - Node.js 20+
 - Fastify 5
 - TypeScript
@@ -18,6 +21,7 @@ A web-based billing and network management application consisting of:
 - Swagger/OpenAPI
 
 ### Frontend
+
 - React 18+
 - Vite
 - TypeScript
@@ -162,7 +166,7 @@ VITE_API_URL=http://localhost:3000/api
 - Admin dashboard
 - Customer management
 - Package and pricing management
-- Router and hotspot management
+- Router management
 - Invoice and payment processing
 - Payment review and approval flow
 - Ticket management
@@ -203,8 +207,10 @@ npm run preview
 
 - Keep your real `.env` file local and never commit it to Git.
 - Use `.env.example` as a template for other developers.
-- Use the project docs in [Backend.PRD.md](Backend.PRD.md) and [PRD.MD](PRD.MD) for business rules and requirements.
+- Use the project docs in [Backend.PRD.md](Backend.PRD.md) and [PRD.MD](PRD.MD)
+  for business rules and requirements.
 
 ## License
 
-This project is intended for internal or project-specific use unless a separate license is provided.
+This project is intended for internal or project-specific use unless a separate
+license is provided.

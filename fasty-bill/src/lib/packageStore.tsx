@@ -12,7 +12,7 @@ import api from "./axios"
 import { useAuthStore } from "@/store/useAppStore"
 
 /* ---------- types ---------- */
-export type PackageType = "Hotspot" | "PPPoE" | "Static IP"
+export type PackageType = "PPPoE"
 export type PackageStatus = "Aktif" | "Nonaktif"
 
 export interface ServicePackage {
@@ -38,63 +38,8 @@ type Action =
   | { type: "SET_PACKAGES"; payload: ServicePackage[] }
   | { type: "UPSERT_PACKAGE"; payload: ServicePackage }
 
-/* ---------- initial seed ---------- */
-const seed: ServicePackage[] = [
-  {
-    id: "1", code: "PKG-01", name: "Paket 10 Mbps", downloadSpeed: 10, uploadSpeed: 10, price: 150000,
-    type: "Hotspot", status: "Aktif",
-    description: "Paket hemat untuk browsing, media sosial, dan streaming ringan.",
-    createdAt: "10 Januari 2025",
-  },
-  {
-    id: "2", code: "PKG-02", name: "Paket 20 Mbps", downloadSpeed: 20, uploadSpeed: 20, price: 250000,
-    type: "PPPoE", status: "Aktif",
-    description: "Cocok untuk keluarga dengan streaming HD dan video call.",
-    createdAt: "10 Januari 2025",
-  },
-  {
-    id: "3", code: "PKG-03", name: "Paket 30 Mbps", downloadSpeed: 30, uploadSpeed: 30, price: 350000,
-    type: "PPPoE", status: "Aktif",
-    description: "Untuk rumah tangga aktif dengan banyak perangkat terhubung.",
-    createdAt: "15 Februari 2025",
-  },
-  {
-    id: "4", code: "PKG-04", name: "Paket 50 Mbps", downloadSpeed: 50, uploadSpeed: 50, price: 500000,
-    type: "Static IP", status: "Aktif",
-    description: "Kecepatan tinggi dengan IP statis untuk kebutuhan bisnis.",
-    createdAt: "01 Maret 2025",
-  },
-  {
-    id: "5", code: "PKG-05", name: "Paket 75 Mbps", downloadSpeed: 75, uploadSpeed: 75, price: 750000,
-    type: "Static IP", status: "Aktif",
-    description: "Ideal untuk kantor kecil dengan server internal.",
-    createdAt: "20 April 2025",
-  },
-  {
-    id: "6", code: "PKG-06", name: "Paket 100 Mbps", downloadSpeed: 100, uploadSpeed: 100, price: 900000,
-    type: "PPPoE", status: "Aktif",
-    description: "Koneksi sangat cepat untuk streaming 4K dan gaming.",
-    createdAt: "10 Mei 2025",
-  },
-  {
-    id: "7", code: "PKG-07", name: "Paket 150 Mbps", downloadSpeed: 150, uploadSpeed: 150, price: 1200000,
-    type: "Static IP", status: "Nonaktif",
-    description: "Untuk bisnis besar dan hosting server lokal.",
-    createdAt: "01 Juni 2025",
-  },
-  {
-    id: "8", code: "PKG-08", name: "Paket Bisnis 50", downloadSpeed: 50, uploadSpeed: 100, price: 800000,
-    type: "Static IP", status: "Aktif",
-    description: "Upload asimetris untuk kantor dengan cloud sync.",
-    createdAt: "15 Juni 2025",
-  },
-  {
-    id: "9", code: "PKG-09", name: "Paket Hotspot Publik", downloadSpeed: 10, uploadSpeed: 5, price: 100000,
-    type: "Hotspot", status: "Nonaktif",
-    description: "Untuk area publik seperti warung dan taman.",
-    createdAt: "01 Juli 2025",
-  },
-]
+/* ---------- initial seed (kosong — data dimuat dari API) ---------- */
+const seed: ServicePackage[] = []
 
 /* ---------- reducer ---------- */
 function packageReducer(state: ServicePackage[], action: Action): ServicePackage[] {

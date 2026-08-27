@@ -399,10 +399,10 @@ export async function executeImport(
           allocated = row.ipAddress.trim()
         } else {
           const [routerRow] = await q.query(
-            "SELECT ip_pool FROM routers WHERE id = ?",
+            "SELECT ip_pool_pppoe FROM routers WHERE id = ?",
             [routerId],
           ) as Record<string, unknown>[]
-          const pool = routerRow?.ip_pool ? String(routerRow.ip_pool) : ""
+          const pool = routerRow?.ip_pool_pppoe ? String(routerRow.ip_pool_pppoe) : ""
           if (pool) {
             const [base, prefixStr] = pool.split("/")
             const prefix = Number(prefixStr ?? 24)

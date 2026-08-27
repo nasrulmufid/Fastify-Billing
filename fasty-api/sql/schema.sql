@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS packages (
   download_speed INT NOT NULL DEFAULT 10,
   upload_speed INT NOT NULL DEFAULT 10,
   price DECIMAL(12,0) NOT NULL,
-  type ENUM('Hotspot','PPPoE','Static IP') NOT NULL DEFAULT 'PPPoE',
+  type ENUM('PPPoE') NOT NULL DEFAULT 'PPPoE',
   status ENUM('Aktif','Nonaktif') NOT NULL DEFAULT 'Aktif',
   description TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -158,66 +158,6 @@ CREATE TABLE IF NOT EXISTS ticket_timeline (
   note TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_timeline_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- ------------------------------------------------------------
--- hotspot_profiles — profil paket voucher hotspot
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hotspot_profiles (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(120) NOT NULL,
-  duration_hours INT NOT NULL DEFAULT 24,
-  duration_label VARCHAR(40) NOT NULL DEFAULT '1 Hari',
-  price DECIMAL(12,0) NOT NULL,
-  download_speed INT NOT NULL DEFAULT 10,
-  upload_speed INT NOT NULL DEFAULT 10,
-  shared_users INT NOT NULL DEFAULT 1,
-  session_timeout INT NOT NULL DEFAULT 30, -- menit
-  status ENUM('Aktif','Nonaktif') NOT NULL DEFAULT 'Aktif',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- ------------------------------------------------------------
--- hotspot_users — voucher/user hotspot
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hotspot_users (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(80) NOT NULL UNIQUE,
-  password VARCHAR(80) NOT NULL,
-  profile_id BIGINT UNSIGNED NULL,
-  price DECIMAL(12,0) NOT NULL DEFAULT 0,
-  valid_until DATETIME NULL,
-  status ENUM('Aktif','Belum Terpakai','Expired') NOT NULL DEFAULT 'Belum Terpakai',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_hotspot_profile FOREIGN KEY (profile_id) REFERENCES hotspot_profiles(id) ON DELETE SET NULL,
-  INDEX idx_hotspot_username (username)
-) ENGINE=InnoDB;
-
--- ------------------------------------------------------------
--- voucher_templates — template HTML voucher
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS voucher_templates (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(120) NOT NULL,
-  html LONGTEXT NOT NULL,
-  is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- ------------------------------------------------------------
--- hotspot_settings — konfigurasi server hotspot (single-row)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hotspot_settings (
-  id TINYINT UNSIGNED NOT NULL DEFAULT 1 PRIMARY KEY,
-  server_url VARCHAR(255) NULL,
-  api_port INT NULL DEFAULT 8728,
-  api_user VARCHAR(80) NULL DEFAULT 'admin',
-  api_password VARCHAR(120) NULL,
-  company_name VARCHAR(120) NULL DEFAULT 'RTRW Net',
-  currency VARCHAR(10) NULL DEFAULT 'IDR',
-  login_page_url VARCHAR(255) NULL,
-  voucher_prefix VARCHAR(20) NULL DEFAULT '',
-  auto_sync BOOLEAN NOT NULL DEFAULT FALSE
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------

@@ -1,5 +1,5 @@
 /**
- * Smoke test Fase 3 — tickets, hotspot, wa-gateway, notifications, activity-logs, settings, dashboard.
+ * Smoke test Fase 3 — tickets, wa-gateway, notifications, activity-logs, settings, dashboard.
  * Server :3000, DB fresh. Jalankan: npx tsx src/scripts/smoke3.ts
  */
 const BASE = "http://localhost:3000/api"
@@ -41,15 +41,7 @@ async function main() {
   const detail2 = await req(`/tickets/${t.id}`, { token })
   check("timeline bertambah", detail2.json.data?.timeline?.length === (detail.json.data?.timeline?.length ?? 0) + 2)
 
-  // 2. hotspot profiles + generate voucher
-  const profiles = await req("/hotspot/profiles", { token })
-  check("hotspot profiles", profiles.status === 200 && profiles.json.data?.length >= 3, `count=${profiles.json.data?.length}`)
-  const gen = await req("/hotspot/vouchers/generate", { method: "POST", token, body: { count: 5, profileId: 1, price: 10000, format: "ABCD123", usernameEqualsPassword: true, prefix: "" } })
-  const vouchers = gen.json.data ?? []
-  check("generate voucher 5", gen.status === 201 && vouchers.length === 5, `count=${vouchers.length}`)
-  check("voucher username = password", vouchers[0]?.username === vouchers[0]?.password && /^[A-Z]{3}\d{3}$/.test(vouchers[0]?.username ?? ""), vouchers[0]?.username)
-
-  // 3. wa-gateway templates + config + send + status
+  // 2. wa-gateway templates + config + send + status
   const waTpl = await req("/wa-gateway/templates", { token })
   check("wa templates", waTpl.status === 200 && waTpl.json.data?.length >= 3, `count=${waTpl.json.data?.length}`)
   const waCfg = await req("/wa-gateway/config", { method: "PUT", token, body: { serverUrl: "https://api.go-whatsapp.example.com", apiKey: "wa_key_123", deviceName: "Bot", autoReconnect: true } })
@@ -59,7 +51,7 @@ async function main() {
   const send = await req("/wa-gateway/send", { method: "POST", token, body: { to: ["0812-3456-7890"], template: { body: "Halo {nama}, tagihan {no_invoice} sebesar {jumlah}" }, vars: [{ phone: "0812-3456-7890", nama: "Budi", jumlah: "Rp 250.000", no_invoice: "INV-1038" }] } })
   check("wa send", send.status === 200, `sent=${send.json.data?.sent} failed=${send.json.data?.failed}`)
 
-  // 4. notifications list + resend
+  // 3. notifications list + resend
   const notifs = await req("/notifications", { token })
   check("notifications list", notifs.status === 200 && notifs.json.data?.length >= 4, `count=${notifs.json.data?.length}`)
   const failedNotif = notifs.json.data?.find((n: any) => n.status === "Gagal")
@@ -70,12 +62,12 @@ async function main() {
     check("notif resend (skip — tak ada Gagal)", true)
   }
 
-  // 5. activity logs — trigger dulu via isolir (menulis activity_log), lalu cek
+  // 4. activity logs — trigger dulu via isolir (menulis activity_log), lalu cek
   await req("/network/isolir/3", { method: "POST", token, body: { isolate: true } })
   const logs = await req("/activity-logs", { token })
   check("activity logs", logs.status === 200 && logs.json.data?.length >= 1, `count=${logs.json.data?.length}`)
 
-  // 6. settings GET/PUT
+  // 5. settings GET/PUT
   const settings = await req("/settings", { token })
   check("settings GET", settings.status === 200 && settings.json.data?.gracePeriodDays === 7, `grace=${settings.json.data?.gracePeriodDays}`)
   const setPut = await req("/settings", { method: "PUT", token, body: { gracePeriodDays: 10 } })
@@ -83,7 +75,7 @@ async function main() {
   const settings2 = await req("/settings", { token })
   check("settings tersimpan", settings2.json.data?.gracePeriodDays === 10)
 
-  // 7. dashboard
+  // 6. dashboard
   const stats = await req("/dashboard/stats", { token })
   check("dashboard stats", stats.status === 200 && stats.json.data?.totalCustomers >= 30, JSON.stringify(stats.json.data))
   const revenue = await req("/dashboard/revenue", { token })

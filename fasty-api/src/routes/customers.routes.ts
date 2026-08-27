@@ -188,10 +188,10 @@ export async function customersRoutes(app: FastifyInstance) {
       const code = await nextCustomerCode(q.query)
       let allocated = body.ipAddress || ""
       if (!allocated && body.routerId) {
-        const [routerRow] = (await q.query("SELECT ip_pool FROM routers WHERE id = ?", [
+        const [routerRow] = (await q.query("SELECT ip_pool_pppoe FROM routers WHERE id = ?", [
           body.routerId,
         ])) as Record<string, unknown>[]
-        const pool = routerRow?.ip_pool ? String(routerRow.ip_pool) : ""
+        const pool = routerRow?.ip_pool_pppoe ? String(routerRow.ip_pool_pppoe) : ""
         if (pool) {
           allocated = await nextIpFromPool(q.query, pool)
         } else {
@@ -388,8 +388,8 @@ export async function customersRoutes(app: FastifyInstance) {
     // atau fallback ke 192.168.1.x seperti pada pembuatan.
     if ((row.ip_address === null || String(row.ip_address).trim() === "") && (body.routerId || row.router_id)) {
       const routerIdToUse = body.routerId ? Number(body.routerId) : Number(row.router_id)
-      const [routerRow] = (await app.db.query("SELECT ip_pool FROM routers WHERE id = ?", [routerIdToUse])) as Record<string, unknown>[]
-      const pool = routerRow?.ip_pool ? String(routerRow.ip_pool) : ""
+      const [routerRow] = (await app.db.query("SELECT ip_pool_pppoe FROM routers WHERE id = ?", [routerIdToUse])) as Record<string, unknown>[]
+      const pool = routerRow?.ip_pool_pppoe ? String(routerRow.ip_pool_pppoe) : ""
       let allocated = ""
       if (pool) {
         allocated = await nextIpFromPool(app.db.query, pool)
@@ -637,7 +637,7 @@ export async function customersRoutes(app: FastifyInstance) {
 
         const secrets: Array<{ name: string; password: string; profile?: string; disabled: boolean }> = []
         for (const c of list) {
-          // Paket non-PPPoE (Hotspot/Static IP) tidak punya profile rate-limit PPPoE —
+          // Paket non-PPPoE tidak punya profile rate-limit PPPoE —
           // tetap buat secret tanpa profile agar username bisa login (service default).
           let profile: string | undefined
           if (c.package_type === "PPPoE" && c.download_speed && c.upload_speed) {

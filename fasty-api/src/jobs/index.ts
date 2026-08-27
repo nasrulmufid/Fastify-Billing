@@ -128,14 +128,6 @@ export function registerJobs(app: FastifyInstance) {
     }
   })
 
-  // 5. Setiap 15 menit — voucher hotspot kedaluwarsa
-  cron.schedule("*/15 * * * *", async () => {
-    try {
-      await app.db.query(
-        "UPDATE hotspot_users SET status = 'Expired' WHERE status = 'Belum Terpakai' AND valid_until < NOW()",
-      )
-    } catch (err) {
-      app.log.error(err, "Gagal update voucher expired")
-    }
-  })
+  // 5. Setiap 15 menit — hapus job voucher hotspot (sudah tidak digunakan)
+  // TODO: tambahkan job lain jika diperlukan
 }

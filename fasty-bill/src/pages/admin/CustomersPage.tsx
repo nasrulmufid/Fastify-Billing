@@ -459,58 +459,64 @@ export function CustomersPage() {
       />
 
       {/* ---------- Toolbar ---------- */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1 lg:max-w-sm">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Cari nama, ID, atau No HP..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(0)
-            }}
-            className="pl-9"
-          />
+      <div className="space-y-3">
+        {/* Baris 1: Search + Filters */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1 lg:max-w-sm">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Cari nama, ID, atau No HP..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(0)
+              }}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={statusFilter}
+              onValueChange={(val) => {
+                setStatusFilter(val ?? "all")
+                setPage(0)
+              }}
+            >
+              <SelectTrigger className="w-40 text-sm">
+                <SelectValue placeholder="Semua status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua status</SelectItem>
+                <SelectItem value="Active">Aktif</SelectItem>
+                <SelectItem value="Isolated">Isolir</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={packageFilter}
+              onValueChange={(val) => {
+                setPackageFilter(val ?? "all")
+                setPage(0)
+              }}
+            >
+              <SelectTrigger className="w-42 text-sm">
+                <SelectValue placeholder="Semua paket" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua paket</SelectItem>
+                {packages.map((pkg) => (
+                  <SelectItem key={pkg.id} value={pkg.name}>
+                    {pkg.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        {/* Baris 2: Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
-          <Select
-            value={statusFilter}
-            onValueChange={(val) => {
-              setStatusFilter(val ?? "all")
-              setPage(0)
-            }}
-          >
-            <SelectTrigger className="w-[160px] text-sm">
-              <SelectValue placeholder="Semua status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua status</SelectItem>
-              <SelectItem value="Active">Aktif</SelectItem>
-              <SelectItem value="Isolated">Isolir</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={packageFilter}
-            onValueChange={(val) => {
-              setPackageFilter(val ?? "all")
-              setPage(0)
-            }}
-          >
-            <SelectTrigger className="w-[170px] text-sm">
-              <SelectValue placeholder="Semua paket" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua paket</SelectItem>
-              {packages.map((pkg) => (
-                <SelectItem key={pkg.id} value={pkg.name}>
-                  {pkg.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Button variant="outline" onClick={handleSyncCustomers} disabled={syncing}>
             {syncing ? (
               <Loader2 className="mr-1.5 size-4 animate-spin" />
@@ -521,44 +527,48 @@ export function CustomersPage() {
           </Button>
 
           {/* Dropdown Export */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Download className="mr-1.5 size-4" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Export Operations</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleExportExcel}>
-                <Download className="mr-2 size-4" />
-                Export Pelanggan (.xlsx)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="relative">
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button variant="outline" className="shrink-0">
+                  <Download className="mr-1.5 size-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={4}>
+                <DropdownMenuLabel>Export Operations</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleExportExcel}>
+                  <Download className="mr-2 size-4" />
+                  Export Pelanggan (.xlsx)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
           {/* Dropdown Import */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Upload className="mr-1.5 size-4" />
-                Import
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Import Operations</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 size-4" />
-                Import Pelanggan (.xlsx)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDownloadTemplate}>
-                <Download className="mr-2 size-4" />
-                Download Template Import
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="relative">
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button variant="outline" className="shrink-0">
+                  <Upload className="mr-1.5 size-4" />
+                  Import
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={4}>
+                <DropdownMenuLabel>Import Operations</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="mr-2 size-4" />
+                  Import Pelanggan (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadTemplate}>
+                  <Download className="mr-2 size-4" />
+                  Download Template Import
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -568,8 +578,8 @@ export function CustomersPage() {
           />
         </div>
       </div>
-            onChange={handleFileChange}
-          /a Table ---------- */}
+
+      {/* ---------- Table ---------- */}
       <div className="rounded-xl border border-border bg-card">
         {/* ===== Mobile: kartu per pelanggan ===== */}
         <div className="divide-y divide-border sm:hidden">
@@ -591,7 +601,7 @@ export function CustomersPage() {
                   </div>
                   <CustomerRowActions
                     cust={cust}
-                    onDetail={(id) => navigate(`/admin/customers/${id}`)}
+                    onDetail={(id) => navigate(`/admin/pppoe/customers/${id}`)}
                     onEdit={openEditSheet}
                     onEditExpiry={openExpiryDialog}
                     onIsolate={setIsolateTarget}
@@ -643,7 +653,7 @@ export function CustomersPage() {
               <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 Masa Aktif
               </TableHead>
-              <TableHead className="w-[60px] text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+              <TableHead className="w-15 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 <span className="sr-only">Aksi</span>
               </TableHead>
             </TableRow>

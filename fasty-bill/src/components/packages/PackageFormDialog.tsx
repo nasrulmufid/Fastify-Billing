@@ -35,7 +35,7 @@ import {
    Options
    ---------------------------------------------------------------- */
 
-export const PACKAGE_TYPE_OPTIONS = ["Hotspot", "PPPoE", "Static IP"] as const satisfies readonly PackageType[]
+export const PACKAGE_TYPE_OPTIONS = ["PPPoE"] as const satisfies readonly PackageType[]
 
 /* ----------------------------------------------------------------
    Schema

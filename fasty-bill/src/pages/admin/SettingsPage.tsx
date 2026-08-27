@@ -129,12 +129,8 @@ const statusBadge: Record<UserStatus, string> = {
   Nonaktif: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
 }
 
-const seedUsers: SettingsUser[] = [
-  { id: "1", name: "Admin", email: "admin@rtrw.net", role: "super_admin", status: "Aktif", lastLogin: "20 Agu 2026 09:12" },
-  { id: "2", name: "Rina Kusuma", email: "rina@rtrw.net", role: "admin", status: "Aktif", lastLogin: "19 Agu 2026 16:40" },
-  { id: "3", name: "Deni Pratama", email: "deni@rtrw.net", role: "finance", status: "Aktif", lastLogin: "19 Agu 2026 10:05" },
-  { id: "4", name: "Sari Wulandari", email: "sari@rtrw.net", role: "teknisi", status: "Nonaktif", lastLogin: "15 Agu 2026 08:30" },
-]
+/* ---------- initial users (kosong — dimuat dari API) ---------- */
+const seedUsers: SettingsUser[] = []
 
 function getInitials(name: string): string {
   return name

@@ -8,10 +8,10 @@ USE fasty_bill;
 -- packages (PKG-01..04)
 -- ------------------------------------------------------------
 INSERT INTO packages (code, name, download_speed, upload_speed, price, type, status, description) VALUES
-('PKG-01', 'Paket 10 Mbps', 10, 10, 150000, 'Hotspot', 'Aktif', 'Paket hemat untuk browsing, media sosial, dan streaming ringan.'),
+('PKG-01', 'Paket 10 Mbps', 10, 10, 150000, 'PPPoE', 'Aktif', 'Paket hemat untuk browsing, media sosial, dan streaming ringan.'),
 ('PKG-02', 'Paket 20 Mbps', 20, 20, 250000, 'PPPoE', 'Aktif', 'Cocok untuk keluarga dengan streaming HD dan video call.'),
 ('PKG-03', 'Paket 30 Mbps', 30, 30, 350000, 'PPPoE', 'Aktif', 'Untuk rumah dengan banyak perangkat dan gaming online.'),
-('PKG-04', 'Paket 50 Mbps', 50, 50, 500000, 'Static IP', 'Aktif', 'Kecepatan tinggi untuk kebutuhan bisnis dan power user.');
+('PKG-04', 'Paket 50 Mbps', 50, 50, 500000, 'PPPoE', 'Aktif', 'Kecepatan tinggi untuk kebutuhan bisnis dan power user.');
 
 -- ------------------------------------------------------------
 -- routers
@@ -102,34 +102,6 @@ INSERT INTO ticket_timeline (ticket_id, status, actor, note) VALUES
 (1, 'Selesai', 'Admin', 'Koneksi dipulihkan. Masalah pada kabel ODP.'),
 (2, 'Dibuka', 'Sistem', 'Tiket dibuat otomatis oleh sistem.'),
 (2, 'Diproses', 'Teknisi', 'Sedang dilakukan pengecekan upstream.');
-
--- ------------------------------------------------------------
--- hotspot_profiles
--- ------------------------------------------------------------
-INSERT INTO hotspot_profiles (name, duration_hours, duration_label, price, download_speed, upload_speed, shared_users, session_timeout, status) VALUES
-('1 Hari', 24, '1 Hari', 10000, 10, 10, 1, 30, 'Aktif'),
-('3 Hari', 72, '3 Hari', 25000, 20, 20, 1, 30, 'Aktif'),
-('7 Hari', 168, '1 Minggu', 50000, 30, 30, 2, 30, 'Aktif');
-
--- ------------------------------------------------------------
--- hotspot_users (voucher sample)
--- ------------------------------------------------------------
-INSERT INTO hotspot_users (username, password, profile_id, price, valid_until, status) VALUES
-('KLM482', 'KLM482', 1, 10000, '2026-08-21 10:00:00', 'Belum Terpakai'),
-('kjm481', 'kjm481', 2, 25000, '2026-08-23 10:00:00', 'Belum Terpakai'),
-('PRT999', 'abc123XYZ', 3, 50000, '2026-08-20 10:00:00', 'Aktif');
-
--- ------------------------------------------------------------
--- voucher_templates
--- ------------------------------------------------------------
-INSERT INTO voucher_templates (name, html, is_default) VALUES
-('Template Standar', '<h1>{company}</h1><p>Username: {username}</p><p>Password: {password}</p><p>Berlaku: {duration}</p>', TRUE);
-
--- ------------------------------------------------------------
--- hotspot_settings (single row)
--- ------------------------------------------------------------
-INSERT INTO hotspot_settings (id, server_url, api_port, api_user, api_password, company_name, currency, login_page_url, voucher_prefix, auto_sync) VALUES
-(1, 'http://192.168.1.1', 8728, 'admin', '', 'RTRW Net', 'IDR', '', 'HOT-', TRUE);
 
 -- ------------------------------------------------------------
 -- wa_templates (TPL-001..003)

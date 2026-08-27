@@ -8,7 +8,7 @@ import {
   type RouterWarning,
 } from "../services/router.service.js"
 
-const PKG_TYPE_ENUM = z.enum(["Hotspot", "PPPoE", "Static IP"])
+const PKG_TYPE_ENUM = z.enum(["PPPoE"])
 const PKG_STATUS_ENUM = z.enum(["Aktif", "Nonaktif"])
 
 const createPkgSchema = z.object({

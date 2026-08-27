@@ -12,7 +12,6 @@ import { authRoutes } from "./routes/auth.routes.js"
 import { activityLogsRoutes } from "./routes/activity-logs.routes.js"
 import { customersRoutes } from "./routes/customers.routes.js"
 import { dashboardRoutes } from "./routes/dashboard.routes.js"
-import { hotspotRoutes } from "./routes/hotspot.routes.js"
 import { invoicesRoutes } from "./routes/invoices.routes.js"
 import { notificationsRoutes } from "./routes/notifications.routes.js"
 import { packagesRoutes } from "./routes/packages.routes.js"
@@ -71,7 +70,6 @@ export async function buildApp(): Promise<FastifyInstance> {
 
       // Fase 3 — dukungan & operasional
       await api.register(ticketsRoutes)
-      await api.register(hotspotRoutes)
       await api.register(waGatewayRoutes)
       await api.register(notificationsRoutes)
       await api.register(activityLogsRoutes)

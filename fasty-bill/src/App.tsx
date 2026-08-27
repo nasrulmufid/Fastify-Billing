@@ -1,5 +1,12 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom"
 import { Toaster } from "sonner"
+
+// Redirect component that reads :id from source route params
+function CustomerRedirect() {
+  const { id } = useParams<{ id: string }>()
+  if (!id) return <Navigate to="/admin/pppoe/customers" replace />
+  return <Navigate to={`/admin/pppoe/customers/${id}`} replace />
+}
 
 import { AdminLayout } from "@/components/layouts/AdminLayout"
 import { AuthLayout } from "@/components/layouts/AuthLayout"
@@ -10,13 +17,10 @@ import { PackageProvider } from "@/lib/packageStore"
 import { ActivityLogPage } from "@/pages/admin/ActivityLogPage"
 import { AdminDashboard } from "@/pages/admin/AdminDashboard"
 import { CustomerLayout } from "@/pages/admin/CustomerDetail"
-import { CustomersPage } from "@/pages/admin/CustomersPage"
 import { InvoiceCreatePage, InvoiceDetailPage } from "@/pages/admin/InvoiceDetail"
 import { InvoicesPage } from "@/pages/admin/InvoicesPage"
 import { NetworkPage } from "@/pages/admin/NetworkPage"
 import { NotificationsPage } from "@/pages/admin/NotificationsPage"
-import { HotspotPage } from "@/pages/admin/HotspotPage"
-import { PackagesPage } from "@/pages/admin/PackagesPage"
 import { PaymentApprovalPage, PaymentDetailPage } from "@/pages/admin/PaymentDetail"
 import { PaymentsPage } from "@/pages/admin/PaymentsPage"
 import { WAGatewayPage } from "@/pages/admin/WAGatewayPage"
@@ -25,8 +29,6 @@ import { TicketDetailPage } from "@/pages/admin/TicketDetail"
 import { TicketsPage } from "@/pages/admin/TicketsPage"
 import { PppoeCustomersPage } from "@/pages/admin/pppoe/CustomersPage"
 import { PppoePackagesPage } from "@/pages/admin/pppoe/PackagesPage"
-import { ProfilesPage } from "@/pages/admin/hotspot/ProfilesPage"
-import { VouchersPage } from "@/pages/admin/hotspot/VouchersPage"
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage"
 import { LoginPage } from "@/pages/auth/LoginPage"
 import { PortalLoginPage } from "@/pages/auth/PortalLoginPage"
@@ -74,13 +76,10 @@ export function App() {
                 <Route path="pppoe/customers" element={<PppoeCustomersPage />} />
                 <Route path="pppoe/customers/:id/*" element={<CustomerLayout />} />
                 <Route path="pppoe/packages" element={<PppoePackagesPage />} />
-                {/* Hotspot routes */}
-                <Route path="hotspot/profiles" element={<ProfilesPage />} />
-                <Route path="hotspot/vouchers" element={<VouchersPage />} />
                 {/* Legacy routes (redirect) */}
                 <Route path="customers" element={<Navigate to="/admin/pppoe/customers" replace />} />
+                <Route path="customers/:id/*" element={<CustomerRedirect />} />
                 <Route path="packages" element={<Navigate to="/admin/pppoe/packages" replace />} />
-                <Route path="hotspot" element={<Navigate to="/admin/hotspot/profiles" replace />} />
                 {/* Other routes */}
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/new" element={<InvoiceCreatePage />} />

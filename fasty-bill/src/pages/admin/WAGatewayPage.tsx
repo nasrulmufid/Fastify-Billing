@@ -15,6 +15,8 @@ import {
   Plus,
   Clock,
   MessageCircle,
+  Braces,
+  ExternalLink,
   Search,
   ListChecks,
   Filter,
@@ -58,6 +60,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useCustomers } from "@/lib/customerStore"
+import api from "@/lib/axios"
 
 /* ================================================================
    Types & Data
@@ -108,43 +111,8 @@ const defaultApiConfig: ApiConfig = {
   autoReconnect: true,
 }
 
-const defaultTemplates: Template[] = [
-  {
-    id: "TPL-001",
-    name: "Pengingat Tagihan",
-    body: "Halo {nama}, tagihan internet Anda sebesar {jumlah} akan jatuh tempo pada {tanggal}. Segera lakukan pembayaran agar layanan tetap aktif.",
-    createdAt: "12 Jul 2026",
-    updatedAt: "12 Jul 2026",
-  },
-  {
-    id: "TPL-002",
-    name: "Konfirmasi Pembayaran",
-    body: "Pembayaran Anda sebesar {jumlah} untuk invoice {no_invoice} telah kami terima. Terima kasih, layanan tetap aktif.",
-    createdAt: "15 Jul 2026",
-    updatedAt: "20 Jul 2026",
-  },
-  {
-    id: "TPL-003",
-    name: "Notifikasi Isolir",
-    body: "Halo {nama}, layanan internet Anda sementara diisolir karena tagihan belum dibayar. Segera lakukan pembayaran untuk mengaktifkan kembali.",
-    createdAt: "18 Jul 2026",
-    updatedAt: "18 Jul 2026",
-  },
-  {
-    id: "TPL-004",
-    name: "Selamat Datang",
-    body: "Halo {nama}, selamat datang di RT/RW Net! Akun Anda telah aktif dengan paket {paket}. Nikmati layanan internet kami.",
-    createdAt: "1 Agu 2026",
-    updatedAt: "1 Agu 2026",
-  },
-  {
-    id: "TPL-005",
-    name: "Promo Bulanan",
-    body: "Promo spesial bulan ini! Upgrade paket internet Anda dan dapatkan diskon 10%. Hubungi admin untuk info selengkapnya.",
-    createdAt: "3 Agu 2026",
-    updatedAt: "5 Agu 2026",
-  },
-]
+/* ---------- initial templates (kosong — dimuat dari API) ---------- */
+const defaultTemplates: Template[] = []
 
 /* ================================================================
    Tab: Pengaturan API
@@ -414,7 +382,7 @@ function KirimPesanTab() {
   const selectedCustomers = customers.filter((c) => selectedIds.includes(c.id))
   const selectedPhones = selectedCustomers.map((c) => normalizePhone(c.phone)).filter(Boolean)
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const recipients = mode === "single" ? [phone.trim()] : selectedPhones
 
     if (recipients.length === 0 || !recipients[0]) {
@@ -427,18 +395,36 @@ function KirimPesanTab() {
     }
 
     setSending(true)
-    setTimeout(() => {
-      setSending(false)
-      const newLog = recipients.map((p) => ({
-        time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    try {
+      const vars = selectedCustomers.map((customer) => ({
+        phone: customer.phone,
+        nama: customer.name,
+        paket: customer.packageName,
+      }))
+      const { data } = await api.post("/wa-gateway/send", {
+        to: recipients,
+        template: { body: message.trim() },
+        vars: mode === "bulk" ? vars : undefined,
+      })
+      const result = data.data as { sent: number; failed: number }
+      const now = new Date().toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+      const newLog = recipients.map((p, index) => ({
+        time: now,
         phone: p,
-        status: (Math.random() > 0.2 ? "ok" : "fail") as "ok" | "fail",
-        note: Math.random() > 0.2 ? "Terkirim" : "Nomor tidak terdaftar",
+        status: (index < result.sent ? "ok" : "fail") as "ok" | "fail",
+        note: index < result.sent ? "Terkirim" : "Nomor tidak terdaftar",
       }))
       setLog((prev) => [...newLog, ...prev].slice(0, 50))
-      const okCount = newLog.filter((l) => l.status === "ok").length
-      toast.success(`${okCount}/${newLog.length} pesan terkirim`)
-    }, 1200)
+      toast.success(`${result.sent}/${recipients.length} pesan terkirim`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan")
+    } finally {
+      setSending(false)
+    }
   }
 
   const bulkCount = mode === "bulk" ? selectedIds.length : 0
@@ -649,7 +635,7 @@ function KirimPesanTab() {
               placeholder="Tulis pesan WhatsApp di sini…"
             />
             <p className="text-xs text-muted-foreground">
-              Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}
+              Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
             </p>
           </div>
 
@@ -673,6 +659,40 @@ function KirimPesanTab() {
               </>
             )}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Placeholder reference */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Braces className="size-4 text-muted-foreground" />
+            Variabel Pesan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Gunakan variabel berikut di isi pesan. Nilainya diisi otomatis berdasarkan pelanggan dan tagihan terbaru.
+          </p>
+          <div className="grid gap-2 text-xs">
+            {[
+              ["{nama}", "Nama pelanggan"],
+              ["{jumlah}", "Jumlah tagihan"],
+              ["{tanggal}", "Tanggal jatuh tempo"],
+              ["{no_invoice}", "Nomor invoice"],
+              ["{paket}", "Nama paket"],
+              ["{payment_link}", "Link pembayaran QRIS"],
+            ].map(([variable, description]) => (
+              <div key={variable} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+                <code className="font-medium text-primary">{variable}</code>
+                <span className="text-right text-muted-foreground">{description}</span>
+              </div>
+            ))}
+          </div>
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            <ExternalLink className="mt-0.5 size-3 shrink-0" />
+            <span>{"{payment_link}"} berisi link QRIS SumoPod untuk invoice belum lunas.</span>
+          </p>
         </CardContent>
       </Card>
 
@@ -921,7 +941,7 @@ function TemplatePesanTab() {
                 placeholder="Tulis template pesan…"
               />
               <p className="text-xs text-muted-foreground">
-                Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}
+                Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
               </p>
             </div>
           </div>

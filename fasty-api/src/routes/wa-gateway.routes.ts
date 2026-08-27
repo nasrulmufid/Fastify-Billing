@@ -4,6 +4,7 @@ import { z } from "zod"
 import { nextCode } from "../utils/codegen.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
+import { createSumopodPayment } from "../utils/sumopod.js"
 
 const templateSchema = z.object({
   name: z.string().min(1, "Nama template wajib diisi"),
@@ -30,6 +31,7 @@ const sendSchema = z.object({
         tanggal: z.string().optional(),
         no_invoice: z.string().optional(),
         paket: z.string().optional(),
+        payment_link: z.string().optional(),
       }),
     )
     .optional(),
@@ -37,6 +39,40 @@ const sendSchema = z.object({
 
 function fillPlaceholders(body: string, vars: Record<string, string>): string {
   return body.replace(/\{(\w+)\}/g, (_m, key) => vars[key] ?? "")
+}
+
+async function createInvoicePaymentLink(
+  app: FastifyInstance,
+  invoice: Record<string, unknown>,
+  apiKey: string,
+): Promise<string> {
+  const [existing] = (await app.db.query(
+    "SELECT * FROM payments WHERE invoice_id = ? AND status = 'Pending' ORDER BY id DESC LIMIT 1",
+    [invoice.invoice_id],
+  )) as Record<string, unknown>[]
+  let payment = existing
+  if (!payment) {
+    const code = await app.db.transaction(async (q) => nextCode(q.query, "payments", "PY-"))
+    const result = (await app.db.query(
+      "INSERT INTO payments (code, customer_id, invoice_id, method, amount, status) VALUES (?, ?, ?, 'QRIS', ?, 'Pending')",
+      [code, invoice.customer_id, invoice.invoice_id, Number(invoice.amount)],
+    )) as unknown as { insertId: number }
+    const [createdPayment] = (await app.db.query("SELECT * FROM payments WHERE id = ?", [
+      result.insertId,
+    ])) as Record<string, unknown>[]
+    payment = createdPayment
+  }
+
+  const created = await createSumopodPayment({
+    orderId: String(payment.code),
+    amount: Number(invoice.amount),
+    apiKey,
+  })
+  await app.db.query("UPDATE payments SET gateway_ref = ? WHERE id = ?", [
+    created.paymentId,
+    payment.id,
+  ])
+  return created.paymentLinkUrl
 }
 
 export async function waGatewayRoutes(app: FastifyInstance) {
@@ -154,6 +190,22 @@ export async function waGatewayRoutes(app: FastifyInstance) {
   // POST /wa-gateway/send — kirim pesan single/bulk + tulis notification_logs
   app.post("/wa-gateway/send", superOnly, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = sendSchema.parse(req.body)
+    const needsPaymentLink = body.template.body.includes("{payment_link}")
+    let paymentGatewayApiKey = ""
+    if (needsPaymentLink) {
+      const [paymentConfig] = (await app.db.query(
+        "SELECT api_key FROM payment_gateway_config WHERE id = 1",
+      )) as Record<string, unknown>[]
+      paymentGatewayApiKey = decryptSecret(String(paymentConfig?.api_key ?? ""))
+      if (!paymentGatewayApiKey) {
+        return reply.code(400).send({
+          error: {
+            code: "NOT_CONFIGURED",
+            message: "Payment gateway QRIS belum dikonfigurasi oleh admin",
+          },
+        })
+      }
+    }
     const varsByPhone = new Map<string, Record<string, string>>()
     for (const v of body.vars ?? []) {
       varsByPhone.set(normalizePhone(v.phone), {
@@ -162,6 +214,7 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         tanggal: v.tanggal ?? "",
         no_invoice: v.no_invoice ?? "",
         paket: v.paket ?? "",
+        payment_link: v.payment_link ?? "",
       })
     }
 
@@ -169,7 +222,25 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     let failed = 0
     for (const rawPhone of body.to) {
       const phone = normalizePhone(rawPhone)
-      const vars = varsByPhone.get(phone) ?? {}
+      const vars = { ...(varsByPhone.get(phone) ?? {}) }
+      const [invoiceData] = (await app.db.query(
+        `SELECT c.name, p.name AS package_name, i.id AS invoice_id, i.code AS invoice_code,
+                i.amount, i.due_at
+         FROM customers c
+         LEFT JOIN packages p ON p.id = c.package_id
+         LEFT JOIN invoices i ON i.customer_id = c.id AND i.status IN ('Unpaid', 'Overdue')
+         WHERE c.phone LIKE ?
+         ORDER BY i.id DESC LIMIT 1`,
+        [`%${phone.replace(/^62/, "0")}%`],
+      )) as Record<string, unknown>[]
+      vars.nama ||= String(invoiceData?.name ?? "")
+      vars.jumlah ||= invoiceData?.amount == null ? "" : String(invoiceData.amount)
+      vars.tanggal ||= String(invoiceData?.due_at ?? "")
+      vars.no_invoice ||= String(invoiceData?.invoice_code ?? "")
+      vars.paket ||= String(invoiceData?.package_name ?? "")
+      if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
+        vars.payment_link = await createInvoicePaymentLink(app, invoiceData, paymentGatewayApiKey)
+      }
       const message = fillPlaceholders(body.template.body, vars)
       // Simulasi kirim — tulis notification_logs
       const ok = Math.random() > 0.2
