@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCustomers } from "@/lib/customerStore"
 import api from "@/lib/axios"
 import { useAuthStore } from "@/store/useAppStore"
@@ -60,6 +61,15 @@ interface InvoiceNearDue {
   status: "critical" | "warning" | "normal"
 }
 
+type RevenuePeriod = 1 | 6 | 12
+
+function formatRevenue(valueInMillions: number): string {
+  if (valueInMillions > 0 && valueInMillions < 1) {
+    return `${Math.round(valueInMillions * 1_000).toLocaleString("id-ID")} rb`
+  }
+  return `${valueInMillions.toLocaleString("id-ID")} jt`
+}
+
 const statusVariant: Record<string, string> = {
   success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
@@ -81,7 +91,7 @@ function CustomTooltip({ active, payload, label }: any) {
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-md">
       <p className="font-medium">{label}</p>
-      <p className="text-primary">Rp {payload[0].value} jt</p>
+      <p className="text-primary">Rp {formatRevenue(Number(payload[0].value))}</p>
     </div>
   )
 }
@@ -118,19 +128,19 @@ export function AdminDashboard() {
   const [revenueTrend, setRevenueTrend] = useState<RevenuePoint[]>([])
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [invoicesNearDue, setInvoicesNearDue] = useState<InvoiceNearDue[]>([])
+  const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>(12)
+  const [revenueLoading, setRevenueLoading] = useState(true)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!token) return
     const fetchAll = async () => {
       try {
-        const [statsRes, revRes, actRes] = await Promise.all([
+        const [statsRes, actRes] = await Promise.all([
           api.get("/dashboard/stats", { headers: { Authorization: `Bearer ${token}` } }),
-          api.get("/dashboard/revenue", { headers: { Authorization: `Bearer ${token}` } }),
           api.get("/dashboard/activity", { headers: { Authorization: `Bearer ${token}` } }),
         ])
         setStats(statsRes.data.data)
-        setRevenueTrend(revRes.data.data || [])
         setRecentActivity((actRes.data.data || []).map((a: any) => ({
           ...a,
           status: a.action?.includes("isolir") ? "warning" as const : "info" as const,
@@ -143,6 +153,25 @@ export function AdminDashboard() {
     }
     fetchAll()
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    const fetchRevenue = async () => {
+      setRevenueLoading(true)
+      try {
+        const response = await api.get(`/dashboard/revenue?months=${revenuePeriod}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        setRevenueTrend(response.data.data || [])
+      } catch (err) {
+        console.error("Gagal memuat tren pemasukan:", err)
+        setRevenueTrend([])
+      } finally {
+        setRevenueLoading(false)
+      }
+    }
+    fetchRevenue()
+  }, [token, revenuePeriod])
 
   const customerStatusDist = [
     {
@@ -248,14 +277,30 @@ export function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-lg font-semibold">Tren Pemasukan</CardTitle>
-              <p className="text-sm text-muted-foreground">30 hari terakhir (juta Rupiah)</p>
+              <p className="text-sm text-muted-foreground">
+                {revenuePeriod === 1 ? "1 bulan terakhir" : `${revenuePeriod} bulan terakhir`} (Rupiah)
+              </p>
             </div>
-            <Badge variant="outline" className="text-xs font-normal">
-              +8% YoY
-            </Badge>
+            <Select
+              value={String(revenuePeriod)}
+              onValueChange={(value) => setRevenuePeriod(Number(value) as RevenuePeriod)}
+            >
+              <SelectTrigger className="h-8 w-30 text-xs" aria-label="Periode grafik pemasukan">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 Bulan</SelectItem>
+                <SelectItem value="6">6 Bulan</SelectItem>
+                <SelectItem value="12">12 Bulan</SelectItem>
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
-            {revenueTrend.length > 0 ? (
+            {revenueLoading ? (
+              <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                Memuat data pemasukan...
+              </div>
+            ) : revenueTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={revenueTrend} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
                   <defs>
@@ -275,7 +320,7 @@ export function AdminDashboard() {
                     tickLine={false}
                     axisLine={false}
                     tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
-                    tickFormatter={(v) => `${v} jt`}
+                    tickFormatter={(v) => formatRevenue(Number(v))}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Area

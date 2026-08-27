@@ -383,7 +383,7 @@ export async function recordRouterWarning(
       (await import("../utils/codegen.js")).nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 }),
     )
     await app.db.query(
-      "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'router', ?, 'Sistem', 'Gagal', ?)",
+      "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'router', ?, 'WhatsApp', 'Gagal', ?)",
       [ntCode, opts.customerId ?? null, opts.warning.message],
     )
     await app.db.query("INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Gagal sinkron Mikrotik', ?)", [

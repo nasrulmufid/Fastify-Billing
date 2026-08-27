@@ -13,8 +13,8 @@ import { recordRouterWarning, withRouter, type RouterWarning } from "./router.se
  * HARUS dipanggil di dalam app.db.transaction(fn) — argumen `q`.
  * Idempotent: jika payment sudah Sukses, tidak dieksekusi ulang.
  *
- * `app` bersifat opsional: bila diberikan, setelah transaksi commit akan
- * mencoba enable secret PPPoE di Mikrotik (bila customer punya router).
+ * `app` bersifat opsional: bila diberikan, akan mencoba enable secret PPPoE
+ * di Mikrotik (bila customer punya router).
  * Kegagalan router dikembalikan sebagai `warning` (tidak membatalkan pembayaran).
  */
 export async function completePaymentFlow(
@@ -87,22 +87,53 @@ export async function completePaymentFlow(
     String(payment.code),
   ])
 
-  // 6) Sinkron ke Mikrotik: enable secret PPPoE (setelah transaksi DB commit)
-  let warning: RouterWarning | undefined
+  // Router adalah side effect; jalankan setelah transaksi selesai agar router
+  // offline tidak menahan atau menggagalkan pembayaran.
   if (app && customer?.router_id && customer?.pppoe_username) {
-    const res = await withRouter(app, customer.router_id as number, async (client) => {
-      await client.setSecretDisabled(String(customer.pppoe_username), false)
-    })
-    if (!res.ok) {
-      warning = res.warning
-      await recordRouterWarning(app, {
-        routerId: Number(customer.router_id),
-        customerId: Number(customer.id),
-        action: "Pembayaran sukses — enable secret",
-        warning: res.warning,
+    setImmediate(() => {
+      void syncRouterAfterPayment(app, customer, method).catch((err) => {
+        app.log.error(err, "Gagal sinkron router setelah pembayaran")
       })
-    }
+    })
   }
 
-  return { payment: { ...payment, status: "Sukses" }, invoice, warning }
+  return { payment: { ...payment, status: "Sukses" }, invoice }
+}
+
+export async function syncRouterAfterPayment(
+  app: FastifyInstance,
+  customer: Record<string, unknown>,
+  method: "QRIS" | "Tunai" | "Transaksi" = "Transaksi",
+): Promise<boolean> {
+  const [pkg] = (await app.db.query(
+    "SELECT name, download_speed, upload_speed FROM packages WHERE id = ?",
+    [customer.package_id],
+  )) as Record<string, unknown>[]
+  if (!pkg?.name || !pkg.download_speed || !pkg.upload_speed) {
+    app.log.warn({ customerId: customer.id }, "Profile paket tidak tersedia untuk sinkronisasi router")
+    return false
+  }
+
+  const res = await withRouter(app, customer.router_id as number, async (client) => {
+    const profile = await client.ensurePppProfile({
+      name: String(pkg.name),
+      downloadSpeed: Number(pkg.download_speed),
+      uploadSpeed: Number(pkg.upload_speed),
+    })
+    await client.changePppProfile({
+      name: String(customer.pppoe_username),
+      password: String(customer.pppoe_password ?? ""),
+      profile,
+    })
+  })
+  if (!res.ok) {
+    await recordRouterWarning(app, {
+      routerId: Number(customer.router_id),
+      customerId: Number(customer.id),
+      action: `Router offline — pembayaran ${method}`,
+      warning: res.warning,
+    })
+    return false
+  }
+  return true
 }

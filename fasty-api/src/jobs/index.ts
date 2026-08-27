@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify"
 import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { recordRouterWarning, withRouter } from "../services/router.service.js"
+import { syncRouterAfterPayment } from "../services/payment.service.js"
 
 /**
  * Scheduler (node-cron) — sesuai Backend.PRD.md bagian 10.
@@ -125,6 +126,39 @@ export function registerJobs(app: FastifyInstance) {
       app.log.info({ count: invoices.length }, "Reminder tagihan dikirim")
     } catch (err) {
       app.log.error(err, "Gagal kirim reminder")
+    }
+  })
+
+  // Setiap 5 menit — coba ulang sinkronisasi pembayaran yang gagal karena router offline
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      const customers = (await app.db.query(
+        `SELECT DISTINCT c.*
+         FROM customers c
+         JOIN notification_logs n ON n.customer_id = c.id
+         WHERE n.type = 'router' AND n.status = 'Gagal'
+           AND n.error LIKE 'Gagal menghubungi%'
+           AND c.status = 'Active'
+           AND c.router_id IS NOT NULL
+           AND c.pppoe_username IS NOT NULL`,
+      )) as Record<string, unknown>[]
+
+      for (const customer of customers) {
+        const synced = await syncRouterAfterPayment(app, customer, "Transaksi")
+        if (synced) {
+          await app.db.query(
+            "UPDATE notification_logs SET status = 'Terkirim', error = NULL WHERE type = 'router' AND status = 'Gagal' AND customer_id = ?",
+            [customer.id],
+          )
+          await app.db.query(
+            "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Sinkronisasi router berhasil', ?)",
+            [String(customer.name ?? customer.id)],
+          )
+        }
+      }
+      if (customers.length > 0) app.log.info({ count: customers.length }, "Retry sinkronisasi router selesai")
+    } catch (err) {
+      app.log.error(err, "Gagal retry sinkronisasi router")
     }
   })
 

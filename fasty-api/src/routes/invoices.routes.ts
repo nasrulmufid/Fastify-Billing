@@ -101,7 +101,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     return reply.code(201).send({ data: mapInvoice(row) })
   })
 
-  // POST /invoices/:id/mark-paid — pembayaran TunaI (transaksi)
+  // POST /invoices/:id/mark-paid — pembayaran manual (transaksi)
   app.post("/invoices/:id/mark-paid", auth, async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string }
     const body = markPaidSchema.parse(req.body)
@@ -121,14 +121,14 @@ export async function invoicesRoutes(app: FastifyInstance) {
         throw err
       }
 
-      // buat payment Tunai (status Pending — nanti diselesaikan completePaymentFlow)
+      // Buat payment lalu selesaikan dalam transaksi yang sama.
       const pyCode = await nextCode(q.query, "payments", "PY-")
       const pRes = (await q.query(
-        "INSERT INTO payments (code, customer_id, invoice_id, method, amount, paid_at, status) VALUES (?, ?, ?, 'Tunai', ?, ?, 'Pending')",
-        [pyCode, invoice.customer_id, invoice.id, invoice.amount, toDbDateTime(new Date())],
+        "INSERT INTO payments (code, customer_id, invoice_id, method, amount, paid_at, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')",
+        [pyCode, invoice.customer_id, invoice.id, body.method, invoice.amount, toDbDateTime(new Date())],
       )) as unknown as { insertId: number }
 
-      return completePaymentFlow(q, pRes.insertId, "Tunai", "Admin", app)
+      return completePaymentFlow(q, pRes.insertId, body.method, "Admin", app)
     })
 
     return reply.send({ data: result })

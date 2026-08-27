@@ -232,7 +232,7 @@ export function AdminLayout() {
         <Separator />
 
         {/* Navigation */}
-        <ScrollArea className={cn("flex-1 py-4", sidebarCollapsed ? "px-2" : "px-3")}>
+        <ScrollArea className={cn("min-h-0 flex-1 py-4", sidebarCollapsed ? "px-2" : "px-3")}>
           <nav className={cn("space-y-4", sidebarCollapsed && "space-y-1")}>
             {navGroups.map((group) => (
               <NavGroupSection

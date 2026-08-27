@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify"
+import { z } from "zod"
 
 import { fromISODate, formatIdDate } from "../utils/date.js"
 
@@ -24,12 +25,17 @@ export async function dashboardRoutes(app: FastifyInstance) {
     })
   })
 
-  // GET /dashboard/revenue — tren pemasukan (7-12 titik)
+  // GET /dashboard/revenue — tren pemasukan berdasarkan periode
   app.get("/dashboard/revenue", auth, async (req, reply: FastifyReply) => {
+    const { months } = z.object({
+      months: z.coerce.number().refine((value) => [1, 6, 12].includes(value), "Periode tidak valid").default(12),
+    }).parse(req.query)
+    const groupBy = months === 1 ? "DATE(paid_at)" : "DATE_FORMAT(paid_at, '%Y-%m-01')"
     const rows = (await app.db.query(
-      `SELECT DATE(paid_at) AS date, COALESCE(SUM(amount),0) AS revenue
-       FROM payments WHERE status = 'Sukses'
-       GROUP BY DATE(paid_at) ORDER BY date ASC LIMIT 30`,
+      `SELECT ${groupBy} AS date, COALESCE(SUM(amount),0) AS revenue
+       FROM payments
+       WHERE status = 'Sukses' AND paid_at >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+       GROUP BY ${groupBy} ORDER BY date ASC`,
     )) as Record<string, unknown>[]
     return reply.send({
       data: rows.map((r) => ({
