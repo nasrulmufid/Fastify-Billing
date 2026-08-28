@@ -3,8 +3,10 @@ import type { FastifyInstance } from "fastify"
 
 import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
+import { fillPlaceholders } from "../utils/template.js"
 import { recordRouterWarning, withRouter } from "../services/router.service.js"
 import { syncRouterAfterPayment } from "../services/payment.service.js"
+import { getReminderTemplate, sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
 
 /**
  * Scheduler (node-cron) — sesuai Backend.PRD.md bagian 10.
@@ -35,8 +37,8 @@ export function registerJobs(app: FastifyInstance) {
     }
   })
 
-  // 2. Setiap hari 01:00 — tandai invoice lewat jatuh tempo -> Overdue
-  cron.schedule("0 1 * * *", async () => {
+  // 2. Setiap hari 08:00 — tandai invoice lewat jatuh tempo -> Overdue
+  cron.schedule("0 8 * * *", async () => {
     try {
       await app.db.query("UPDATE invoices SET status = 'Overdue' WHERE status = 'Unpaid' AND due_at < CURRENT_DATE()")
       app.log.info("Invoice overdue ditandai")
@@ -63,18 +65,30 @@ export function registerJobs(app: FastifyInstance) {
         ])
         // Buat notifikasi untuk setiap customer yang terisolir + ubah profile ke ISOLIR di router
         const isolated = (await app.db.query(
-          `SELECT c.id AS customer_id, c.name AS customer_name, c.router_id, c.pppoe_username, c.pppoe_password
+          `SELECT c.id AS customer_id, c.name AS customer_name, c.phone, c.router_id, c.pppoe_username, c.pppoe_password
            FROM customers WHERE status = 'Isolated' AND expiry_at < DATE_SUB(CURRENT_DATE(), INTERVAL ? DAY)`,
           [grace],
         )) as Record<string, unknown>[]
         for (const cust of isolated) {
+          // Kirim pesan notifikasi isolir via template WA
+          const isoTemplate = await getReminderTemplate(app, "isolir")
+          const isoVars: Record<string, string> = {
+            nama: String(cust.customer_name ?? ""),
+            jumlah: "",
+            tanggal: "",
+          }
+          const isoMessage = fillPlaceholders(isoTemplate.body, isoVars)
+          const isoResult = await sendWhatsAppMessage(app, { phone: String(cust.phone ?? ""), message: isoMessage })
           const ntCode = await app.db.transaction(async (q) =>
             nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 }),
           )
           await app.db.query(
-            "INSERT INTO notification_logs (code, type, customer_id, channel, status) VALUES (?, 'isolir', ?, 'WhatsApp', 'Terkirim')",
-            [ntCode, cust.customer_id],
+            "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'isolir', ?, 'WhatsApp', ?, ?)",
+            [ntCode, cust.customer_id, isoResult.ok ? "Terkirim" : "Gagal", isoResult.ok ? null : isoResult.error],
           )
+          if (!isoResult.ok) {
+            app.log.warn({ customerId: cust.customer_id, error: isoResult.error }, "Gagal kirim notif isolir WA")
+          }
           // Sinkron ke Mikrotik: ubah profile ke ISOLIR dengan ip-pool isolir
           if (cust.router_id && cust.pppoe_username) {
             const res = await withRouter(app, cust.router_id as number, async (client) => {
@@ -106,27 +120,94 @@ export function registerJobs(app: FastifyInstance) {
     }
   })
 
-  // 4. Setiap hari 08:00 — reminder tagihan H-3
-  cron.schedule("0 8 * * *", async () => {
+  // Helper: kirim reminder tagihan massal berdasarkan tipe (H-7/H-3/H-1) dengan jeda tiap 5 pesan
+  async function sendReminderBatch(type: "h7" | "h3" | "h1", intervalDays: number) {
     try {
       const invoices = (await app.db.query(
-        `SELECT i.*, c.name AS customer_name, c.phone FROM invoices i
+        `SELECT i.id AS invoice_id, i.code AS invoice_code, i.amount, i.due_at,
+                c.id AS customer_id, c.name AS customer_name, c.phone, p.name AS package_name
+         FROM invoices i
          JOIN customers c ON c.id = i.customer_id
-         WHERE i.status = 'Unpaid' AND i.due_at BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 3 DAY)`,
+         LEFT JOIN packages p ON p.id = c.package_id
+         WHERE i.status = 'Unpaid' AND i.due_at BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)`,
+        [intervalDays],
       )) as Record<string, unknown>[]
-      for (const inv of invoices) {
+
+      if (invoices.length === 0) {
+        app.log.info({ type }, "Tidak ada invoice yang perlu di-reminder")
+        return
+      }
+
+      const template = await getReminderTemplate(app, type)
+      const needsPaymentLink = template.body.includes("{payment_link}")
+      let sent = 0
+      let failed = 0
+
+      for (let idx = 0; idx < invoices.length; idx++) {
+        const inv = invoices[idx]
+        const phone = String(inv.phone ?? "")
+        const vars: Record<string, string> = {
+          nama: String(inv.customer_name ?? ""),
+          jumlah: inv.amount == null ? "" : String(inv.amount),
+          tanggal: String(inv.due_at ?? ""),
+          no_invoice: String(inv.invoice_code ?? ""),
+          paket: String(inv.package_name ?? ""),
+        }
+        // Buat payment link per-invoice bila template membutuhkannya
+        if (needsPaymentLink) {
+          try {
+            const link = await buildPaymentLinkForInvoice(app, {
+              invoice_id: Number(inv.invoice_id),
+              customer_id: Number(inv.customer_id),
+              amount: Number(inv.amount),
+            })
+            if (link) vars.payment_link = link
+          } catch (err) {
+            app.log.warn({ invoiceId: inv.invoice_id, error: String(err) }, "Gagal buat payment link")
+          }
+        }
+        const message = fillPlaceholders(template.body, vars)
+
+        const result = await sendWhatsAppMessage(app, { phone, message })
         const ntCode = await app.db.transaction(async (q) =>
           nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 }),
         )
         await app.db.query(
-          "INSERT INTO notification_logs (code, type, customer_id, channel, status) VALUES (?, 'reminder', ?, 'WhatsApp', 'Terkirim')",
-          [ntCode, inv.customer_id],
+          "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'reminder', ?, 'WhatsApp', ?, ?)",
+          [ntCode, inv.customer_id, result.ok ? "Terkirim" : "Gagal", result.ok ? null : result.error],
         )
+
+        if (result.ok) sent++
+        else {
+          failed++
+          app.log.warn({ customerId: inv.customer_id, error: result.error }, "Gagal kirim reminder WA")
+        }
+
+        // Jeda antar-batch: setiap 5 pesan dikirim, beri jeda agar tidak membanjiri gateway pihak ketiga
+        if ((idx + 1) % 5 === 0 && idx + 1 < invoices.length) {
+          await sleep(1000)
+        }
       }
-      app.log.info({ count: invoices.length }, "Reminder tagihan dikirim")
+
+      app.log.info({ type, total: invoices.length, sent, failed }, "Reminder tagihan dikirim")
     } catch (err) {
       app.log.error(err, "Gagal kirim reminder")
     }
+  }
+
+  // 4a. Setiap hari 08:05 — reminder tagihan H-7 (setelah job overdue jam 08:00)
+  cron.schedule("5 8 * * *", async () => {
+    await sendReminderBatch("h7", 7)
+  })
+
+  // 4b. Setiap hari 08:10 — reminder tagihan H-3
+  cron.schedule("10 8 * * *", async () => {
+    await sendReminderBatch("h3", 3)
+  })
+
+  // 4c. Setiap hari 08:15 — reminder tagihan H-1
+  cron.schedule("15 8 * * *", async () => {
+    await sendReminderBatch("h1", 1)
   })
 
   // Setiap 5 menit — coba ulang sinkronisasi pembayaran yang gagal karena router offline

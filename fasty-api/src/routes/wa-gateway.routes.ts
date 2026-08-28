@@ -4,7 +4,8 @@ import { z } from "zod"
 import { nextCode } from "../utils/codegen.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
-import { createSumopodPayment } from "../utils/sumopod.js"
+import { fillPlaceholders } from "../utils/template.js"
+import { sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
 
 const templateSchema = z.object({
   name: z.string().min(1, "Nama template wajib diisi"),
@@ -36,44 +37,6 @@ const sendSchema = z.object({
     )
     .optional(),
 })
-
-function fillPlaceholders(body: string, vars: Record<string, string>): string {
-  return body.replace(/\{(\w+)\}/g, (_m, key) => vars[key] ?? "")
-}
-
-async function createInvoicePaymentLink(
-  app: FastifyInstance,
-  invoice: Record<string, unknown>,
-  apiKey: string,
-): Promise<string> {
-  const [existing] = (await app.db.query(
-    "SELECT * FROM payments WHERE invoice_id = ? AND status = 'Pending' ORDER BY id DESC LIMIT 1",
-    [invoice.invoice_id],
-  )) as Record<string, unknown>[]
-  let payment = existing
-  if (!payment) {
-    const code = await app.db.transaction(async (q) => nextCode(q.query, "payments", "PY-"))
-    const result = (await app.db.query(
-      "INSERT INTO payments (code, customer_id, invoice_id, method, amount, status) VALUES (?, ?, ?, 'QRIS', ?, 'Pending')",
-      [code, invoice.customer_id, invoice.invoice_id, Number(invoice.amount)],
-    )) as unknown as { insertId: number }
-    const [createdPayment] = (await app.db.query("SELECT * FROM payments WHERE id = ?", [
-      result.insertId,
-    ])) as Record<string, unknown>[]
-    payment = createdPayment
-  }
-
-  const created = await createSumopodPayment({
-    orderId: String(payment.code),
-    amount: Number(invoice.amount),
-    apiKey,
-  })
-  await app.db.query("UPDATE payments SET gateway_ref = ? WHERE id = ?", [
-    created.paymentId,
-    payment.id,
-  ])
-  return created.paymentLinkUrl
-}
 
 export async function waGatewayRoutes(app: FastifyInstance) {
   const superOnly = {
@@ -239,27 +202,35 @@ export async function waGatewayRoutes(app: FastifyInstance) {
       vars.no_invoice ||= String(invoiceData?.invoice_code ?? "")
       vars.paket ||= String(invoiceData?.package_name ?? "")
       if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
-        vars.payment_link = await createInvoicePaymentLink(app, invoiceData, paymentGatewayApiKey)
+        vars.payment_link = (await buildPaymentLinkForInvoice(app, {
+          invoice_id: Number(invoiceData.invoice_id),
+          customer_id: Number(invoiceData.customer_id ?? 0),
+          amount: Number(invoiceData.amount ?? 0),
+        })) ?? ""
       }
       const message = fillPlaceholders(body.template.body, vars)
-      // Simulasi kirim — tulis notification_logs
-      const ok = Math.random() > 0.2
+      const result = await sendWhatsAppMessage(app, { phone: rawPhone, message })
       const ntCode = await app.db.transaction(async (q) => {
         return nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 })
       })
       const [cust] = (await app.db.query("SELECT id FROM customers WHERE phone LIKE ? LIMIT 1", [
         `%${phone.replace(/^62/, "0")}%`,
       ])) as Record<string, unknown>[]
-      if (ok) {
+      if (result.ok) {
         sent++
       } else {
         failed++
+        app.log.warn({ phone, error: result.error }, "Gagal kirim WA (manual)")
       }
       await app.db.query(
         "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'reminder', ?, 'WhatsApp', ?, ?)",
-        [ntCode, cust?.id ?? null, ok ? "Terkirim" : "Gagal", ok ? null : "Nomor tidak terdaftar"],
+        [ntCode, cust?.id ?? null, result.ok ? "Terkirim" : "Gagal", result.ok ? null : result.error],
       )
-      void message
+
+      // Jeda antar-batch: setiap 5 pesan dikirim, beri jeda agar tidak membanjiri gateway pihak ketiga
+      if (sent + failed > 0 && (sent + failed) % 5 === 0) {
+        await sleep(1000)
+      }
     }
     return reply.send({ data: { sent, failed } })
   })

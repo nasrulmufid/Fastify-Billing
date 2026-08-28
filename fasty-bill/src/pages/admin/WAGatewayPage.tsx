@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
   Send,
@@ -66,18 +66,16 @@ import api from "@/lib/axios"
    Types & Data
    ================================================================ */
 
-type CustomerStatus = "Active" | "Isolated" | "Pending"
+type CustomerStatus = "Active" | "Isolated"
 
 const statusLabel: Record<CustomerStatus, string> = {
   Active: "Aktif",
   Isolated: "Isolir",
-  Pending: "Pending",
 }
 
 const statusBadgeClass: Record<CustomerStatus, string> = {
   Active: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   Isolated: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
-  Pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
 }
 
 /** Ubah "0812-3456-7890" → "6281234567890" */
@@ -331,8 +329,29 @@ function KirimPesanTab() {
   const [templateId, setTemplateId] = useState("")
   const [sending, setSending] = useState(false)
   const [log, setLog] = useState<{ time: string; phone: string; status: "ok" | "fail"; note: string }[]>([])
+  const [templates, setTemplates] = useState<Template[]>(defaultTemplates)
 
-  const templates = defaultTemplates
+  // Muat template dari backend agar dropdown template tersedia di tab Kirim Pesan
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data } = await api.get("/wa-gateway/templates")
+        if (Array.isArray(data?.data)) {
+          setTemplates(
+            data.data.map((t: Record<string, unknown>) => ({
+              id: String(t.id),
+              name: String(t.name ?? ""),
+              body: String(t.body ?? ""),
+              createdAt: String(t.createdAt ?? ""),
+              updatedAt: String(t.updatedAt ?? ""),
+            })),
+          )
+        }
+      } catch {
+        /* abaikan — template opsional di tab kirim */
+      }
+    })()
+  }, [])
 
   const applyTemplate = (id: string) => {
     const tpl = templates.find((t) => t.id === id)
@@ -493,7 +512,7 @@ function KirimPesanTab() {
               {/* Filter status */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <Filter className="size-3.5 text-muted-foreground" />
-                {(["Semua", "Active", "Isolated", "Pending"] as const).map((f) => {
+                {(["Semua", "Active", "Isolated"] as const).map((f) => {
                   const count =
                     f === "Semua"
                       ? customers.length
@@ -749,11 +768,41 @@ function KirimPesanTab() {
 
 function TemplatePesanTab() {
   const [templates, setTemplates] = useState<Template[]>(defaultTemplates)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null)
   const [editing, setEditing] = useState<Template | null>(null)
   const [formName, setFormName] = useState("")
   const [formBody, setFormBody] = useState("")
+
+  // Muat template dari backend saat mount
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const { data } = await api.get("/wa-gateway/templates")
+        if (active && Array.isArray(data?.data)) {
+          setTemplates(
+            data.data.map((t: Record<string, unknown>) => ({
+              id: String(t.id),
+              name: String(t.name ?? ""),
+              body: String(t.body ?? ""),
+              createdAt: String(t.createdAt ?? ""),
+              updatedAt: String(t.updatedAt ?? ""),
+            })),
+          )
+        }
+      } catch (err) {
+        toast.error("Gagal memuat template pesan")
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const openCreate = () => {
     setEditing(null)
@@ -769,7 +818,7 @@ function TemplatePesanTab() {
     setDialogOpen(true)
   }
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     if (!formName.trim()) {
       toast.error("Nama template harus diisi")
       return
@@ -779,43 +828,56 @@ function TemplatePesanTab() {
       return
     }
 
-    const now = new Date().toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-
-    if (editing) {
-      setTemplates((prev) =>
-        prev.map((t) =>
-          t.id === editing.id
-            ? { ...t, name: formName.trim(), body: formBody.trim(), updatedAt: now }
-            : t,
-        ),
-      )
-      toast.success(`Template "${formName.trim()}" diperbarui`)
-    } else {
-      const id = `TPL-${String(templates.length + 1).padStart(3, "0")}`
-      setTemplates((prev) => [
-        ...prev,
-        {
-          id,
+    setSaving(true)
+    try {
+      if (editing) {
+        await api.put(`/wa-gateway/templates/${editing.id}`, {
           name: formName.trim(),
           body: formBody.trim(),
-          createdAt: now,
-          updatedAt: now,
-        },
-      ])
-      toast.success(`Template "${formName.trim()}" dibuat`)
+        })
+        setTemplates((prev) =>
+          prev.map((t) =>
+            t.id === editing.id ? { ...t, name: formName.trim(), body: formBody.trim() } : t,
+          ),
+        )
+        toast.success(`Template "${formName.trim()}" diperbarui`)
+      } else {
+        const { data } = await api.post("/wa-gateway/templates", {
+          name: formName.trim(),
+          body: formBody.trim(),
+        })
+        const created = data?.data
+        setTemplates((prev) => [
+          ...prev,
+          {
+            id: String(created?.id ?? `${Date.now()}`),
+            name: formName.trim(),
+            body: formBody.trim(),
+            createdAt: created?.createdAt ?? "",
+            updatedAt: created?.updatedAt ?? "",
+          },
+        ])
+        toast.success(`Template "${formName.trim()}" dibuat`)
+      }
+      setDialogOpen(false)
+    } catch (err) {
+      toast.error("Gagal menyimpan template")
+    } finally {
+      setSaving(false)
     }
-    setDialogOpen(false)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return
-    setTemplates((prev) => prev.filter((t) => t.id !== deleteTarget.id))
-    toast.success(`Template "${deleteTarget.name}" dihapus`)
-    setDeleteTarget(null)
+    try {
+      await api.delete(`/wa-gateway/templates/${deleteTarget.id}`)
+      setTemplates((prev) => prev.filter((t) => t.id !== deleteTarget.id))
+      toast.success(`Template "${deleteTarget.name}" dihapus`)
+    } catch (err) {
+      toast.error("Gagal menghapus template")
+    } finally {
+      setDeleteTarget(null)
+    }
   }
 
   const copyTemplate = (body: string) => {
@@ -827,7 +889,7 @@ function TemplatePesanTab() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {templates.length} template tersimpan
+          {loading ? "Memuat template…" : `${templates.length} template tersimpan`}
         </p>
         <Button size="sm" onClick={openCreate}>
           <Plus className="mr-1.5 size-4" />
@@ -946,9 +1008,11 @@ function TemplatePesanTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
-            <Button onClick={handleSaveTemplate}>
-              {editing ? "Simpan Perubahan" : "Buat Template"}
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+              Batal
+            </Button>
+            <Button onClick={handleSaveTemplate} disabled={saving}>
+              {saving ? "Menyimpan…" : editing ? "Simpan Perubahan" : "Buat Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
