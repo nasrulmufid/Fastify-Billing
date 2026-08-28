@@ -620,6 +620,8 @@ export function CustomersPage() {
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-dashed border-border pt-2 text-xs">
                   <dt className="text-muted-foreground">Paket Layanan</dt>
                   <dd className="text-right font-medium">{cust.packageName}</dd>
+                  <dt className="text-muted-foreground">Router</dt>
+                  <dd className="text-right font-medium">{cust.router || "-"}</dd>
                   <dt className="text-muted-foreground">IP Address</dt>
                   <dd className="text-right font-mono text-muted-foreground">{cust.ipAddress}</dd>
                   <dt className="text-muted-foreground">Masa Aktif</dt>
@@ -645,6 +647,9 @@ export function CustomersPage() {
                 Paket Layanan
               </TableHead>
               <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Router
+              </TableHead>
+              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 IP Address
               </TableHead>
               <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -661,7 +666,7 @@ export function CustomersPage() {
           <TableBody>
             {paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-28 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="h-28 text-center text-sm text-muted-foreground">
                   Tidak ada pelanggan ditemukan.
                 </TableCell>
               </TableRow>
@@ -681,6 +686,7 @@ export function CustomersPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{cust.packageName}</TableCell>
+                  <TableCell className="text-sm">{cust.router || "-"}</TableCell>
                   <TableCell>
                     <span className="font-mono text-xs text-muted-foreground">{cust.ipAddress}</span>
                   </TableCell>

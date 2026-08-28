@@ -1,0 +1,14 @@
+{
+  "name": "fastify-billing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo untuk backend API dan frontend billing",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors blue,green \"npm run dev --prefix fasty-api\" \"npm run dev --prefix fasty-bill\"",
+    "build": "npm run build --prefix fasty-api && npm run build --prefix fasty-bill",
+    "start": "npm run build && concurrently --kill-others-on-fail --names api,web --prefix-colors blue,green \"npm run start --prefix fasty-api\" \"npm run preview --prefix fasty-bill\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -9,7 +9,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "tsx src/scripts/migrate.ts"
+    "db:migrate": "tsx src/scripts/migrate.ts",
+    "db:migrate:ip-pools": "tsx src/scripts/migrate_ip_pools.ts",
+    "db:migrate:customer-ip-pools": "tsx src/scripts/migrate_customer_ip_pools.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

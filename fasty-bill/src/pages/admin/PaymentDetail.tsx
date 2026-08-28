@@ -22,7 +22,7 @@ import {
 } from "@/lib/paymentData"
 import { usePaymentStore } from "@/store/paymentStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
-import { useCustomers, useCustomerActions } from "@/lib/customerStore"
+import { useCustomers } from "@/lib/customerStore"
 
 const methodIcon: Record<PaymentMethod, typeof QrCode> = {
   QRIS: QrCode,
@@ -42,7 +42,6 @@ export function PaymentDetailPage() {
   const invoices = useInvoiceStore((s) => s.invoices)
   const markPaid = useInvoiceStore((s) => s.markPaid)
   const customers = useCustomers()
-  const { extendExpiry } = useCustomerActions()
 
   if (!payment) {
     return (
@@ -72,8 +71,8 @@ export function PaymentDetailPage() {
 
   const handleConfirm = async () => {
     setStatus(payment.id, "Sukses")
-    const cust = customers.find((c) => c.name === payment.customer)
-    if (cust) extendExpiry(cust.id, 1)
+    // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+    // Tidak perlu extendExpiry lagi di frontend (akan double extend)
     const invoice = invoices.find((inv) => inv.code === payment.invoice)
     if (invoice && invoice.status !== "Paid") {
       await markPaid(invoice.id, payment.method)
@@ -222,12 +221,11 @@ export function PaymentApprovalPage() {
   const invoices = useInvoiceStore((s) => s.invoices)
   const markPaid = useInvoiceStore((s) => s.markPaid)
   const customers = useCustomers()
-  const { extendExpiry } = useCustomerActions()
 
   const handleApprove = async (payment: Payment) => {
     setStatus(payment.id, "Sukses")
-    const cust = customers.find((c) => c.name === payment.customer)
-    if (cust) extendExpiry(cust.id, 1)
+    // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+    // Tidak perlu extendExpiry lagi di frontend (akan double extend)
     const invoice = invoices.find((inv) => inv.code === payment.invoice)
     if (invoice && invoice.status !== "Paid") {
       await markPaid(invoice.id, payment.method)

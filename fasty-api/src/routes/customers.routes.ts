@@ -59,6 +59,7 @@ const SQL_SELECT = `
 async function nextIpFromPool(
   query: (sql: string, params?: unknown[]) => Promise<unknown>,
   cidr: string,
+  routerId: number,
 ): Promise<string> {
   const [base, prefixStr] = cidr.split("/")
   const prefix = Number(prefixStr ?? 24)
@@ -74,8 +75,8 @@ async function nextIpFromPool(
 
   // Cari oktet terakhir tertinggi yang sudah dipakai di subnet ini
   const rows = (await query(
-    `SELECT ip_address FROM customers WHERE ip_address LIKE ?`,
-    [`${parts[0]}.${parts[1]}.${parts[2]}.%`],
+    `SELECT ip_address FROM customers WHERE router_id = ? AND ip_address LIKE ?`,
+    [routerId, `${parts[0]}.${parts[1]}.${parts[2]}.%`],
   )) as Record<string, unknown>[]
   let highest = firstUsable - 1
   for (const r of rows) {
@@ -193,7 +194,7 @@ export async function customersRoutes(app: FastifyInstance) {
         ])) as Record<string, unknown>[]
         const pool = routerRow?.ip_pool_pppoe ? String(routerRow.ip_pool_pppoe) : ""
         if (pool) {
-          allocated = await nextIpFromPool(q.query, pool)
+          allocated = await nextIpFromPool(q.query, pool, Number(body.routerId))
         } else {
           const [maxRow] = (await q.query(
             "SELECT ip_address FROM customers WHERE ip_address LIKE '192.168.1.%' ORDER BY CAST(SUBSTRING_INDEX(ip_address, '.', -1) AS UNSIGNED) DESC LIMIT 1",
@@ -208,11 +209,14 @@ export async function customersRoutes(app: FastifyInstance) {
     const joinAt = new Date()
     // Pelanggan baru: akun AKTIF (bisa login portal & lihat tagihan) tapi layanan ISOLIR
     // (menunggu pembayaran). Setelah pembayaran pertama -> status Active (payment.service).
+    // expiry_at diset ke join_at + 1 bulan agar payment flow bisa menghitung perpanjangan
+    // dari tanggal yang benar (bukan fallback ke "hari ini").
+    const expiryAt = new Date(joinAt.getFullYear(), joinAt.getMonth() + 1, joinAt.getDate())
     const result = (await app.db.query(
       `INSERT INTO customers
         (code, name, email, phone, address, package_id, router_id, status, ip_address,
-         pppoe_username, pppoe_password, login_username, login_password, odp_id, gps, join_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Isolated', ?, ?, ?, ?, ?, ?, ?, ?)`,
+         pppoe_username, pppoe_password, login_username, login_password, odp_id, gps, join_at, expiry_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'Isolated', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         code,
         body.name,
@@ -229,6 +233,7 @@ export async function customersRoutes(app: FastifyInstance) {
         body.odpId ?? "",
         body.gps ?? "",
         joinAt,
+        expiryAt,
       ],
     )) as unknown as { insertId: number }
 
@@ -257,19 +262,12 @@ export async function customersRoutes(app: FastifyInstance) {
     // + pastikan profile (nama paket) ada. Kegagalan -> warning, bukan error.
     const warnings: RouterWarning[] = []
     if (body.routerId && body.pppoeUsername) {
-      const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
-        body.packageId,
-      ])) as Record<string, unknown>[]
       const res = await withRouter(app, body.routerId, async (client) => {
-        let profile: string | undefined
-        if (pkg?.download_speed && pkg?.upload_speed) {
-          profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
-        }
         await client.ensurePppSecret({
           name: body.pppoeUsername,
           password: body.pppoePassword,
-          profile,
-          disabled: true,
+          profile: await client.ensureIsolirProfile(),
+          disabled: false,
           localAddress: nextIp,
         })
       })
@@ -392,7 +390,7 @@ export async function customersRoutes(app: FastifyInstance) {
       const pool = routerRow?.ip_pool_pppoe ? String(routerRow.ip_pool_pppoe) : ""
       let allocated = ""
       if (pool) {
-        allocated = await nextIpFromPool(app.db.query, pool)
+        allocated = await nextIpFromPool(app.db.query, pool, routerIdToUse)
       } else {
         const [maxRow] = (await app.db.query(
           "SELECT ip_address FROM customers WHERE ip_address LIKE '192.168.1.%' ORDER BY CAST(SUBSTRING_INDEX(ip_address, '.', -1) AS UNSIGNED) DESC LIMIT 1",
@@ -406,7 +404,7 @@ export async function customersRoutes(app: FastifyInstance) {
     }
 
     // Auto-reassign profile PPPoE bila pelanggan PINDAH PAKET (kecepatan berubah).
-    // Update secret di router: profile baru + status disabled mengikuti status DB.
+    // Customer Isolated tetap enabled dan memakai profile ISOLIR.
     // Kegagalan -> warning, bukan error (DB tetap source of truth).
     const warnings: RouterWarning[] = []
     const newPackageId = body.packageId ? Number(body.packageId) : null
@@ -416,12 +414,19 @@ export async function customersRoutes(app: FastifyInstance) {
       ])) as Record<string, unknown>[]
       if (pkg?.download_speed && pkg?.upload_speed) {
         const res = await withRouter(app, Number(row.router_id), async (client) => {
-          const profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
+          const isIsolated = String(row.status) === "Isolated"
+          const profile = isIsolated
+            ? await client.ensureIsolirProfile()
+            : await client.ensurePppProfile({
+                name: String(pkg.name),
+                downloadSpeed: Number(pkg.download_speed),
+                uploadSpeed: Number(pkg.upload_speed),
+              })
           await client.ensurePppSecret({
             name: String(row.pppoe_username),
             password: String(row.pppoe_password ?? ""),
             profile,
-            disabled: String(row.status) !== "Active",
+            disabled: !isIsolated && String(row.status) !== "Active",
             localAddress: row.ip_address ? String(row.ip_address) : undefined,
           })
         })
@@ -445,14 +450,17 @@ export async function customersRoutes(app: FastifyInstance) {
       ])) as Record<string, unknown>[]
       const res = await withRouter(app, Number(row.router_id), async (client) => {
         let profile: string | undefined
-        if (pkg?.download_speed && pkg?.upload_speed) {
+        const isIsolated = String(row.status) === "Isolated"
+        if (isIsolated) {
+          profile = await client.ensureIsolirProfile()
+        } else if (pkg?.download_speed && pkg?.upload_speed) {
           profile = await client.ensurePppProfile({ name: String(pkg.name), downloadSpeed: Number(pkg.download_speed), uploadSpeed: Number(pkg.upload_speed) })
         }
         await client.ensurePppSecret({
           name: String(row.pppoe_username),
           password: String(row.pppoe_password ?? ""),
           profile,
-          disabled: String(row.status) !== "Active",
+          disabled: !isIsolated && String(row.status) !== "Active",
           localAddress: row.ip_address ? String(row.ip_address) : undefined,
         })
       })
@@ -584,14 +592,14 @@ export async function customersRoutes(app: FastifyInstance) {
   })
 
   // POST /customers/sync — sinkron secret PPPoE SEMUA pelanggan ke router masing-masing.
-  // Mapping paket -> profile Mikrotik dijamin benar: profile = dl{download}-ul{upload}
-  // sesuai download/upload speed paket pelanggan (ensurePppProfile + ensurePppSecret).
+  // Mapping paket -> profile Mikrotik memakai nama paket dari database.
+  // Pelanggan Isolated tetap enabled, tetapi memakai profile ISOLIR.
   // Dikelompokkan per router; satu router gagal tidak menghentikan router lain.
   app.post("/customers/sync", techAuth, async (req, reply) => {
     const customers = (await app.db.query(
       `SELECT c.id AS customer_id, c.name AS customer_name, c.router_id,
               c.pppoe_username, c.pppoe_password, c.status,
-              p.download_speed, p.upload_speed, p.type AS package_type
+              p.name AS package_name, p.download_speed, p.upload_speed, p.type AS package_type
        FROM customers c
        LEFT JOIN packages p ON p.id = c.package_id
        WHERE c.router_id IS NOT NULL
@@ -623,6 +631,9 @@ export async function customersRoutes(app: FastifyInstance) {
 
     for (const [routerId, list] of byRouter) {
       const res = await withRouter(app, routerId, async (client) => {
+        // Profile ISOLIR wajib tersedia karena secret Isolated tetap enabled.
+        const isolirProfile = await client.ensureIsolirProfile()
+
         // Pastikan SEMUA paket PPPoE punya profile di Mikrotik (bahkan yang belum ada pelanggan)
         const pppoePackages = (await app.db.query(
           "SELECT name, download_speed, upload_speed FROM packages WHERE type = 'PPPoE' AND status = 'Aktif'",
@@ -637,17 +648,27 @@ export async function customersRoutes(app: FastifyInstance) {
 
         const secrets: Array<{ name: string; password: string; profile?: string; disabled: boolean }> = []
         for (const c of list) {
-          // Paket non-PPPoE tidak punya profile rate-limit PPPoE —
-          // tetap buat secret tanpa profile agar username bisa login (service default).
           let profile: string | undefined
-          if (c.package_type === "PPPoE" && c.download_speed && c.upload_speed) {
-            profile = await client.ensurePppProfile({ name: String(c.package_name ?? "PPPoE"), downloadSpeed: Number(c.download_speed), uploadSpeed: Number(c.upload_speed) })
+          let disabled = true
+          if (String(c.status) === "Isolated") {
+            profile = isolirProfile
+            disabled = false
+          } else if (String(c.status) === "Active") {
+            // Pelanggan aktif memakai profile dengan nama paket dari database.
+            if (c.package_type === "PPPoE" && c.download_speed && c.upload_speed) {
+              profile = await client.ensurePppProfile({
+                name: String(c.package_name),
+                downloadSpeed: Number(c.download_speed),
+                uploadSpeed: Number(c.upload_speed),
+              })
+            }
+            disabled = false
           }
           secrets.push({
             name: String(c.pppoe_username),
             password: String(c.pppoe_password ?? ""),
             profile,
-            disabled: String(c.status) !== "Active",
+            disabled,
           })
         }
         return client.syncSecrets(secrets)

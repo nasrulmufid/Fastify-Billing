@@ -353,13 +353,16 @@ export async function testRouterConnection(
 export async function syncPackagesToRouter(
   app: FastifyInstance,
   routerId: number,
-  packages: Array<{ name?: string; downloadSpeed: number; uploadSpeed: number }>,
+  packages: Array<{ name: string; downloadSpeed: number; uploadSpeed: number }>,
 ): Promise<RouterResult<number>> {
   return withRouter(app, routerId, async (client) => {
     let synced = 0
     for (const p of packages) {
-      const name = p.name || `${p.downloadSpeed}Mbps`
-      await client.ensurePppProfile({ name, downloadSpeed: p.downloadSpeed, uploadSpeed: p.uploadSpeed })
+      await client.ensurePppProfile({
+        name: p.name,
+        downloadSpeed: p.downloadSpeed,
+        uploadSpeed: p.uploadSpeed,
+      })
       synced++
     }
     return synced

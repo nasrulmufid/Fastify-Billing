@@ -11,6 +11,7 @@ import {
   MapPin,
   Mail,
   Phone,
+  Wallet,
   Wifi,
   WifiOff,
 } from "lucide-react"
@@ -51,6 +52,9 @@ import {
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog"
 import api from "@/lib/axios"
 import { useAuthStore } from "@/store/useAppStore"
+
+import { formatPrice } from "@/lib/paymentData"
+import { Banknote } from "lucide-react"
 
 /* ================================================================
    Helpers
@@ -129,6 +133,8 @@ export function CustomerDetailPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [isolateOpen, setIsolateOpen] = useState(false)
   const [extendOpen, setExtendOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
+  const [payInvoice, setPayInvoice] = useState<any | null>(null)
 
   // Fetch customer data from backend API
   useEffect(() => {
@@ -195,6 +201,28 @@ export function CustomerDetailPage() {
       description: `Berlaku hingga +1 bulan. Pelanggan diaktifkan (unisolir) di Mikrotik.`,
     })
     setExtendOpen(false)
+  }
+
+  const handleMarkPaid = async () => {
+    if (!payInvoice) return
+    try {
+      await api.post(`/invoices/${payInvoice.id}/mark-paid`, { method: "Tunai" })
+      // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+      // Tidak perlu extendExpiry lagi di frontend (akan double extend)
+      toast.success("Pembayaran tunai dicatat", {
+        description: `${payInvoice.code} lunas — masa aktif ${customer.name} diperpanjang 1 bulan.`,
+      })
+      setPayOpen(false)
+      setPayInvoice(null)
+      // Refresh invoices
+      const invRes = await api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      setInvoices(invRes.data.data || [])
+    } catch (err: any) {
+      console.error("Gagal memproses pembayaran:", err)
+      toast.error("Gagal memproses pembayaran", {
+        description: err?.response?.data?.error?.message || "Terjadi kesalahan saat menandai invoice lunas.",
+      })
+    }
   }
 
   return (
@@ -447,9 +475,7 @@ export function CustomerDetailPage() {
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Jatuh Tempo</TableHead>
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Nominal</TableHead>
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
-                      <TableHead className="w-[60px] text-xs uppercase tracking-wider text-muted-foreground">
-                        <span className="sr-only">Aksi</span>
-                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -471,14 +497,34 @@ export function CustomerDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Unduh PDF ${inv.id}`}
-                            onClick={() => toast.info(`Mengunduh PDF ${inv.id}…`)}
-                          >
-                            <FileDown className="size-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {inv.status === "Unpaid" && (
+                              <div className="group relative">
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                                  onClick={() => {
+                                    setPayInvoice(inv)
+                                    setPayOpen(true)
+                                  }}
+                                >
+                                  <Wallet className="size-3.5" />
+                                </Button>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                                  Terima Pembayaran Cash
+                                </div>
+                              </div>
+                            )}
+                            {/* <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Unduh PDF ${inv.id}`}
+                              onClick={() => toast.info(`Mengunduh PDF ${inv.id}…`)}
+                            >
+                              <FileDown className="size-3.5" />
+                            </Button> */}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -566,6 +612,27 @@ export function CustomerDetailPage() {
             <AlertDialogAction onClick={handleExtend} className="bg-primary">
               <CalendarPlus className="mr-1.5 size-4" />
               Perpanjang
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ---------- Dialog Terima Pembayaran Cash ---------- */}
+      <AlertDialog open={payOpen} onOpenChange={setPayOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg">Terima Pembayaran Cash?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              {payInvoice
+                ? `Pembayaran tunai untuk invoice ${payInvoice.code} sebesar ${formatPrice(payInvoice.amount)} akan dicatat. Masa aktif ${customer.name} akan diperpanjang 1 bulan.`
+                : "Pilih invoice yang akan dibayar."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMarkPaid} className="bg-primary">
+              <Banknote className="mr-1.5 size-4" />
+              Terima Pembayaran
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

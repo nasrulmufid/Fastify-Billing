@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS routers (
   api_use_https TINYINT(1) NOT NULL DEFAULT 0, -- 1 = gunakan HTTPS (port 443)
   api_user VARCHAR(80) NULL DEFAULT 'admin',
   api_password VARCHAR(400) NULL, -- terenkripsi (AES-256-GCM)
-  ip_pool VARCHAR(45) NULL, -- CIDR pool PPPoE, contoh 192.168.200.0/24 (untuk alokasi IP otomatis)
+  ip_pool_pppoe VARCHAR(45) NULL COMMENT 'CIDR pool PPPoE untuk alokasi IP otomatis',
+  ip_pool_isolir VARCHAR(45) NULL COMMENT 'CIDR pool untuk profile ISOLIR Mikrotik',
   status ENUM('Connected','Standby','Disconnected') NOT NULL DEFAULT 'Standby',
   client_count INT NOT NULL DEFAULT 0,
   uptime VARCHAR(60) NOT NULL DEFAULT '—',

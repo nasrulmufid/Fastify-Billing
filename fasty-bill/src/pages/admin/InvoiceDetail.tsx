@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -35,11 +35,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatPrice, paymentMethodBadge } from "@/lib/paymentData"
+import { MONTHS_ID } from "@/lib/dateUtils"
 import api from "@/lib/axios"
 import { usePackages } from "@/lib/packageStore"
 import { statusLabel, statusBadgeClass, useInvoiceStore } from "@/store/invoiceStore"
 import { usePaymentStore } from "@/store/paymentStore"
-import { useCustomers, useCustomerActions } from "@/lib/customerStore"
+import { useCustomers } from "@/lib/customerStore"
 
 export function InvoiceDetailPage() {
   const navigate = useNavigate()
@@ -49,7 +50,6 @@ export function InvoiceDetailPage() {
   const markPaid = useInvoiceStore((s) => s.markPaid)
   const payments = usePaymentStore((s) => s.payments)
   const customers = useCustomers()
-  const { extendExpiry } = useCustomerActions()
 
   const [payOpen, setPayOpen] = useState(false)
 
@@ -87,9 +87,8 @@ export function InvoiceDetailPage() {
       })
       return
     }
-    if (customer) {
-      extendExpiry(customer.id, 1)
-    }
+    // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+    // Tidak perlu extendExpiry lagi di frontend (akan double extend)
     toast.success("Pembayaran tunai dicatat", {
       description: customer
         ? `${invoice.code} lunas — masa aktif ${customer.name} diperpanjang 1 bulan.`
@@ -331,10 +330,22 @@ export function InvoiceCreatePage() {
     }
   }, [selectedPackage, setValue])
 
+  // Generate period options (dropdown): 12 bulan ke depan dari bulan ini
+  const periodOptions = useMemo(() => {
+    const now = new Date()
+    const options: { value: string; label: string }[] = []
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      const label = `${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`
+      options.push({ value: label, label })
+    }
+    return options
+  }, [])
+
   // Set default period to current month/year
   useEffect(() => {
     const now = new Date()
-    const period = `${now.toLocaleString("id-ID", { month: "long" })} ${now.getFullYear()}`
+    const period = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`
     setValue("period", period)
   }, [setValue])
 
@@ -432,12 +443,21 @@ export function InvoiceCreatePage() {
               {/* Periode */}
               <div className="space-y-1.5">
                 <Label htmlFor="period">Periode</Label>
-                <Input
-                  id="period"
-                  placeholder="Contoh: Agustus 2026"
-                  className="h-9"
-                  {...register("period")}
-                />
+                <Select
+                  onValueChange={(v) => setValue("period", v)}
+                  value={watch("period")}
+                >
+                  <SelectTrigger id="period" className="h-9">
+                    <SelectValue placeholder="Pilih periode…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periodOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.period && (
                   <p className="text-xs text-destructive">{errors.period.message}</p>
                 )}

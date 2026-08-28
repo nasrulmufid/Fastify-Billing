@@ -59,38 +59,56 @@ Fastify Billing/
 - Git
 - Browser for frontend access
 
-## Backend Setup
+## Quick Start
 
-1. Open the backend folder:
-
-```bash
-cd fasty-api
-```
-
-2. Copy the environment file:
-
-```bash
-cp .env.example .env
-```
-
-3. Update the values in `.env` according to your local database and credentials.
-
-4. Install dependencies:
+Install dependencies for the root runner and both applications:
 
 ```bash
 npm install
+npm install --prefix fasty-api
+npm install --prefix fasty-bill
 ```
 
-5. Run database migration and seed:
-
-```bash
-npm run db:migrate
-```
-
-6. Start the development server:
+Configure `fasty-api/.env` and `fasty-bill/.env` using the respective
+`.env.example` files, then run both applications from this directory:
 
 ```bash
 npm run dev
+```
+
+For a production-style run, build both applications and start them together:
+
+```bash
+npm run start
+```
+
+The API is available at `http://localhost:3000` and the Vite development server
+at `http://localhost:5173`. The production-style frontend preview is available
+at `http://localhost:4173`.
+
+## Backend Setup
+
+1. Copy the environment file:
+
+```bash
+cp fasty-api/.env.example fasty-api/.env
+```
+
+2. Update the values in `fasty-api/.env` according to your local database and
+   credentials.
+
+3. Run database migration and seed:
+
+```bash
+npm run db:migrate --prefix fasty-api
+```
+
+3. Start both servers from the project root with `npm run dev`.
+
+The backend can still be started independently from `fasty-api` when needed:
+
+```bash
+npm run dev --prefix fasty-api
 ```
 
 The API will run at:
@@ -100,28 +118,20 @@ The API will run at:
 
 ## Frontend Setup
 
-1. Open the frontend folder:
+1. Copy the environment file:
 
 ```bash
-cd fasty-bill
+cp fasty-bill/.env.example fasty-bill/.env
 ```
 
-2. Copy the environment file:
+2. The frontend starts automatically with the backend when running `npm run dev`
+   from the project root.
+
+The frontend can still be started independently from the project root when
+needed:
 
 ```bash
-cp .env.example .env
-```
-
-3. Install dependencies:
-
-```bash
-npm install
-```
-
-4. Run the frontend:
-
-```bash
-npm run dev
+npm run dev --prefix fasty-bill
 ```
 
 The frontend will run at:

@@ -54,7 +54,7 @@ import {
 } from "@/lib/paymentData"
 import { usePaymentStore } from "@/store/paymentStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
-import { useCustomers, useCustomerActions } from "@/lib/customerStore"
+import { useCustomers } from "@/lib/customerStore"
 
 const PAGE_SIZE = 8
 
@@ -120,7 +120,6 @@ export function PaymentsPage() {
   const invoices = useInvoiceStore((s) => s.invoices)
   const markPaid = useInvoiceStore((s) => s.markPaid)
   const customers = useCustomers()
-  const { extendExpiry } = useCustomerActions()
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -178,11 +177,9 @@ export function PaymentsPage() {
     // QRIS: konfirmasi callback gateway -> pembayaran Sukses
     setStatus(payment.id, "Sukses")
 
-    // Perpanjang masa aktif pelanggan (aktivasi otomatis)
-    const cust = customers.find((c) => c.name === payment.customer)
-    if (cust) extendExpiry(cust.id, 1)
-
     // Tandai invoice terkait lunas dengan metode pembayaran ini
+    // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+    // Tidak perlu extendExpiry lagi di frontend (akan double extend)
     const invoice = invoices.find((inv) => inv.code === payment.invoice)
     if (invoice && invoice.status !== "Paid") {
       await markPaid(invoice.id, payment.method)

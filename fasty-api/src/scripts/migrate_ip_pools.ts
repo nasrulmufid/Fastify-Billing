@@ -1,36 +1,53 @@
 import mysql from "mysql2/promise"
 
+import { config } from "../config.js"
+
 async function main() {
   const connection = await mysql.createConnection({
-    host: "127.0.0.1",
-    port: 3306,
-    user: "root",
-    password: "",
-    database: "fasty_bill",
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
+    database: config.db.database,
   })
 
-  console.log("Migrasi: Menambahkan kolom ip_pool_pppoe dan ip_pool_isolir...")
+  try {
+    const [columns] = await connection.query<mysql.RowDataPacket[]>(
+      `SELECT COLUMN_NAME AS columnName
+       FROM information_schema.columns
+       WHERE table_schema = ? AND table_name = 'routers'`,
+      [config.db.database],
+    )
+    const existingColumns = new Set(columns.map((column) => String(column.columnName)))
 
-  // Tambahkan kolom ip_pool_pppoe
-  await connection.query(
-    "ALTER TABLE routers ADD COLUMN ip_pool_pppoe VARCHAR(45) NULL COMMENT 'CIDR pool PPPoE untuk alokasi IP otomatis' AFTER ip_pool"
-  )
-  console.log("✓ Kolom ip_pool_pppoe ditambahkan")
+    console.log("Migrasi: Menyesuaikan kolom IP pool pada tabel routers...")
 
-  // Tambahkan kolom ip_pool_isolir
-  await connection.query(
-    "ALTER TABLE routers ADD COLUMN ip_pool_isolir VARCHAR(45) NULL COMMENT 'CIDR pool untuk profile ISOLIR Mikrotik' AFTER ip_pool_pppoe"
-  )
-  console.log("✓ Kolom ip_pool_isolir ditambahkan")
+    if (!existingColumns.has("ip_pool_pppoe")) {
+      await connection.query(
+        "ALTER TABLE routers ADD COLUMN ip_pool_pppoe VARCHAR(45) NULL COMMENT 'CIDR pool PPPoE untuk alokasi IP otomatis' AFTER api_password",
+      )
+      console.log("✓ Kolom ip_pool_pppoe ditambahkan")
+    }
 
-  // Migrasi data: salin ip_pool ke ip_pool_pppoe
-  await connection.query(
-    "UPDATE routers SET ip_pool_pppoe = ip_pool WHERE ip_pool IS NOT NULL AND ip_pool <> ''"
-  )
-  console.log("✓ Data ip_pool disalin ke ip_pool_pppoe")
+    if (!existingColumns.has("ip_pool_isolir")) {
+      await connection.query(
+        "ALTER TABLE routers ADD COLUMN ip_pool_isolir VARCHAR(45) NULL COMMENT 'CIDR pool untuk profile ISOLIR Mikrotik' AFTER ip_pool_pppoe",
+      )
+      console.log("✓ Kolom ip_pool_isolir ditambahkan")
+    }
 
-  await connection.end()
-  console.log("Migrasi selesai!")
+    if (existingColumns.has("ip_pool")) {
+      await connection.query(
+        "UPDATE routers SET ip_pool_pppoe = ip_pool WHERE (ip_pool_pppoe IS NULL OR ip_pool_pppoe = '') AND ip_pool IS NOT NULL AND ip_pool <> ''",
+      )
+      await connection.query("ALTER TABLE routers DROP COLUMN ip_pool")
+      console.log("✓ Data ip_pool dipindahkan dan kolom ip_pool dihapus")
+    }
+
+    console.log("Migrasi selesai!")
+  } finally {
+    await connection.end()
+  }
 }
 
 main().catch((err) => {

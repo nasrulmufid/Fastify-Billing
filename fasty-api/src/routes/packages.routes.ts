@@ -48,7 +48,8 @@ async function syncPackagesToAllRouters(
   pkgRows: Record<string, unknown>[],
 ): Promise<{ syncedCount: number; routerResults: Record<string, unknown>[]; warnings: RouterWarning[] }> {
   const routers = (await app.db.query("SELECT id, name FROM routers ORDER BY id ASC")) as Record<string, unknown>[]
-  const speeds = pkgRows.map((p) => ({
+  const packages = pkgRows.map((p) => ({
+    name: String(p.name),
     downloadSpeed: Number(p.download_speed),
     uploadSpeed: Number(p.upload_speed),
   }))
@@ -57,7 +58,7 @@ async function syncPackagesToAllRouters(
   let syncedCount = 0
 
   for (const r of routers) {
-    const res = await syncPackagesToRouter(app, Number(r.id), speeds)
+    const res = await syncPackagesToRouter(app, Number(r.id), packages)
     const entry: Record<string, unknown> = {
       routerId: Number(r.id),
       routerName: r.name,

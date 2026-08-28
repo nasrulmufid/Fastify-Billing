@@ -52,7 +52,7 @@ import {
   type InvoiceStatus,
 } from "@/store/invoiceStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
-import { useCustomers, useCustomerActions } from "@/lib/customerStore"
+import { useCustomers } from "@/lib/customerStore"
 
 const PAGE_SIZE = 8
 
@@ -137,7 +137,6 @@ export function InvoicesPage() {
   const markPaid = useInvoiceStore((s) => s.markPaid)
   const removeInvoice = useInvoiceStore((s) => s.removeInvoice)
   const customers = useCustomers()
-  const { extendExpiry } = useCustomerActions()
 
   // Muat data dari backend saat halaman dibuka
   useEffect(() => {
@@ -183,15 +182,10 @@ export function InvoicesPage() {
       })
       return
     }
-    // Perpanjang masa aktif layanan pelanggan
-    const cust = customers.find((c) => c.name === invoice.customer)
-    if (cust) {
-      extendExpiry(cust.id, 1)
-    }
+    // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+    // Tidak perlu extendExpiry lagi di frontend (akan double extend)
     toast.success("Pembayaran tunai dicatat", {
-      description: cust
-        ? `${invoice.code} lunas — masa aktif ${cust.name} diperpanjang 1 bulan.`
-        : `${invoice.code} telah ditandai lunas (Tunai).`,
+      description: `${invoice.code} lunas — masa aktif ${invoice.customer} diperpanjang 1 bulan.`,
     })
     setPayTarget(null)
   }
