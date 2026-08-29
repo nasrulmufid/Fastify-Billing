@@ -47,16 +47,16 @@ function BreadcrumbPage({ className, ...props }: ComponentProps<"span">) {
   )
 }
 
-function BreadcrumbSeparator({ className, ...props }: ComponentProps<"li">) {
+function BreadcrumbSeparator({ className, ...props }: ComponentProps<"span">) {
   return (
-    <li
+    <span
       role="presentation"
       aria-hidden="true"
-      className={cn("[&>svg]:size-3.5", className)}
+      className={cn("inline-flex items-center [&>svg]:size-3.5", className)}
       {...props}
     >
       <ChevronRight />
-    </li>
+    </span>
   )
 }
 
