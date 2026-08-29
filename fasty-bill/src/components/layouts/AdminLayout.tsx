@@ -372,6 +372,7 @@ export function AdminLayout() {
               size="sm"
               className="inline-flex h-9 w-9 shrink-0 p-0 sm:w-56 sm:justify-start sm:px-3 lg:w-64"
               onClick={() => setSearchOpen(true)}
+              aria-label="Cari nama pelanggan"
             >
               <Search className="h-4 w-4 shrink-0 sm:mr-2" />
               <span className="hidden truncate text-muted-foreground sm:inline">Cari nama pelanggan…</span>

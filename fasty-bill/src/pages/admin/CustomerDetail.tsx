@@ -53,8 +53,11 @@ import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog"
 import api from "@/lib/axios"
 import { useAuthStore } from "@/store/useAppStore"
 import { useCustomerActions } from "@/lib/customerStore"
+import { expiryToInputValue, inputToExpiry } from "@/lib/dateUtils"
 import { formatPrice } from "@/lib/paymentData"
 import { Banknote } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 
 /* ================================================================
    Helpers
@@ -121,7 +124,7 @@ export function CustomerDetailPage() {
   const location = useLocation()
   const { token } = useAuthStore()
   const navigate = useNavigate()
-  const { extendExpiry } = useCustomerActions()
+  const { extendExpiry, setExpiry, setStatus } = useCustomerActions()
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
@@ -134,6 +137,8 @@ export function CustomerDetailPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [isolateOpen, setIsolateOpen] = useState(false)
   const [extendOpen, setExtendOpen] = useState(false)
+  const [extendDate, setExtendDate] = useState<string>("")
+  const [extendLoading, setExtendLoading] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [payInvoice, setPayInvoice] = useState<any | null>(null)
 
@@ -197,11 +202,60 @@ export function CustomerDetailPage() {
     setIsolateOpen(false)
   }
 
-  const handleExtend = () => {
-    toast.success("Masa aktif diperpanjang", {
-      description: `Berlaku hingga +1 bulan. Pelanggan diaktifkan (unisolir) di Mikrotik.`,
-    })
-    setExtendOpen(false)
+  const handleExtendMonth = async () => {
+    if (!customer) return
+    setExtendLoading(true)
+    try {
+      await extendExpiry(customer.id, 1)
+      toast.success("Masa aktif diperpanjang", {
+        description: `Berlaku hingga +1 bulan. Pelanggan diaktifkan (unisolir) di Mikrotik.`,
+      })
+      setExtendOpen(false)
+    } catch (err: any) {
+      console.error("Gagal memperpanjang masa aktif:", err)
+      toast.error("Gagal memperpanjang masa aktif", {
+        description: err?.response?.data?.error?.message || "Terjadi kesalahan saat memperpanjang masa aktif.",
+      })
+    } finally {
+      setExtendLoading(false)
+    }
+  }
+
+  const handleExtendDate = async () => {
+    if (!customer || !extendDate) return
+    setExtendLoading(true)
+    try {
+      const newExpiry = inputToExpiry(extendDate)
+      await setExpiry(customer.id, newExpiry)
+      toast.success("Masa aktif diperbarui", {
+        description: `${customer.name} berlaku hingga ${newExpiry}.`,
+      })
+      setExtendOpen(false)
+    } catch (err: any) {
+      console.error("Gagal mengubah masa aktif:", err)
+      toast.error("Gagal mengubah masa aktif", {
+        description: err?.response?.data?.error?.message || "Terjadi kesalahan saat mengubah masa aktif.",
+      })
+    } finally {
+      setExtendLoading(false)
+    }
+  }
+
+  const handleIsolate = async () => {
+    if (!customer) return
+    try {
+      await setStatus(customer.id, isIsolated ? "Active" : "Isolated")
+      toast.success(
+        isIsolated ? "Koneksi diaktifkan kembali" : "Pelanggan diisolir",
+        { description: isIsolated ? "Akses internet telah dipulihkan." : "Akses internet telah dinonaktifkan." }
+      )
+    } catch (err: any) {
+      console.error("Gagal mengubah status koneksi:", err)
+      toast.error("Gagal mengubah status koneksi", {
+        description: err?.response?.data?.error?.message || "Terjadi kesalahan saat mengubah status koneksi.",
+      })
+    }
+    setIsolateOpen(false)
   }
 
   const handleMarkPaid = async () => {
@@ -280,7 +334,7 @@ export function CustomerDetailPage() {
             onClick={() => setIsolateOpen(true)}
           >
             {isIsolated ? <Wifi className="mr-1.5 size-4" /> : <WifiOff className="mr-1.5 size-4" />}
-            {isIsolated ? "Aktifkan Koneksi" : "Isolir Koneksi"}
+            {isIsolated ? "Buka Isolir" : "Isolir Koneksi"}
           </Button>
         </div>
       </div>
@@ -601,23 +655,59 @@ export function CustomerDetailPage() {
       </AlertDialog>
 
       {/* ---------- Dialog Perpanjang Manual ---------- */}
-      <AlertDialog open={extendOpen} onOpenChange={setExtendOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg">Perpanjang Masa Aktif?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              Masa aktif {customer.name} akan direset +1 bulan dan koneksi diaktifkan (unisolir) secara paksa di Mikrotik.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExtend} className="bg-primary">
+      <Dialog
+        open={extendOpen}
+        onOpenChange={(open) => {
+          setExtendOpen(open)
+          if (open && customer) setExtendDate(expiryToInputValue(customer.expiryDate))
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Perpanjang Masa Aktif</DialogTitle>
+            <DialogDescription className="text-sm">
+              Pilih untuk memperpanjang 1 bulan otomatis, atau tentukan tanggal berakhir sendiri untuk {customer.name}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border border-border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground">Masa aktif saat ini</p>
+              <p className="text-sm font-medium">{customer.expiryDate}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="extend-date">Pilih tanggal berakhir</Label>
+              <Input
+                id="extend-date"
+                type="date"
+                value={extendDate}
+                onChange={(e) => setExtendDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={handleExtendDate}
+              disabled={extendLoading || !extendDate}
+            >
               <CalendarPlus className="mr-1.5 size-4" />
-              Perpanjang
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Terapkan Tanggal
+            </Button>
+            <Button
+              className="w-full bg-primary sm:w-auto"
+              onClick={handleExtendMonth}
+              disabled={extendLoading}
+            >
+              <CalendarPlus className="mr-1.5 size-4" />
+              Perpanjang 1 Bulan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ---------- Dialog Terima Pembayaran Cash ---------- */}
       <AlertDialog open={payOpen} onOpenChange={setPayOpen}>
