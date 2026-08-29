@@ -13,27 +13,59 @@ import { getReminderTemplate, sendWhatsAppMessage, sleep, buildPaymentLinkForInv
  * Diaktifkan hanya di production (NODE_ENV=production) agar tidak mengganggu dev.
  */
 export function registerJobs(app: FastifyInstance) {
-  // 1. Tanggal 1 tiap bulan — generate invoice bulanan utk customer aktif
+  // 1. Anniversary billing — buat invoice menjelang expiry_at masing-masing customer
+  //    (bukan serentak tgl 1). due_at = expiry_at (tanggal anniversary customer) agar
+  //    konsisten dengan job isolir (yang memakai expiry_at). Interval siklus (1/2/...
+  //    bulan) dari app_settings.billing_cycle menentukan rentang generate ke depan.
   cron.schedule("0 0 1 * *", async () => {
     try {
-      const period = formatIdDate(new Date()).split(" ").slice(1).join(" ") // "Agustus 2026"
-      const customers = (await app.db.query(
-        "SELECT * FROM customers WHERE status = 'Active'",
+      const [settings] = (await app.db.query(
+        "SELECT billing_cycle FROM app_settings WHERE id = 1",
       )) as Record<string, unknown>[]
+      const cycle = String(settings?.billing_cycle ?? "Setiap 1 bulan")
+      const m = cycle.match(/(\d+)/)
+      const months = m ? Math.max(1, Number(m[1])) : 1
+      // Generate invoice untuk customer yang jatuh tempo dalam N bulan ke depan
+      const lookAheadDays = months * 31
+
+      const customers = (await app.db.query(
+        `SELECT * FROM customers
+         WHERE status = 'Active' AND expiry_at IS NOT NULL
+           AND expiry_at BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)`,
+        [lookAheadDays],
+      )) as Record<string, unknown>[]
+
+      let created = 0
       for (const c of customers) {
         const [pkg] = (await app.db.query("SELECT * FROM packages WHERE id = ?", [
           c.package_id,
         ])) as Record<string, unknown>[]
         if (!pkg) continue
+
+        // Sudah ada invoice terbuka (Unpaid/Overdue)? Jangan buat duplikat.
+        const [open] = (await app.db.query(
+          "SELECT id FROM invoices WHERE customer_id = ? AND status IN ('Unpaid','Overdue') LIMIT 1",
+          [c.id],
+        )) as Record<string, unknown>[]
+        if (open) continue
+
+        // due_at = expiry_at customer (anniversary, preserve hari)
+        const expiryStr = fromISODate(c.expiry_at as string | undefined)
+        if (!expiryStr) continue
+        const dueISO = toISODate(expiryStr)
+        if (!dueISO) continue
+
+        const period = expiryStr.split(" ").slice(1).join(" ") // "September 2026"
         const code = await app.db.transaction(async (q) => nextCode(q.query, "invoices", "INV-"))
         await app.db.query(
           "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, ?)",
-          [code, c.id, pkg.price, period, toISODate(addMonthsToExpiry(formatIdDate(new Date()), 1))],
+          [code, c.id, pkg.price, period, dueISO],
         )
+        created++
       }
-      app.log.info({ count: customers.length }, "Invoice bulanan dibuat")
+      app.log.info({ count: created, cycle, months }, "Invoice anniversary dibuat")
     } catch (err) {
-      app.log.error(err, "Gagal generate invoice bulanan")
+      app.log.error(err, "Gagal generate invoice anniversary")
     }
   })
 

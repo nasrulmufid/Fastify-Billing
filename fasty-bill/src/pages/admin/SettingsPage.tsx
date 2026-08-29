@@ -908,21 +908,49 @@ function TabUser() {
 function TabUmum() {
   const [gracePeriod, setGracePeriod] = useState("7")
   const [billingCycle, setBillingCycle] = useState("Setiap 1 bulan")
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  function handleSave() {
+  // Muat pengaturan dari API saat tab dibuka
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        const res = await api.get("/settings")
+        const data = res.data?.data
+        if (mounted && data) {
+          setGracePeriod(String(data.gracePeriodDays ?? 7))
+          setBillingCycle(data.billingCycle ?? "Setiap 1 bulan")
+        }
+      } catch {
+        // biarkan default jika gagal memuat
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function handleSave() {
     const days = Number(gracePeriod)
     if (!days || days < 1 || days > 60) {
       toast.error("Grace period harus 1–60 hari")
       return
     }
     setSaving(true)
-    setTimeout(() => {
-      setSaving(false)
+    try {
+      await api.put("/settings", { gracePeriodDays: days, billingCycle })
       toast.success("Pengaturan disimpan", {
         description: `Grace period ${days} hari · siklus tagihan ${billingCycle.toLowerCase()}.`,
       })
-    }, 800)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Gagal menyimpan pengaturan")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -945,6 +973,7 @@ function TabUmum() {
                 max={60}
                 className="h-9 w-28"
                 value={gracePeriod}
+                disabled={loading}
                 onChange={(e) => setGracePeriod(e.target.value)}
               />
               <span className="text-sm text-muted-foreground">hari</span>
@@ -960,7 +989,7 @@ function TabUmum() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">Siklus penerbitan tagihan otomatis per pelanggan.</p>
-            <Select value={billingCycle} onValueChange={(v) => v && setBillingCycle(v)}>
+            <Select value={billingCycle} onValueChange={(v) => v && setBillingCycle(v)} disabled={loading}>
               <SelectTrigger className="w-full" data-slot="select-trigger">
                 <SelectValue />
               </SelectTrigger>
@@ -976,13 +1005,13 @@ function TabUmum() {
       <div className="flex items-center justify-between rounded-xl border border-dashed border-border bg-muted/40 px-4 py-3 text-sm">
         <span className="flex items-center gap-2 text-muted-foreground">
           <CalendarClock className="size-4" />
-          Invoice otomatis dibuat {billingCycle === "Setiap 1 bulan" ? "tanggal 1" : "awal periode"} tiap bulan.
+          Invoice dibuat otomatis menjelang tanggal anniversary (jatuh tempo) tiap pelanggan, sesuai siklus {billingCycle.toLowerCase()}.
         </span>
       </div>
 
-      <Button className="w-full sm:w-auto" onClick={handleSave} disabled={saving}>
+      <Button className="w-full sm:w-auto" onClick={handleSave} disabled={saving || loading}>
         {saving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Save className="mr-1.5 size-4" />}
-        {saving ? "Menyimpan…" : "Simpan Pengaturan"}
+        {saving ? "Menyimpan…" : loading ? "Memuat…" : "Simpan Pengaturan"}
       </Button>
     </div>
   )
