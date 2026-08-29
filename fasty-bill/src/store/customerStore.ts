@@ -2,7 +2,7 @@ import { create } from "zustand"
 
 import api from "@/lib/axios"
 
-export type CustomerStatus = "Active" | "Isolated" | "Pending"
+export type CustomerStatus = "Active" | "Isolated"
 
 export interface CustomerProfile {
   id: number

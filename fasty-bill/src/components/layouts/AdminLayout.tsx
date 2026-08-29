@@ -352,16 +352,12 @@ export function AdminLayout() {
                             className={`text-xs font-medium capitalize ${
                               c.status === "Active"
                                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                : c.status === "Isolated"
-                                  ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
-                                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
                             }`}
                           >
                             {c.status === "Active"
                               ? "Aktif"
-                              : c.status === "Isolated"
-                                ? "Isolir"
-                                : "Pending"}
+                              : "Isolir"}
                           </Badge>
                         </button>
                       ))
@@ -374,7 +370,7 @@ export function AdminLayout() {
             <Button
               variant="outline"
               size="sm"
-              className="hidden h-9 w-9 shrink-0 p-0 sm:inline-flex sm:w-56 sm:justify-start sm:px-3 lg:w-64"
+              className="inline-flex h-9 w-9 shrink-0 p-0 sm:w-56 sm:justify-start sm:px-3 lg:w-64"
               onClick={() => setSearchOpen(true)}
             >
               <Search className="h-4 w-4 shrink-0 sm:mr-2" />
@@ -382,7 +378,7 @@ export function AdminLayout() {
             </Button>
           )}
 
-          <div className="flex-1" />
+          {!searchOpen && <div className="flex-1" />}
 
           {/* Notifications */}
           <DropdownMenu>

@@ -79,13 +79,11 @@ import api from "@/lib/axios"
 const statusBadgeClass: Record<string, string> = {
   Active: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   Isolated: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
-  Pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
 }
 
 const statusLabel: Record<string, string> = {
   Active: "Aktif",
   Isolated: "Isolir",
-  Pending: "Pending",
 }
 
 const PAGE_SIZE = 8
@@ -164,18 +162,14 @@ function CustomerRowActions({ cust, onDetail, onEdit, onIsolate, onDelete, onEdi
           Edit Masa Aktif
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onIsolate(cust)}>
-          {cust.status === "Pending" ? (
-            <UserCheck className="mr-2 size-4" />
-          ) : cust.status === "Isolated" ? (
+          {cust.status === "Isolated" ? (
             <Wifi className="mr-2 size-4" />
           ) : (
             <WifiOff className="mr-2 size-4" />
           )}
-          {cust.status === "Pending"
-            ? "Aktifkan Akun"
-            : cust.status === "Isolated"
-              ? "Aktifkan Koneksi"
-              : "Isolir Pelanggan"}
+          {cust.status === "Isolated"
+            ? "Aktifkan Koneksi"
+            : "Isolir Pelanggan"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -428,9 +422,7 @@ export function CustomersPage() {
       {
         description: willIsolate
           ? "Koneksi internet dinonaktifkan."
-          : st === "Pending"
-            ? "Akun portal aktif — pelanggan dapat login & melakukan pembayaran."
-            : "Koneksi internet dipulihkan.",
+          : "Koneksi internet dipulihkan.",
       }
     )
     setIsolateTarget(null)
@@ -489,7 +481,6 @@ export function CustomersPage() {
                 <SelectItem value="all">Semua status</SelectItem>
                 <SelectItem value="Active">Aktif</SelectItem>
                 <SelectItem value="Isolated">Isolir</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
               </SelectContent>
             </Select>
 

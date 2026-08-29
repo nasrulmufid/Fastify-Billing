@@ -123,14 +123,7 @@ export async function authRoutes(app: FastifyInstance) {
         })
       }
 
-      // Status Pending = akun belum diaktifkan (tidak bisa login).
       // Active = layanan aktif; Isolated = akun aktif tapi layanan diisolir (bisa login & bayar).
-      if (row.status === "Pending") {
-        return reply.code(403).send({
-          error: { code: "CUSTOMER_INACTIVE", message: "Akun pelanggan belum diaktifkan" },
-        })
-      }
-
       const token = app.jwt.sign({ sub: row.id, role: "customer" })
       return reply.send({ data: { token, customer: publicCustomer(row) } })
     },

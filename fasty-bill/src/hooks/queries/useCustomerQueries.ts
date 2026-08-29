@@ -3,7 +3,7 @@ import api from "@/lib/axios"
 import { toast } from "sonner"
 
 // --- Types ---
-export type CustomerStatus = "active" | "isolated" | "pending"
+export type CustomerStatus = "active" | "isolated"
 
 export type Customer = {
   id: number | string

@@ -21,7 +21,7 @@ export interface Customer {
   phone: string
   address: string
   packageName: string
-  status: "Active" | "Isolated" | "Pending"
+  status: "Active" | "Isolated"
   ipAddress: string
   router: string
   pppoeUsername: string

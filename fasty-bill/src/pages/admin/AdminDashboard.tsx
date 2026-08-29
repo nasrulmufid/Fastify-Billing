@@ -184,11 +184,6 @@ export function AdminDashboard() {
       value: customers.filter((c) => c.status === "Isolated").length,
       color: "hsl(0 72.2% 50.6%)",
     },
-    {
-      name: "Suspend",
-      value: customers.filter((c) => c.status === "Pending").length,
-      color: "hsl(45.4 93.4% 47.5%)",
-    },
   ]
 
   if (loading) {

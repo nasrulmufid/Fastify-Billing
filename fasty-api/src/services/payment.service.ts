@@ -59,7 +59,9 @@ export async function completePaymentFlow(
   }
 
   // 3) masa aktif customer +1 bulan + Active
-  const [customer] = (await q.query("SELECT * FROM customers WHERE id = ?", [
+  // FOR UPDATE: kunci baris agar 2 pembayaran berurutan/bersamaan selalu
+  // extend dari expiry terbaru (ter-commit), bukan nilai stale -> +N bulan utk N pembayaran.
+  const [customer] = (await q.query("SELECT * FROM customers WHERE id = ? FOR UPDATE", [
     payment.customer_id,
   ])) as Record<string, unknown>[]
   if (customer) {

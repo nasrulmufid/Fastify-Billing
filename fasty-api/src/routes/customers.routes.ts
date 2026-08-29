@@ -2,8 +2,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
 import { nextCode, nextCustomerCode } from "../utils/codegen.js"
-import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, MONTHS_ID } from "../utils/date.js"
+import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, toDbDateTime, MONTHS_ID } from "../utils/date.js"
 import { recordRouterWarning, withRouter, type RouterWarning } from "../services/router.service.js"
+import { completePaymentFlow } from "../services/payment.service.js"
 import {
   generateCustomerWorkbook,
   generateTemplateWorkbook,
@@ -11,7 +12,7 @@ import {
   executeImport,
 } from "../utils/excel.js"
 
-const CUSTOMER_STATUS_ENUM = z.enum(["Active", "Isolated", "Pending"])
+const CUSTOMER_STATUS_ENUM = z.enum(["Active", "Isolated"])
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -520,6 +521,62 @@ export async function customersRoutes(app: FastifyInstance) {
       id,
     ])) as Record<string, unknown>[]
     return reply.send({ data: mapCustomer(updated) })
+  })
+
+  // POST /customers/:id/purchase-cash — beli paket tunai: ganti paket (jika beda),
+  // buat invoice baru (Unpaid), lalu lunasi tunai -> completePaymentFlow (invoice Paid,
+  // masa aktif +1 bulan, status Active, sinkron router).
+  app.post("/customers/:id/purchase-cash", adminAuth, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string }
+    const body = z.object({ packageId: z.coerce.number().min(1) }).parse(req.body)
+
+    const [customer] = (await app.db.query("SELECT * FROM customers WHERE id = ?", [
+      id,
+    ])) as Record<string, unknown>[]
+    if (!customer) {
+      return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Pelanggan tidak ditemukan" } })
+    }
+
+    const [pkg] = (await app.db.query("SELECT * FROM packages WHERE id = ?", [
+      body.packageId,
+    ])) as Record<string, unknown>[]
+    if (!pkg) {
+      return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Paket tidak ditemukan" } })
+    }
+
+    const result = await app.db.transaction(async (q) => {
+      // 1) Ganti paket bila berbeda
+      if (Number(customer.package_id) !== Number(body.packageId)) {
+        await q.query("UPDATE customers SET package_id = ? WHERE id = ?", [body.packageId, id])
+      }
+
+      // 2) Buat invoice baru (Unpaid) untuk periode berjalan
+      const now = new Date()
+      const period = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`
+      const invCode = await nextCode(q.query, "invoices", "INV-")
+      const invRes = (await q.query(
+        "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(NOW(), INTERVAL 1 MONTH))",
+        [invCode, id, Number(pkg.price), period],
+      )) as unknown as { insertId: number }
+
+      // 3) Buat payment lalu selesaikan (lunas tunai) dalam transaksi yang sama
+      const pyCode = await nextCode(q.query, "payments", "PY-")
+      const pRes = (await q.query(
+        "INSERT INTO payments (code, customer_id, invoice_id, method, amount, paid_at, status) VALUES (?, ?, ?, 'Tunai', ?, ?, 'Pending')",
+        [pyCode, id, invRes.insertId, Number(pkg.price), toDbDateTime(now)],
+      )) as unknown as { insertId: number }
+
+      return completePaymentFlow(q, pRes.insertId, "Tunai", "Admin", app)
+    })
+
+    const [updated] = (await app.db.query(`${SQL_SELECT} WHERE c.id = ?`, [
+      id,
+    ])) as Record<string, unknown>[]
+    const payload: Record<string, unknown> = {
+      data: { customer: mapCustomer(updated), invoice: result.invoice, payment: result.payment },
+    }
+    if (result.warning) payload.warning = result.warning
+    return reply.send(payload)
   })
 
   // POST /network/isolir/:id — isolir / unisolir

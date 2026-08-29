@@ -60,12 +60,12 @@ export async function dashboardRoutes(app: FastifyInstance) {
     })
   })
 
-  // GET /dashboard/status-distribution — pie: Aktif / Isolir / Suspend(Pending)
+  // GET /dashboard/status-distribution — pie: Aktif / Isolir
   app.get("/dashboard/status-distribution", auth, async (req, reply: FastifyReply) => {
     const rows = (await app.db.query(
       "SELECT status, COUNT(*) AS value FROM customers GROUP BY status",
     )) as Record<string, unknown>[]
-    const map: Record<string, string> = { Active: "Aktif", Isolated: "Isolir", Pending: "Suspend" }
+    const map: Record<string, string> = { Active: "Aktif", Isolated: "Isolir" }
     return reply.send({
       data: rows.map((r) => ({
         name: map[String(r.status)] ?? String(r.status),

@@ -52,7 +52,7 @@ import {
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog"
 import api from "@/lib/axios"
 import { useAuthStore } from "@/store/useAppStore"
-
+import { useCustomerActions } from "@/lib/customerStore"
 import { formatPrice } from "@/lib/paymentData"
 import { Banknote } from "lucide-react"
 
@@ -121,6 +121,7 @@ export function CustomerDetailPage() {
   const location = useLocation()
   const { token } = useAuthStore()
   const navigate = useNavigate()
+  const { extendExpiry } = useCustomerActions()
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
@@ -207,8 +208,7 @@ export function CustomerDetailPage() {
     if (!payInvoice) return
     try {
       await api.post(`/invoices/${payInvoice.id}/mark-paid`, { method: "Tunai" })
-      // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
-      // Tidak perlu extendExpiry lagi di frontend (akan double extend)
+      extendExpiry(customer.id, 1)
       toast.success("Pembayaran tunai dicatat", {
         description: `${payInvoice.code} lunas — masa aktif ${customer.name} diperpanjang 1 bulan.`,
       })
@@ -475,7 +475,9 @@ export function CustomerDetailPage() {
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Jatuh Tempo</TableHead>
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Nominal</TableHead>
                       <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
-                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Aksi</TableHead>
+                      <TableHead className="w-[60px] text-xs uppercase tracking-wider text-muted-foreground">
+                        <span className="sr-only">Aksi</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -498,6 +500,14 @@ export function CustomerDetailPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Unduh PDF ${inv.id}`}
+                              onClick={() => toast.info(`Mengunduh PDF ${inv.id}…`)}
+                            >
+                              <FileDown className="size-3.5" />
+                            </Button>
                             {inv.status === "Unpaid" && (
                               <div className="group relative">
                                 <Button
@@ -516,14 +526,6 @@ export function CustomerDetailPage() {
                                 </div>
                               </div>
                             )}
-                            {/* <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Unduh PDF ${inv.id}`}
-                              onClick={() => toast.info(`Mengunduh PDF ${inv.id}…`)}
-                            >
-                              <FileDown className="size-3.5" />
-                            </Button> */}
                           </div>
                         </TableCell>
                       </TableRow>

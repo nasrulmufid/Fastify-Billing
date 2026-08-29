@@ -11,7 +11,7 @@ import { createSumopodPayment } from "../utils/sumopod.js"
  * (role "customer", sub = customer.id). Data selalu dibatasi ke customer sendiri.
  */
 
-const CUSTOMER_STATUS_ENUM = z.enum(["Active", "Isolated", "Pending"])
+const CUSTOMER_STATUS_ENUM = z.enum(["Active", "Isolated"])
 
 const createTicketSchema = z.object({
   title: z.string().min(3, "Judul minimal 3 karakter"),
