@@ -92,10 +92,8 @@ type PackageRowActionsProps = {
 function PackageRowActions({ pkg, onEdit, onToggle, onDelete, onSync, syncing }: PackageRowActionsProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button variant="ghost" size="icon-sm">
-          <MoreHorizontal className="size-4" />
-        </Button>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+        <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>Aksi</DropdownMenuLabel>

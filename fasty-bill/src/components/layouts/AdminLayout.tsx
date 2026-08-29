@@ -393,15 +393,13 @@ export function AdminLayout() {
 
           {/* Notifications */}
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="ghost" size="icon" className="relative h-10 w-10" aria-label="Notifikasi">
-                <Bell className="size-6" />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] text-white">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative h-10 w-10" aria-label="Notifikasi" />}>
+              <Bell className="size-6" />
+              {unreadCount > 0 && (
+                <Badge className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] text-white">
+                  {unreadCount}
+                </Badge>
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
               <DropdownMenuLabel>Notifikasi</DropdownMenuLabel>

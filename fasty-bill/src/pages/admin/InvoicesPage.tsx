@@ -78,10 +78,8 @@ function InvoiceRowActions({ invoice, onDetail, onMarkPaid, onDelete }: InvoiceR
   const canPay = invoice.status !== "Paid"
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button variant="ghost" size="icon-sm">
-          <MoreHorizontal className="size-4" />
-        </Button>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+        <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Aksi</DropdownMenuLabel>

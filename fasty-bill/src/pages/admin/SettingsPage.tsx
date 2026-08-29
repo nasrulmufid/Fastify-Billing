@@ -733,10 +733,8 @@ function TabUser() {
                 </div>
               </div>
               <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <Button variant="ghost" size="icon-sm">
-                    <MoreHorizontal className="size-4" />
-                  </Button>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+                  <MoreHorizontal className="size-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuLabel>Aksi</DropdownMenuLabel>
@@ -824,10 +822,8 @@ function TabUser() {
                     <TableCell className="text-sm text-muted-foreground">{u.lastLogin}</TableCell>
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <Button variant="ghost" size="icon-sm">
-                            <MoreHorizontal className="size-4" />
-                          </Button>
+                        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+                          <MoreHorizontal className="size-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuLabel>Aksi</DropdownMenuLabel>

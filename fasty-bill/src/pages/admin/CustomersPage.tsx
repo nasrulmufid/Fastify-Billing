@@ -141,10 +141,8 @@ type CustomerRowActionsProps = {
 function CustomerRowActions({ cust, onDetail, onEdit, onIsolate, onDelete, onEditExpiry }: CustomerRowActionsProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button variant="ghost" size="icon-sm">
-          <MoreHorizontal className="size-4" />
-        </Button>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+        <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>Aksi</DropdownMenuLabel>
@@ -520,11 +518,9 @@ export function CustomersPage() {
           {/* Dropdown Export */}
           <div className="relative">
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button variant="outline" className="shrink-0">
-                  <Download className="mr-1.5 size-4" />
-                  Export
-                </Button>
+              <DropdownMenuTrigger render={<Button variant="outline" className="shrink-0" />}>
+                <Download className="mr-1.5 size-4" />
+                Export
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={4}>
                 <DropdownMenuLabel>Export Operations</DropdownMenuLabel>
@@ -540,11 +536,9 @@ export function CustomersPage() {
           {/* Dropdown Import */}
           <div className="relative">
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button variant="outline" className="shrink-0">
-                  <Upload className="mr-1.5 size-4" />
-                  Import
-                </Button>
+              <DropdownMenuTrigger render={<Button variant="outline" className="shrink-0" />}>
+                <Upload className="mr-1.5 size-4" />
+                Import
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={4}>
                 <DropdownMenuLabel>Import Operations</DropdownMenuLabel>
