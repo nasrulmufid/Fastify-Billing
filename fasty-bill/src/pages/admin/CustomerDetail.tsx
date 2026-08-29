@@ -194,14 +194,6 @@ export function CustomerDetailPage() {
 
   const isIsolated = customer.status === "Isolated"
 
-  const handleIsolate = () => {
-    toast.success(
-      isIsolated ? "Koneksi diaktifkan kembali" : "Pelanggan diisolir",
-      { description: isIsolated ? "Akses internet telah dipulihkan." : "Akses internet telah dinonaktifkan." }
-    )
-    setIsolateOpen(false)
-  }
-
   const handleExtendMonth = async () => {
     if (!customer) return
     setExtendLoading(true)
@@ -262,7 +254,8 @@ export function CustomerDetailPage() {
     if (!payInvoice) return
     try {
       await api.post(`/invoices/${payInvoice.id}/mark-paid`, { method: "Tunai" })
-      extendExpiry(customer.id, 1)
+      // Note: backend completePaymentFlow sudah update expiry_at customer + status Active
+      // Tidak perlu extendExpiry lagi di frontend (akan double extend)
       toast.success("Pembayaran tunai dicatat", {
         description: `${payInvoice.code} lunas — masa aktif ${customer.name} diperpanjang 1 bulan.`,
       })

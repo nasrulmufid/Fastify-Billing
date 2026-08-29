@@ -19,6 +19,7 @@ import {
   Settings,
   Activity,
   MessageCircle,
+  X,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 
@@ -305,14 +306,14 @@ export function AdminLayout() {
 
           {/* Global search */}
           {searchOpen ? (
-            <div className="relative w-full max-w-lg flex-1 lg:max-w-xl">
+            <div className="relative flex w-full max-w-lg flex-1 items-center lg:max-w-xl">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari nama pelanggan..."
-                className="h-9 pl-9"
+                className="h-9 pl-9 pr-9"
                 onBlur={closeSearch}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") closeSearch()
@@ -321,62 +322,71 @@ export function AdminLayout() {
                   }
                 }}
               />
-              {searchQuery.trim() !== "" && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
-                  <ScrollArea className="max-h-72">
-                    {searchResults.length === 0 ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground">
-                        Tidak ada pelanggan dengan nama &ldquo;{searchQuery.trim()}&rdquo;.
-                      </p>
-                    ) : (
-                      searchResults.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => goToCustomer(c.id)}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                        >
-                          <Avatar className="h-7 w-7">
-                            <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                              {c.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{c.name}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {c.code} · {c.packageName}
-                            </p>
-                          </div>
-                          <Badge
-                            className={`text-xs font-medium capitalize ${
-                              c.status === "Active"
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
-                            }`}
-                          >
-                            {c.status === "Active"
-                              ? "Aktif"
-                              : "Isolir"}
-                          </Badge>
-                        </button>
-                      ))
-                    )}
-                  </ScrollArea>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={closeSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label="Tutup pencarian"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           ) : (
             <Button
               variant="outline"
               size="sm"
-              className="inline-flex h-9 w-9 shrink-0 p-0 sm:w-56 sm:justify-start sm:px-3 lg:w-64"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 sm:w-56 sm:justify-start sm:px-3 lg:w-64"
               onClick={() => setSearchOpen(true)}
               aria-label="Cari nama pelanggan"
             >
               <Search className="h-4 w-4 shrink-0 sm:mr-2" />
               <span className="hidden truncate text-muted-foreground sm:inline">Cari nama pelanggan…</span>
             </Button>
+          )}
+
+          {!searchOpen && searchQuery.trim() !== "" && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
+              <ScrollArea className="max-h-72">
+                {searchResults.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">
+                    Tidak ada pelanggan dengan nama &ldquo;{searchQuery.trim()}&rdquo;.
+                  </p>
+                ) : (
+                  searchResults.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => goToCustomer(c.id)}
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                    >
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+                          {c.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{c.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {c.code} · {c.packageName}
+                        </p>
+                      </div>
+                      <Badge
+                        className={`text-xs font-medium capitalize ${
+                          c.status === "Active"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+                        }`}
+                      >
+                        {c.status === "Active"
+                          ? "Aktif"
+                          : "Isolir"}
+                      </Badge>
+                    </button>
+                  ))
+                )}
+              </ScrollArea>
+            </div>
           )}
 
           {!searchOpen && <div className="flex-1" />}
