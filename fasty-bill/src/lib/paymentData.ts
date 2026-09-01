@@ -45,18 +45,7 @@ export const methodHint: Record<PaymentMethod, string> = {
   Tunai: "Dibayar tunai ke admin — dicatat dari menu Invoice, masa aktif diperpanjang.",
 }
 
-export const initialPayments: Payment[] = [
-  { id: "1", code: "PY-1011", customer: "Budi Santoso", invoice: "INV-1038", method: "QRIS", amount: 150000, date: "02 Agustus 2026", status: "Sukses" },
-  { id: "2", code: "PY-1012", customer: "Siti Aminah", invoice: "INV-1039", method: "Tunai", amount: 150000, date: "03 Agustus 2026", status: "Sukses" },
-  { id: "3", code: "PY-1013", customer: "Rizki Putra", invoice: "INV-1040", method: "QRIS", amount: 220000, date: "04 Agustus 2026", status: "Pending" },
-  { id: "4", code: "PY-1014", customer: "Dewi Lestari", invoice: "INV-1041", method: "QRIS", amount: 300000, date: "05 Agustus 2026", status: "Sukses" },
-  { id: "5", code: "PY-1015", customer: "Agus Wijaya", invoice: "INV-1042", method: "Tunai", amount: 150000, date: "05 Agustus 2026", status: "Sukses" },
-  { id: "6", code: "PY-1016", customer: "Budi Santoso", invoice: "INV-1043", method: "QRIS", amount: 150000, date: "06 Agustus 2026", status: "Pending" },
-  { id: "7", code: "PY-1017", customer: "Siti Aminah", invoice: "INV-1044", method: "QRIS", amount: 120000, date: "06 Agustus 2026", status: "Sukses" },
-  { id: "8", code: "PY-1018", customer: "Rizki Putra", invoice: "INV-1045", method: "Tunai", amount: 220000, date: "07 Agustus 2026", status: "Sukses" },
-  { id: "9", code: "PY-1019", customer: "Dewi Lestari", invoice: "INV-1046", method: "QRIS", amount: 300000, date: "07 Agustus 2026", status: "Ditolak" },
-  { id: "10", code: "PY-1020", customer: "Agus Wijaya", invoice: "INV-1047", method: "Tunai", amount: 150000, date: "08 Agustus 2026", status: "Sukses" },
-]
+export const initialPayments: Payment[] = []
 
 export const paymentStatusBadge: Record<PaymentStatus, string> = {
   Sukses: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",

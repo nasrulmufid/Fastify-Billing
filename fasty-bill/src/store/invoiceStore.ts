@@ -19,18 +19,7 @@ export interface Invoice {
   paymentCode?: string
 }
 
-export const initialInvoices: Invoice[] = [
-  { id: "1", code: "INV-1038", customer: "Budi Santoso", amount: 150000, status: "Paid", period: "Agustus 2026", paymentMethod: "QRIS", paymentCode: "PY-1011" },
-  { id: "2", code: "INV-1039", customer: "Siti Aminah", amount: 150000, status: "Paid", period: "Agustus 2026", paymentMethod: "Tunai", paymentCode: "PY-1012" },
-  { id: "3", code: "INV-1040", customer: "Rizki Putra", amount: 220000, status: "Unpaid", period: "Agustus 2026" },
-  { id: "4", code: "INV-1041", customer: "Dewi Lestari", amount: 300000, status: "Paid", period: "Agustus 2026", paymentMethod: "QRIS", paymentCode: "PY-1014" },
-  { id: "5", code: "INV-1042", customer: "Agus Wijaya", amount: 150000, status: "Paid", period: "Agustus 2026", paymentMethod: "Tunai", paymentCode: "PY-1015" },
-  { id: "6", code: "INV-1043", customer: "Budi Santoso", amount: 150000, status: "Unpaid", period: "Agustus 2026" },
-  { id: "7", code: "INV-1044", customer: "Siti Aminah", amount: 120000, status: "Paid", period: "Agustus 2026", paymentMethod: "QRIS", paymentCode: "PY-1017" },
-  { id: "8", code: "INV-1045", customer: "Rizki Putra", amount: 220000, status: "Paid", period: "Agustus 2026", paymentMethod: "Tunai", paymentCode: "PY-1018" },
-  { id: "9", code: "INV-1046", customer: "Dewi Lestari", amount: 300000, status: "Overdue", period: "Juli 2026" },
-  { id: "10", code: "INV-1047", customer: "Agus Wijaya", amount: 150000, status: "Paid", period: "Agustus 2026", paymentMethod: "Tunai", paymentCode: "PY-1020" },
-]
+export const initialInvoices: Invoice[] = []
 
 export const statusLabel: Record<InvoiceStatus, string> = {
   Paid: "Lunas",
