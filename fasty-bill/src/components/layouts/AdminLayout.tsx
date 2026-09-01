@@ -10,7 +10,6 @@ import {
   Users,
   LayoutDashboard,
   Package,
-  Router,
   FileText,
   CreditCard,
   Ticket,
@@ -162,7 +161,7 @@ function NavGroupSection({
 }
 
 /* ---------- initial notifications (kosong — dimuat dari API) ---------- */
-const mockNotifications: NotificationItem[] = []
+const mockNotifications: Notification[] = []
 
 export function AdminLayout() {
   const { sidebarOpen, setSidebarOpen, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } =

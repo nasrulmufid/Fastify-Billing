@@ -54,7 +54,6 @@ import {
 } from "@/lib/paymentData"
 import { usePaymentStore } from "@/store/paymentStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
-import { useCustomers } from "@/lib/customerStore"
 
 const PAGE_SIZE = 8
 

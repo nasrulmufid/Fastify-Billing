@@ -12,7 +12,6 @@ import {
   Search,
   Trash2,
   Upload,
-  UserCheck,
   Wifi,
   WifiOff,
 } from "lucide-react"

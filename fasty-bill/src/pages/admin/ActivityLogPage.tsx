@@ -59,7 +59,7 @@ export function ActivityLogPage() {
             <span>Aksi</span>
             <span>Target</span>
           </div>
-          {logs.map((log, i) => (
+          {logs.map((log) => (
             <div key={log.id} className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center border-b border-border px-4 py-3 text-sm last:border-b-0">
               <span className="text-muted-foreground">{log.time}</span>
               <span className="font-medium">{log.actor}</span>

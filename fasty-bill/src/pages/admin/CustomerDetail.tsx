@@ -627,7 +627,7 @@ export function CustomerDetailPage() {
       <CustomerFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
-        customer={customer}
+        customer={customer as any}
       />
 
       {/* ---------- Konfirmasi Isolir ---------- */}

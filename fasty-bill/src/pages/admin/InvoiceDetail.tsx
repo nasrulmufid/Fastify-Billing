@@ -452,7 +452,7 @@ export function InvoiceCreatePage() {
                   </SelectTrigger>
                   <SelectContent>
                     {periodOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
+                      <SelectItem key={opt.value} value={opt.value ?? ""}>
                         {opt.label}
                       </SelectItem>
                     ))}

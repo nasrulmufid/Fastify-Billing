@@ -41,7 +41,6 @@ export function PaymentDetailPage() {
   const setStatus = usePaymentStore((s) => s.setStatus)
   const invoices = useInvoiceStore((s) => s.invoices)
   const markPaid = useInvoiceStore((s) => s.markPaid)
-  const customers = useCustomers()
 
   if (!payment) {
     return (
@@ -220,7 +219,6 @@ export function PaymentApprovalPage() {
   const setStatus = usePaymentStore((s) => s.setStatus)
   const invoices = useInvoiceStore((s) => s.invoices)
   const markPaid = useInvoiceStore((s) => s.markPaid)
-  const customers = useCustomers()
 
   const handleApprove = async (payment: Payment) => {
     setStatus(payment.id, "Sukses")

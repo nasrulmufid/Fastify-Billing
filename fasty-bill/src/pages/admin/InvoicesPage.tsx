@@ -134,7 +134,6 @@ export function InvoicesPage() {
   const loadInvoices = useInvoiceStore((s) => s.load)
   const markPaid = useInvoiceStore((s) => s.markPaid)
   const removeInvoice = useInvoiceStore((s) => s.removeInvoice)
-  const customers = useCustomers()
 
   // Muat data dari backend saat halaman dibuka
   useEffect(() => {

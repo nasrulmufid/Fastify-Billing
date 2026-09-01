@@ -127,7 +127,6 @@ export function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [revenueTrend, setRevenueTrend] = useState<RevenuePoint[]>([])
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
-  const [invoicesNearDue, setInvoicesNearDue] = useState<InvoiceNearDue[]>([])
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>(12)
   const [revenueLoading, setRevenueLoading] = useState(true)
   const [loading, setLoading] = useState(true)
