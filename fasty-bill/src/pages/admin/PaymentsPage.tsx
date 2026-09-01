@@ -117,8 +117,6 @@ export function PaymentsPage() {
   const removePayment = usePaymentStore((s) => s.removePayment)
   const invoices = useInvoiceStore((s) => s.invoices)
   const markPaid = useInvoiceStore((s) => s.markPaid)
-  const customers = useCustomers()
-
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [methodFilter, setMethodFilter] = useState("all")
