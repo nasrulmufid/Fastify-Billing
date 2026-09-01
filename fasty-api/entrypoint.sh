@@ -35,28 +35,14 @@ if [ $RETRIES -eq 0 ]; then
   exit 1
 fi
 
-# Import migration database (hanya jika belum ada tabel users)
-echo "[INFO] Mengecek status database..."
-MIGRATION_NEEDED=false
-
-# Try to check with root user (untuk migration)
-QUERY_CHECK=$(mysql -h "$DB_HOST" -u root -p"$MYSQL_ROOT_PASSWORD" --skip-ssl -e "SELECT COUNT(*) FROM $DB_NAME.users LIMIT 1;" 2>/dev/null || echo "0")
-
-if echo "$QUERY_CHECK" | grep -q "1"; then
-  echo "[SKIP] Database sudah termigrasi (tabel users ada)."
+# Jalankan migrasi melalui mysql2 agar kompatibel dengan autentikasi MySQL 8.
+echo "[INFO] Menjalankan migrasi database..."
+if [ -f "/app/sql/migration_production.sql" ]; then
+  DB_HOST="$DB_HOST" DB_PORT="$DB_PORT" DB_USER="root" \
+    DB_PASS="$MYSQL_ROOT_PASSWORD" node /app/dist/scripts/migrate_production.js
+  echo "[OK] Migrasi database selesai!"
 else
-  MIGRATION_NEEDED=true
-fi
-
-# Jalankan migrasi jika diperlukan
-if [ "$MIGRATION_NEEDED" = "true" ]; then
-  echo "[INFO] Menjalankan migrasi database..."
-  if [ -f "/app/sql/migration_production.sql" ]; then
-    mysql -h "$DB_HOST" -u root -p"$MYSQL_ROOT_PASSWORD" --skip-ssl < /app/sql/migration_production.sql
-    echo "[OK] Migrasi database selesai!"
-  else
-    echo "[WARN] File migration_production.sql tidak ditemukan di /app/sql/"
-  fi
+  echo "[WARN] File migration_production.sql tidak ditemukan di /app/sql/"
 fi
 
 # Switch ke app user & start aplikasi
