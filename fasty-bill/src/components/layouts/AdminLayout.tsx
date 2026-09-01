@@ -225,12 +225,14 @@ export function AdminLayout() {
             sidebarCollapsed ? "justify-center px-0" : "px-6",
           )}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground text-sm">
-            RB
-          </div>
+          <img
+            src="/fasty-bill-logo.svg"
+            alt="Fasty Bill"
+            className="h-8 w-8 shrink-0 rounded-lg"
+          />
           {!sidebarCollapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight">RTRW Billing</p>
+              <p className="text-sm font-semibold leading-tight">Fasty Bill</p>
               <p className="text-xs text-muted-foreground">Admin Dashboard</p>
             </div>
           )}

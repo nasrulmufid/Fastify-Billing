@@ -98,11 +98,9 @@ export function LoginPage() {
         {/* brand */}
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-lg">
-              RB
-            </div>
+            <img src="/fasty-bill-logo.svg" alt="Fasty Bill" className="h-11 w-11 rounded-xl shadow-lg" />
             <div>
-              <p className="text-sm font-semibold">RTRW Billing</p>
+              <p className="text-sm font-semibold">Fasty Bill</p>
               <p className="text-xs text-secondary-foreground/60">Admin Dashboard</p>
             </div>
           </div>
@@ -149,11 +147,9 @@ export function LoginPage() {
         <div className="w-full max-w-md">
           {/* logo (mobile) */}
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-bold text-primary-foreground">
-              RB
-            </div>
+            <img src="/fasty-bill-logo.svg" alt="Fasty Bill" className="h-10 w-10 rounded-xl" />
             <div>
-              <p className="text-sm font-semibold">RTRW Billing</p>
+              <p className="text-sm font-semibold">Fasty Bill</p>
               <p className="text-xs text-muted-foreground">Admin Dashboard</p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, User, Wifi } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,9 +44,11 @@ export function PortalLoginPage() {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="mb-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground shadow-lg">
-            RB
-          </div>
+          <img
+            src="/fasty-bill-logo.svg"
+            alt="Fasty Bill"
+            className="mx-auto h-14 w-14 rounded-2xl shadow-lg"
+          />
           <h1 className="mt-4 text-2xl font-bold tracking-tight">Portal Pelanggan</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Masuk untuk cek tagihan, bayar, dan ajukan tiket gangguan.
@@ -69,7 +71,7 @@ export function PortalLoginPage() {
                 <Input
                   id="portal-username"
                   autoComplete="username"
-                  placeholder="cth. budi.santoso"
+                  placeholder="Masukkan username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="h-10 pl-9"
@@ -117,25 +119,7 @@ export function PortalLoginPage() {
             </Button>
           </form>
 
-          {/* Akun demo */}
-          <div className="mt-5 rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-            <p className="flex items-center gap-1.5 font-medium text-foreground">
-              <Wifi className="size-3.5" />
-              Akun demo
-            </p>
-            <p className="mt-1">
-              Username: <span className="font-mono font-medium">budi.santoso</span> · Password:{" "}
-              <span className="font-mono font-medium">budi2026</span>
-            </p>
-          </div>
         </div>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Bukan pelanggan?{" "}
-          <Link to="/login" className="font-medium text-primary hover:underline">
-            Masuk admin
-          </Link>
-        </p>
       </div>
     </div>
   )

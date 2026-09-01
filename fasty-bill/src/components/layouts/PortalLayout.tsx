@@ -36,11 +36,9 @@ export function PortalLayout() {
         <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
-                RB
-              </div>
+              <img src="/fasty-bill-logo.svg" alt="Fasty Bill" className="h-8 w-8 rounded-lg" />
               <div>
-                <p className="text-sm leading-tight font-semibold">RTRW Billing</p>
+                <p className="text-sm leading-tight font-semibold">Fasty Bill</p>
                 <p className="text-[10px] text-muted-foreground">Portal Pelanggan</p>
               </div>
             </div>
