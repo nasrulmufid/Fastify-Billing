@@ -73,6 +73,8 @@ services:
       retries: 5
     networks:
       - fasty-net
+    ports:
+      - 3000:3000   # hanya untuk testing, sebaiknya gunakan reverse proxy (nginx) di depan
 
   # ----------------------------------------------------------
   # fasty-bill — Frontend (nginx)
@@ -108,7 +110,7 @@ services:
       - --os=FastifyBilling
       - --account-validation=false
     environment:
-      APP_PORT: 3000
+      APP_PORT: 5000
       APP_DEBUG: "false"
       APP_BASIC_AUTH: ${WA_BASIC_AUTH:-admin:admin}
       # Webhook ke backend agar pesan masuk bisa diproses (isi jika ada handler)
@@ -118,9 +120,9 @@ services:
       - whatsapp_storages:/app/storages
       - whatsapp_statics:/app/statics
     ports:
-      - "3000:3000"   # UI/dashboard gateway (ganti ke 127.0.0.1 jika tak perlu publik)
+      - "5000:5000"   # UI/dashboard gateway (ganti ke 127.0.0.1 jika tak perlu publik)
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
       interval: 30s
       timeout: 5s
       retries: 5
