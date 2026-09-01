@@ -1,0 +1,137 @@
+# ============================================================
+# Fastify-Billing — Production Docker Compose
+# Layanan: mysql, fasty-api (backend), fasty-bill (frontend),
+#          whatsapp (go-whatsapp-web-multidevice gateway)
+#
+# Cara pakai:
+#   1. Salin .env.example -> .env dan isi nilai rahasia.
+#   2. docker compose up -d --build
+#   3. Jalankan migrasi: docker compose exec fasty-api npm run db:migrate
+#      (atau import sql/migration_production.sql ke DB).
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # MySQL / MariaDB
+  # ----------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: fasty-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_root}
+      MYSQL_DATABASE: ${DB_NAME:-fasty_bill}
+      MYSQL_USER: ${DB_USER:-fasty}
+      MYSQL_PASSWORD: ${DB_PASS:-changeme_db}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306"   # hanya localhost, jangan expose ke publik
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-changeme_root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fasty-net
+
+  # ----------------------------------------------------------
+  # fasty-api — Backend Fastify
+  # ----------------------------------------------------------
+  fasty-api:
+    build:
+      context: ./fasty-api
+      dockerfile: Dockerfile
+    image: fasty-api:latest
+    container_name: fasty-api
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-fasty_bill}
+      DB_USER: ${DB_USER:-fasty}
+      DB_PASS: ${DB_PASS:-changeme_db}
+      JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_this_encryption_key_32}
+      SUMODOP_BASE_URL: ${SUMODOP_BASE_URL:-https://api-pay-sandbox.sumopod.com}
+      SUMODOP_WEBHOOK_SECRET: ${SUMODOP_WEBHOOK_SECRET:-}
+      SUMODOP_WEBHOOK_TOKEN: ${SUMODOP_WEBHOOK_TOKEN:-}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fasty-net
+
+  # ----------------------------------------------------------
+  # fasty-bill — Frontend (nginx)
+  # ----------------------------------------------------------
+  fasty-bill:
+    build:
+      context: ./fasty-bill
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    image: fasty-bill:latest
+    container_name: fasty-bill
+    restart: always
+    depends_on:
+      - fasty-api
+    ports:
+      - "80:80"
+    networks:
+      - fasty-net
+
+  # ----------------------------------------------------------
+  # whatsapp — Go WhatsApp Web Multidevice Gateway
+  # (https://github.com/aldinokemal/go-whatsapp-web-multidevice)
+  # ----------------------------------------------------------
+  whatsapp:
+    image: aldinokemal2104/go-whatsapp-web-multidevice:latest
+    container_name: fasty-whatsapp
+    restart: always
+    command:
+      - rest
+      - --basic-auth=${WA_BASIC_AUTH:-admin:admin}
+      - --port=3000
+      - --os=FastifyBilling
+      - --account-validation=false
+    environment:
+      APP_PORT: 3000
+      APP_DEBUG: "false"
+      APP_BASIC_AUTH: ${WA_BASIC_AUTH:-admin:admin}
+      # Webhook ke backend agar pesan masuk bisa diproses (isi jika ada handler)
+      WHATSAPP_WEBHOOK: ${WA_WEBHOOK:-}
+      WHATSAPP_WEBHOOK_SECRET: ${WA_WEBHOOK_SECRET:-secret}
+    volumes:
+      - whatsapp_storages:/app/storages
+      - whatsapp_statics:/app/statics
+    ports:
+      - "3000:3000"   # UI/dashboard gateway (ganti ke 127.0.0.1 jika tak perlu publik)
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fasty-net
+
+volumes:
+  mysql_data:
+  whatsapp_storages:
+  whatsapp_statics:
+
+networks:
+  fasty-net:
+    driver: bridge
