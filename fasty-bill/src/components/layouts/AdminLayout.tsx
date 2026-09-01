@@ -407,11 +407,11 @@ export function AdminLayout() {
           </div>
 
           {/* Spacer — hanya desktop agar notif & profil tetap di kanan */}
-          <div className="hidden flex-1 sm:block" />
+          <div className="hidden lg:block lg:flex-1" />
 
           {/* Notifications */}
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative h-10 w-10" aria-label="Notifikasi" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative ml-auto h-10 w-10 lg:ml-0" aria-label="Notifikasi" />}>
               <Bell className="size-6" />
               {unreadCount > 0 && (
                 <Badge className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] text-white">
