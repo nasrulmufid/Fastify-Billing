@@ -1,6 +1,194 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title>Fasty Bill</title>
-  <rect width="64" height="64" rx="14" fill="#0f766e" />
-  <path d="M18 16h28v8H27v8h16v8H27v8h19v8H18V16Z" fill="#fff" />
-  <path d="M43 12h7v7h-7z" fill="#f59e0b" />
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 1024 1024"
+  width="1024"
+  height="1024"
+>
+  <defs>
+    <!-- Dark green F -->
+    <linearGradient id="darkGreen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#064B38"/>
+      <stop offset="100%" stop-color="#00633E"/>
+    </linearGradient>
+
+    <!-- Bright cash green -->
+    <linearGradient id="cashGreen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#11A900"/>
+      <stop offset="100%" stop-color="#1EC000"/>
+    </linearGradient>
+
+    <!-- Clip cash corners -->
+    <clipPath id="noteClip">
+      <path
+        d="
+          M318 669
+          L352 505
+          Q362 456 425 446
+          H704
+          L674 598
+          Q665 643 607 643
+          H399
+          Q356 643 318 669
+          Z
+        "
+      />
+    </clipPath>
+  </defs>
+
+  <!--
+    Background
+    oklch(88.71% .2122 128.504)
+    ≈ #AFF33E
+  -->
+  <rect
+    x="0"
+    y="0"
+    width="1024"
+    height="1024"
+    rx="76"
+    fill="#AFF33E"
+  />
+
+  <!-- ===================== -->
+  <!-- F LETTER -->
+  <!-- ===================== -->
+
+  <path
+    fill="url(#darkGreen)"
+    d="
+      M345 487
+      L381 284
+      Q395 204 488 204
+      H872
+
+      L851 314
+      Q840 365 782 365
+
+      H529
+      Q504 365 499 394
+
+      L489 446
+      H813
+
+      L793 549
+      Q783 601 724 601
+
+      H681
+      L699 511
+
+      H466
+      Q411 511 372 554
+
+      Z
+    "
+  />
+
+  <!-- Lower part of F -->
+  <path
+    fill="url(#darkGreen)"
+    d="
+      M315 806
+
+      L334 711
+      Q347 650 418 637
+
+      H550
+
+      L532 729
+      Q520 793 456 806
+
+      Z
+    "
+  />
+
+  <!-- ===================== -->
+  <!-- CASH / MONEY -->
+  <!-- ===================== -->
+
+  <path
+    d="
+      M318 669
+      L352 505
+
+      Q362 456 425 446
+
+      H704
+
+      L674 598
+      Q665 643 607 643
+
+      H399
+
+      Q356 643 318 669
+
+      Z
+    "
+    fill="#AFF33E"
+    stroke="url(#cashGreen)"
+    stroke-width="26"
+    stroke-linejoin="round"
+  />
+
+  <!-- Money corner details -->
+  <g
+    clip-path="url(#noteClip)"
+    fill="url(#cashGreen)"
+  >
+    <circle cx="382" cy="515" r="28"/>
+    <circle cx="675" cy="505" r="30"/>
+    <circle cx="365" cy="618" r="28"/>
+    <circle cx="640" cy="615" r="30"/>
+  </g>
+
+  <!-- Center money circle -->
+  <circle
+    cx="505"
+    cy="548"
+    r="48"
+    fill="url(#cashGreen)"
+  />
+
+  <circle
+    cx="505"
+    cy="548"
+    r="32"
+    fill="#AFF33E"
+  />
+
+  <circle
+    cx="505"
+    cy="548"
+    r="27"
+    fill="url(#cashGreen)"
+  />
+
+  <!-- ===================== -->
+  <!-- SPEED LINES -->
+  <!-- ===================== -->
+
+  <g fill="url(#cashGreen)">
+    <rect
+      x="198"
+      y="482"
+      width="108"
+      height="24"
+      rx="12"
+    />
+
+    <rect
+      x="140"
+      y="546"
+      width="154"
+      height="24"
+      rx="12"
+    />
+
+    <rect
+      x="176"
+      y="614"
+      width="111"
+      height="24"
+      rx="12"
+    />
+  </g>
 </svg>
