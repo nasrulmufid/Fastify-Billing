@@ -19,11 +19,22 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
+
+# Install mysql-client & netcat untuk cek koneksi MySQL & import migrasi
+RUN apk add --no-cache mysql-client netcat-openbsd
+
+# Copy SQL migration file & entrypoint script (sebagai root dulu)
+COPY sql ./sql
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Non-root user
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
-USER app
+# Ubah ownership ke app user
+RUN chown -R app:app /app
+
 EXPOSE 3000
-CMD ["node", "dist/server.js"]
+ENTRYPOINT ["/app/entrypoint.sh"]
