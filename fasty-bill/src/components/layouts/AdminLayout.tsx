@@ -161,7 +161,14 @@ function NavGroupSection({
 }
 
 /* ---------- initial notifications (kosong — dimuat dari API) ---------- */
-const mockNotifications: Notification[] = []
+type NotificationItem = {
+  id: string
+  title: string
+  desc: string
+  time: string
+  unread?: boolean
+}
+const mockNotifications: NotificationItem[] = []
 
 export function AdminLayout() {
   const { sidebarOpen, setSidebarOpen, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } =

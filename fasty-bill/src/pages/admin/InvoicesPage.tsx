@@ -52,7 +52,6 @@ import {
   type InvoiceStatus,
 } from "@/store/invoiceStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
-import { useCustomers } from "@/lib/customerStore"
 
 const PAGE_SIZE = 8
 

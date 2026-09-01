@@ -22,7 +22,6 @@ import {
 } from "@/lib/paymentData"
 import { usePaymentStore } from "@/store/paymentStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
-import { useCustomers } from "@/lib/customerStore"
 
 const methodIcon: Record<PaymentMethod, typeof QrCode> = {
   QRIS: QrCode,

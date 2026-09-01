@@ -444,7 +444,7 @@ export function InvoiceCreatePage() {
               <div className="space-y-1.5">
                 <Label htmlFor="period">Periode</Label>
                 <Select
-                  onValueChange={(v) => setValue("period", v)}
+                  onValueChange={(v) => setValue("period", v ?? "")}
                   value={watch("period")}
                 >
                   <SelectTrigger id="period" className="h-9">

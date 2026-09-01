@@ -52,15 +52,6 @@ interface ActivityItem {
   status: "success" | "warning" | "info"
 }
 
-interface InvoiceNearDue {
-  no: string
-  customer: string
-  amount: string
-  due: string
-  daysLeft: number
-  status: "critical" | "warning" | "normal"
-}
-
 type RevenuePeriod = 1 | 6 | 12
 
 function formatRevenue(valueInMillions: number): string {
@@ -74,12 +65,6 @@ const statusVariant: Record<string, string> = {
   success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   info: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
-}
-
-const dueStatusVariant: Record<string, string> = {
-  critical: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-  warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  normal: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
 }
 
 /* ================================================================
@@ -382,75 +367,12 @@ export function AdminDashboard() {
               <Clock className="h-5 w-5 text-amber-500" />
               <CardTitle className="text-lg font-semibold">Invoice Mendekati Jatuh Tempo</CardTitle>
             </div>
-            <Badge variant="outline" className="text-xs font-normal">
-              {invoicesNearDue.filter((inv) => inv.status !== "normal").length} butuh perhatian
-            </Badge>
           </div>
         </CardHeader>
         <CardContent>
-          {invoicesNearDue.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              Tidak ada invoice yang mendekati jatuh tempo
-            </div>
-          ) : (
-            <>
-              {/* ===== Mobile: kartu per invoice ===== */}
-              <div className="divide-y divide-border sm:hidden">
-                {invoicesNearDue.map((inv) => (
-                  <div key={inv.no} className="py-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium">{inv.no}</span>
-                      <Badge className={`text-xs ${dueStatusVariant[inv.status] ?? ""}`}>
-                        {inv.status === "critical"
-                          ? `Sisa ${inv.daysLeft} hari`
-                          : `${inv.daysLeft} hari lagi`}
-                      </Badge>
-                    </div>
-                    <p className="mt-0.5 text-sm text-muted-foreground">{inv.customer}</p>
-                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-dashed border-border pt-2 text-sm">
-                      <dt className="text-muted-foreground">Jumlah</dt>
-                      <dd className="text-right font-medium">{inv.amount}</dd>
-                      <dt className="text-muted-foreground">Jatuh Tempo</dt>
-                      <dd className="text-right text-muted-foreground">{inv.due}</dd>
-                    </dl>
-                  </div>
-                ))}
-              </div>
-              {/* ===== Desktop: tabel ===== */}
-              <div className="hidden sm:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px] text-sm">No. Invoice</TableHead>
-                      <TableHead className="text-sm">Pelanggan</TableHead>
-                      <TableHead className="w-[120px] text-sm">Jumlah</TableHead>
-                      <TableHead className="w-[130px] text-sm">Jatuh Tempo</TableHead>
-                      <TableHead className="w-[130px] text-sm">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoicesNearDue.map((inv) => (
-                      <TableRow key={inv.no}>
-                        <TableCell className="text-sm font-medium">{inv.no}</TableCell>
-                        <TableCell className="text-sm">{inv.customer}</TableCell>
-                        <TableCell className="text-sm">{inv.amount}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{inv.due}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-xs ${dueStatusVariant[inv.status] ?? ""}`}>
-                            {inv.status === "critical"
-                              ? `Sisa ${inv.daysLeft} hari`
-                              : inv.status === "warning"
-                                ? `${inv.daysLeft} hari lagi`
-                                : `${inv.daysLeft} hari lagi`}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Tidak ada invoice yang mendekati jatuh tempo
+          </div>
         </CardContent>
       </Card>
 
