@@ -28,7 +28,7 @@ services:
     ports:
       - "127.0.0.1:3306:3306"   # hanya localhost, jangan expose ke publik
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-changeme_root}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 10
