@@ -92,7 +92,7 @@ services:
     depends_on:
       - fasty-api
     ports:
-      - "80:80"
+      - "9980:80"
     networks:
       - fasty-net
 
