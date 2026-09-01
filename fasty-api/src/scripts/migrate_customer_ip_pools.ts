@@ -1,9 +1,10 @@
 import mysql from "mysql2/promise"
+import type { RowDataPacket } from "mysql2/promise"
 
 import { config } from "../config.js"
 
-type CustomerRow = { id: number; code: string; router_id: number; ip_address: string }
-type RouterRow = { id: number; name: string; ip_pool_pppoe: string | null }
+type CustomerRow = RowDataPacket & { id: number; code: string; router_id: number; ip_address: string }
+type RouterRow = RowDataPacket & { id: number; name: string; ip_pool_pppoe: string | null }
 
 function parsePool(cidr: string) {
   const [address, prefixText] = cidr.split("/")

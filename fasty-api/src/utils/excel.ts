@@ -25,7 +25,7 @@ export const CUSTOMER_COLUMNS = [
   { header: "GPS Coordinates", key: "gps", width: 25 },
 ]
 
-type CustomerRow = Record<string, string | number | null | undefined>
+export type CustomerRow = Record<string, string | number | null | undefined>
 
 /* ----------------------------------------------------------------
    Export: generate workbook dari array customers
@@ -213,7 +213,7 @@ export async function parseImportWorkbook(
   buffer: Buffer,
 ): Promise<{ rows: ParsedCustomerRow[]; errors: ImportResult["errors"] }> {
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(buffer)
+  await workbook.xlsx.load(buffer as any)
 
   const worksheet = workbook.getWorksheet(1)
   if (!worksheet) {
@@ -483,14 +483,14 @@ export async function executeImport(
         "Juli", "Agustus", "September", "Oktober", "November", "Desember",
       ]
       const period = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`
-      const [pkg] = await app.db.query("SELECT price FROM packages WHERE id = ?", [packageId])
-      const price = Number((pkg as any)?.price ?? 0)
+      const pkg = (await app.db.query("SELECT price FROM packages WHERE id = ?", [packageId])) as Record<string, unknown>[]
+      const price = Number((pkg?.[0] as any)?.price ?? 0)
 
       // Get next INV code
-      const [invRow] = await app.db.query(
+      const invRow = (await app.db.query(
         "SELECT MAX(CAST(SUBSTRING(code, 5) AS UNSIGNED)) AS max_num FROM invoices",
-      ) as Record<string, unknown>[]
-      const maxInv = Number((invRow as any)?.max_num ?? 0)
+      )) as Record<string, unknown>[]
+      const maxInv = Number((invRow?.[0] as any)?.max_num ?? 0)
       const invCode = `INV-${maxInv + 1}`
 
       await app.db.query(

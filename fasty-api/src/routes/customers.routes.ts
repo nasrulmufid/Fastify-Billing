@@ -10,6 +10,7 @@ import {
   generateTemplateWorkbook,
   parseImportWorkbook,
   executeImport,
+  type CustomerRow,
 } from "../utils/excel.js"
 
 const CUSTOMER_STATUS_ENUM = z.enum(["Active", "Isolated"])
@@ -186,7 +187,7 @@ export async function customersRoutes(app: FastifyInstance) {
     // Alokasi IP otomatis: bila IP tidak diisi, ambil IP berikutnya dari pool
     // router (ip_pool CIDR, contoh 192.168.200.0/24). Fallback ke 192.168.1.x
     // bila router tidak punya pool.
-    const { nextIp } = await app.db.transaction(async (q) => {
+    const { code, nextIp } = await app.db.transaction(async (q) => {
       const code = await nextCustomerCode(q.query)
       let allocated = body.ipAddress || ""
       if (!allocated && body.routerId) {
@@ -204,7 +205,7 @@ export async function customersRoutes(app: FastifyInstance) {
           allocated = `192.168.1.${lastOctet + 1}`
         }
       }
-      return { code: c, nextIp: allocated }
+      return { code, nextIp: allocated }
     })
 
     const joinAt = new Date()
@@ -756,12 +757,12 @@ export async function customersRoutes(app: FastifyInstance) {
   // GET /customers/export — download semua pelanggan sebagai .xlsx
   app.get("/customers/export", adminAuth, async (req: FastifyRequest, reply: FastifyReply) => {
     const rows = (await app.db.query(SQL_SELECT)) as Record<string, unknown>[]
-    const buffer = await generateCustomerWorkbook(rows)
+    const buffer = await generateCustomerWorkbook(rows as CustomerRow[])
     const filename = `pelanggan_${new Date().toISOString().slice(0, 10)}.xlsx`
     return reply
       .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
       .header("Content-Disposition", `attachment; filename="${filename}"`)
-      .header("Content-Length", buffer.length.toString())
+      .header("Content-Length", buffer.byteLength.toString())
       .send(buffer)
   })
 
@@ -771,7 +772,7 @@ export async function customersRoutes(app: FastifyInstance) {
     return reply
       .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
       .header("Content-Disposition", 'attachment; filename="template-import-pelanggan.xlsx"')
-      .header("Content-Length", buffer.length.toString())
+      .header("Content-Length", buffer.byteLength.toString())
       .send(buffer)
   })
 
