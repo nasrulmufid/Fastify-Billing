@@ -232,6 +232,11 @@ export function AdminLayout() {
   const unreadCount = notifications.filter((n) => n.unread).length
   const recentNotifications = notifications.slice(0, 10)
 
+  // "Read all" — hapus notifikasi dari navbar (badge & list)
+  const handleReadAll = () => {
+    setNotifications([])
+  }
+
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return []
@@ -473,9 +478,20 @@ export function AdminLayout() {
             <DropdownMenuContent align="end" className="w-80">
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Notifikasi</span>
-                {unreadCount > 0 && (
-                  <Badge className="bg-rose-500 text-white hover:bg-rose-500">{unreadCount}</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <Badge className="bg-rose-500 text-white hover:bg-rose-500">{unreadCount}</Badge>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleReadAll}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Read all
+                    </button>
+                  )}
+                </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {recentNotifications.length === 0 ? (
