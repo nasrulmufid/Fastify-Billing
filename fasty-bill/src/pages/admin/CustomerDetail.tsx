@@ -149,6 +149,10 @@ export function CustomerDetailPage() {
   const [extendLoading, setExtendLoading] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [payInvoice, setPayInvoice] = useState<any | null>(null)
+  const [cashOpen, setCashOpen] = useState(false)
+  const [packages, setPackages] = useState<any[]>([])
+  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null)
+  const [cashLoading, setCashLoading] = useState(false)
 
   // Fetch customer data from backend API
   useEffect(() => {
@@ -280,6 +284,55 @@ export function CustomerDetailPage() {
     }
   }
 
+  const handleOpenCash = async () => {
+    setCashLoading(true)
+    try {
+      const res = await api.get("/packages", { headers: { Authorization: `Bearer ${token}` } })
+      setPackages((res.data.data || []).filter((p: any) => p.status === "Aktif"))
+      setSelectedPackageId(null)
+      setCashOpen(true)
+    } catch (err: any) {
+      console.error("Gagal memuat daftar paket:", err)
+      toast.error("Gagal memuat daftar paket", {
+        description: err?.response?.data?.error?.message || "Terjadi kesalahan saat memuat paket.",
+      })
+    } finally {
+      setCashLoading(false)
+    }
+  }
+
+  const handlePurchaseCash = async () => {
+    if (!customer || !selectedPackageId) return
+    setCashLoading(true)
+    try {
+      const res = await api.post(
+        `/customers/${customer.id}/purchase-cash`,
+        { packageId: selectedPackageId },
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      const pkg = packages.find((p) => p.id === selectedPackageId)
+      toast.success("Order paket tunai dicatat", {
+        description: `${customer.name} dipindah ke paket ${pkg?.name ?? ""} — lunas tunai, masa aktif +1 bulan & profile Mikrotik disinkron.`,
+      })
+      setCashOpen(false)
+      setSelectedPackageId(null)
+      // Refresh data pelanggan & invoice
+      const [custRes, invRes] = await Promise.all([
+        api.get(`/customers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+      setCustomer(custRes.data.data)
+      setInvoices(invRes.data.data || [])
+    } catch (err: any) {
+      console.error("Gagal order paket tunai:", err)
+      toast.error("Gagal order paket tunai", {
+        description: err?.response?.data?.error?.message || "Terjadi kesalahan saat memproses order paket.",
+      })
+    } finally {
+      setCashLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* ---------- Breadcrumb ---------- */}
@@ -334,6 +387,15 @@ export function CustomerDetailPage() {
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <Button
+            variant="outline"
+            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+            onClick={handleOpenCash}
+            disabled={cashLoading}
+          >
+            <Banknote className="mr-1.5 size-4" />
+            Terima Cash
+          </Button>
           <Button
             variant="outline"
             className={isIsolated ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900/60"}
@@ -735,6 +797,67 @@ export function CustomerDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ---------- Dialog Terima Cash (Order Paket Baru) ---------- */}
+      <Dialog open={cashOpen} onOpenChange={setCashOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Terima Cash — Order Paket Baru</DialogTitle>
+            <DialogDescription className="text-sm">
+              Pilih paket untuk {customer.name}. Sistem akan mencatat order, melunasi tunai, memperpanjang masa aktif 1 bulan, dan menyinkron profile Mikrotik.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+            {packages.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">Tidak ada paket aktif.</p>
+            ) : (
+              packages.map((pkg) => {
+                const selected = selectedPackageId === pkg.id
+                return (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => setSelectedPackageId(pkg.id)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left transition-colors ${
+                      selected
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{pkg.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {pkg.downloadSpeed}/{pkg.uploadSpeed} Mbps
+                        {pkg.description ? ` · ${pkg.description}` : ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold">{formatPrice(pkg.price)}</span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCashOpen(false)} disabled={cashLoading}>
+              Batal
+            </Button>
+            <Button
+              onClick={handlePurchaseCash}
+              disabled={cashLoading || !selectedPackageId}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {cashLoading ? (
+                <LoaderCircle className="mr-1.5 size-4 animate-spin" />
+              ) : (
+                <Banknote className="mr-1.5 size-4" />
+              )}
+              Konfirmasi &amp; Catat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
