@@ -300,7 +300,7 @@ export function AdminLayout() {
             onClick={toggleSidebar}
             aria-label="Buka sidebar"
           >
-            <Menu className="size-6" />
+            <Menu className="size-5" />
           </Button>
           <Button
             variant="ghost"
@@ -309,7 +309,7 @@ export function AdminLayout() {
             onClick={toggleSidebarCollapsed}
             aria-label="Ciutkan sidebar"
           >
-            <Menu className="size-6" />
+            <Menu className="size-5" />
           </Button>
 
           {/* Global search — container lebar tetap agar layout tidak bergeser
@@ -412,7 +412,7 @@ export function AdminLayout() {
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative ml-auto h-10 w-10 lg:ml-0" aria-label="Notifikasi" />}>
-              <Bell className="size-6" />
+              <Bell className="size-5" />
               {unreadCount > 0 && (
                 <Badge className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] text-white">
                   {unreadCount}
