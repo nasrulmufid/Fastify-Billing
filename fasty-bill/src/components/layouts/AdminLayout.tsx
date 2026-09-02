@@ -19,8 +19,10 @@ import {
   Activity,
   MessageCircle,
   X,
+  AlertTriangle,
+  Wallet,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ComponentType } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,11 +41,12 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useAuthStore, useSidebarStore } from "@/store/useAppStore"
 import { useCustomers } from "@/lib/customerStore"
+import api from "@/lib/axios"
 
 type NavItem = {
   to: string
   label: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: ComponentType<{ className?: string }>
 }
 
 type NavGroup = {
@@ -160,15 +163,26 @@ function NavGroupSection({
   )
 }
 
-/* ---------- initial notifications (kosong — dimuat dari API) ---------- */
+/* ---------- notifications (dimuat dari API) ---------- */
+type NotificationType = "payment" | "isolir" | "due" | "reminder" | "ticket" | "router"
 type NotificationItem = {
   id: string
+  type: NotificationType
   title: string
   desc: string
   time: string
+  customerId?: string
   unread?: boolean
 }
-const mockNotifications: NotificationItem[] = []
+
+const notifMeta: Record<NotificationType, { label: string; icon: ComponentType<{ className?: string }> }> = {
+  payment: { label: "Pembayaran berhasil", icon: Wallet },
+  isolir: { label: "Pelanggan terisolir", icon: AlertTriangle },
+  due: { label: "Tagihan jatuh tempo", icon: BellRing },
+  reminder: { label: "Pengingat tagihan", icon: BellRing },
+  ticket: { label: "Tiket diperbarui", icon: MessageCircle },
+  router: { label: "Peringatan router", icon: AlertTriangle },
+}
 
 export function AdminLayout() {
   const { sidebarOpen, setSidebarOpen, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } =
@@ -179,7 +193,44 @@ export function AdminLayout() {
   const customers = useCustomers()
   const navigate = useNavigate()
 
-  const unreadCount = mockNotifications.filter((n) => n.unread).length
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+
+  // Ambil notifikasi dari backend (payment QRIS/cash, isolir, dll)
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get("/notifications")
+      .then(({ data }) => {
+        if (cancelled) return
+        const items = (data.data ?? []) as Record<string, unknown>[]
+        setNotifications(
+          items.map((r) => {
+            const type = (r.type ?? "payment") as NotificationType
+            const meta = notifMeta[type] ?? notifMeta.payment
+            const customer = (r.customer ?? "") as string
+            return {
+              id: String(r.id),
+              type,
+              title: meta.label,
+              desc: customer ? `${customer} · ${String(r.code ?? "")}` : String(r.code ?? ""),
+              time: (r.time ?? "") as string,
+              customerId: r.customer_id != null ? String(r.customer_id) : undefined,
+              unread: (r.status ?? "Terkirim") === "Gagal",
+            }
+          }),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setNotifications([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Badge = jumlah notifikasi gagal (perlu perhatian)
+  const unreadCount = notifications.filter((n) => n.unread).length
+  const recentNotifications = notifications.slice(0, 10)
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -420,20 +471,49 @@ export function AdminLayout() {
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel>Notifikasi</DropdownMenuLabel>
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Notifikasi</span>
+                {unreadCount > 0 && (
+                  <Badge className="bg-rose-500 text-white hover:bg-rose-500">{unreadCount}</Badge>
+                )}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <ScrollArea className="max-h-72">
-                {mockNotifications.map((n) => (
-                  <DropdownMenuItem key={n.id} className="flex cursor-pointer flex-col items-start gap-0.5 py-3">
-                    <div className="flex w-full items-center gap-2">
-                      <span className="text-sm font-medium">{n.title}</span>
-                      {n.unread && <span className="ml-auto h-2 w-2 rounded-full bg-primary" />}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{n.desc}</p>
-                    <p className="text-[10px] text-muted-foreground">{n.time}</p>
-                  </DropdownMenuItem>
-                ))}
-              </ScrollArea>
+              {recentNotifications.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                  Tidak ada notifikasi.
+                </p>
+              ) : (
+                <ScrollArea className="max-h-80">
+                  {recentNotifications.map((n) => {
+                    const Icon = notifMeta[n.type]?.icon ?? Wallet
+                    return (
+                      <DropdownMenuItem
+                        key={n.id}
+                        className="flex cursor-pointer flex-col items-start gap-0.5 py-3"
+                        onClick={() => {
+                          if (n.customerId) navigate(`/admin/customers/${n.customerId}`)
+                          else navigate("/admin/notifications")
+                        }}
+                      >
+                        <div className="flex w-full items-center gap-2">
+                          <Icon className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="text-sm font-medium">{n.title}</span>
+                          {n.unread && <span className="ml-auto h-2 w-2 rounded-full bg-rose-500" />}
+                        </div>
+                        <p className="pl-6 text-xs text-muted-foreground">{n.desc}</p>
+                        <p className="pl-6 text-[10px] text-muted-foreground">{n.time}</p>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </ScrollArea>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="justify-center text-sm font-medium text-primary"
+                onClick={() => navigate("/admin/notifications")}
+              >
+                Show All
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

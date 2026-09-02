@@ -305,7 +305,7 @@ export function CustomerDetailPage() {
     if (!customer || !selectedPackageId) return
     setCashLoading(true)
     try {
-      const res = await api.post(
+      await api.post(
         `/customers/${customer.id}/purchase-cash`,
         { packageId: selectedPackageId },
         { headers: { Authorization: `Bearer ${token}` } },
