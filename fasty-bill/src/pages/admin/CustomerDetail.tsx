@@ -319,16 +319,21 @@ export function CustomerDetailPage() {
                 <Badge className={`text-xs font-medium ${statusVariant[customer.status] ?? ""}`}>
                   {statusLabel[customer.status] ?? customer.status}
                 </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  aria-label="Edit Profil"
+                  onClick={() => setEditOpen(true)}
+                >
+                  <Edit className="size-4" />
+                </Button>
               </div>
               <p className="text-sm text-muted-foreground">{customer.code} · Bergabung {customer.joinDate}</p>
             </div>
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <Button variant="outline" onClick={() => setEditOpen(true)}>
-            <Edit className="mr-1.5 size-4" />
-            Edit Profil
-          </Button>
           <Button
             variant="outline"
             className={isIsolated ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900/60"}
