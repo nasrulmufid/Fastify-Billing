@@ -85,6 +85,11 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = React.useState<Theme>(() => {
+    // Clear any stored theme on first load to ensure default "dark" is used
+    if (localStorage.getItem(storageKey)) {
+      localStorage.removeItem(storageKey)
+    }
+
     const storedTheme = localStorage.getItem(storageKey)
     if (isTheme(storedTheme)) {
       return storedTheme

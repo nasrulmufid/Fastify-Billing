@@ -8,7 +8,6 @@ import {
   Loader2,
   Lock,
   Mail,
-  ShieldCheck,
   Users,
   Wifi,
 } from "lucide-react"
@@ -251,18 +250,6 @@ export function LoginPage() {
                 </>
               )}
             </Button>
-
-            {/* Info akun demo */}
-            <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-3">
-              <p className="flex items-center gap-1.5 text-xs font-medium">
-                <ShieldCheck className="size-3.5 text-primary" />
-                Akun demo
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Email: <span className="font-mono">admin@rtrw.net</span> · Password:{" "}
-                <span className="font-mono">admin123</span>
-              </p>
-            </div>
           </form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
