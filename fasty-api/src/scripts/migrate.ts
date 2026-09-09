@@ -60,11 +60,14 @@ async function main() {
     console.log("Menjalankan seed.sql ...")
     await runSqlFile(conn, "seed.sql")
 
+<<<<<<< HEAD
     // Migrasi penambahan kolom username (idempoten — aman dijalankan berulang).
     // Diperlukan bila DB sudah dibuat dengan schema lama (tanpa kolom username).
     console.log("Menjalankan migration_add_username.sql ...")
     await runRawSqlFile(conn, "migration_add_username.sql")
 
+=======
+>>>>>>> 151a9865b805330e308d84633cd265a400427992
     // Upsert user admin super_admin (bcrypt hash valid utk "admin")
     const hash = await bcrypt.hash("admin", 10)
     await conn.query(
