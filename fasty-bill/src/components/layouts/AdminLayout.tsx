@@ -550,7 +550,7 @@ export function AdminLayout() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="font-normal">
                 <p className="text-sm font-medium">{user?.name ?? "Admin"}</p>
-                <p className="text-xs text-muted-foreground">{user?.email ?? "admin@rtrw.net"}</p>
+                <p className="text-xs text-muted-foreground">{user?.username ?? "admin"}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/admin/settings")}>

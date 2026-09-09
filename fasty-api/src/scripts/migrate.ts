@@ -49,15 +49,15 @@ async function main() {
     console.log("Menjalankan seed.sql ...")
     await runSqlFile(conn, "seed.sql")
 
-    // Upsert user admin super_admin (bcrypt hash valid utk "admin123")
-    const hash = await bcrypt.hash("admin123", 10)
+    // Upsert user admin super_admin (bcrypt hash valid utk "admin")
+    const hash = await bcrypt.hash("admin", 10)
     await conn.query(
-      `INSERT INTO users (name, email, password_hash, role, status)
-       VALUES ('Admin', 'admin@rtrw.net', ?, 'super_admin', 'Aktif')
+      `INSERT INTO users (name, username, email, password_hash, role, status)
+       VALUES ('Admin', 'admin', 'admin@rtrw.net', ?, 'super_admin', 'Aktif')
        ON DUPLICATE KEY UPDATE name = 'Admin', role = 'super_admin', status = 'Aktif'`,
       [hash],
     )
-    console.log("✔ User admin dibuat: admin@rtrw.net / admin123")
+    console.log("✔ User admin dibuat: admin / admin")
 
     console.log("\nMigrasi selesai. Database siap digunakan.")
   } catch (err) {

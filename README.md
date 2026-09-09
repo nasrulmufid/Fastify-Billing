@@ -201,14 +201,14 @@ Fastify-Billing/
 
    Edit `.env` dan ubah minimal nilai berikut (jangan pakai default):
 
-   | Variabel | Keterangan |
-   | --- | --- |
-   | `MYSQL_ROOT_PASSWORD` | Password root MySQL |
-   | `DB_USER` / `DB_PASS` | Kredensial aplikasi ke DB |
-   | `JWT_SECRET` | Secret JWT (acak, panjang) |
-   | `ENCRYPTION_KEY` | Kunci enkripsi (32 karakter) |
-   | `WA_BASIC_AUTH` | `user:password` dashboard & API gateway WA |
-   | `CORS_ORIGIN` | Origin frontend (mis. `https://billing.domain.com`) |
+   | Variabel              | Keterangan                                          |
+   | --------------------- | --------------------------------------------------- |
+   | `MYSQL_ROOT_PASSWORD` | Password root MySQL                                 |
+   | `DB_USER` / `DB_PASS` | Kredensial aplikasi ke DB                           |
+   | `JWT_SECRET`          | Secret JWT (acak, panjang)                          |
+   | `ENCRYPTION_KEY`      | Kunci enkripsi (32 karakter)                        |
+   | `WA_BASIC_AUTH`       | `user:password` dashboard & API gateway WA          |
+   | `CORS_ORIGIN`         | Origin frontend (mis. `https://billing.domain.com`) |
 
 2. **Build & jalankan semua service**
 
@@ -218,12 +218,12 @@ Fastify-Billing/
 
    Service yang berjalan:
 
-   | Service | Port | Keterangan |
-   | --- | --- | --- |
-   | `fasty-bill` (nginx) | `80` | Frontend + proxy `/api` ke backend |
-   | `fasty-api` | internal `3000` | Backend API (tidak diexpose publik) |
-   | `mysql` | `127.0.0.1:3306` | DB (hanya localhost) |
-   | `whatsapp` | `3000` | Dashboard gateway WA (ubah ke `127.0.0.1` jika tak perlu publik) |
+   | Service              | Port             | Keterangan                                                       |
+   | -------------------- | ---------------- | ---------------------------------------------------------------- |
+   | `fasty-bill` (nginx) | `80`             | Frontend + proxy `/api` ke backend                               |
+   | `fasty-api`          | internal `3000`  | Backend API (tidak diexpose publik)                              |
+   | `mysql`              | `127.0.0.1:3306` | DB (hanya localhost)                                             |
+   | `whatsapp`           | `3000`           | Dashboard gateway WA (ubah ke `127.0.0.1` jika tak perlu publik) |
 
 3. **Migrasi database** (buat skema + user admin default)
 
@@ -236,10 +236,9 @@ Fastify-Billing/
      < fasty-api/sql/migration_production.sql
    ```
 
-   Login admin default: `admin@rtrw.net` / `admin123` (segera ganti password).
+   Login admin default: `admin` / `admin` (segera ganti password).
 
 4. **Verifikasi**
-
    - Frontend: buka `http://<server-ip>/` (atau domain Anda)
    - Swagger API: `http://<server-ip>/docs`
    - Health backend: `http://<server-ip>/health`
@@ -247,15 +246,16 @@ Fastify-Billing/
 
 ### Catatan produksi
 
-- **HTTPS**: compose ini belum menyertakan TLS. Pasang reverse proxy (Caddy/Nginx/Traefik)
-  di depan `fasty-bill:80` dengan sertifikat Let's Encrypt, atau set `CORS_ORIGIN`
-  ke domain HTTPS Anda.
-- **WhatsApp session**: volume `whatsapp_storages` menyimpan session QR — jangan hapus
-  agar tidak perlu scan ulang. Untuk webhook pesan masuk, isi `WA_WEBHOOK` di `.env`
-  dengan endpoint backend Anda.
-- **Keamanan**: ganti semua password/default, jangan expose port MySQL & `fasty-api`
-  ke publik (sudah dibatasi `127.0.0.1` di compose).
-- **Update image WA**: `docker compose pull whatsapp && docker compose up -d whatsapp`.
+- **HTTPS**: compose ini belum menyertakan TLS. Pasang reverse proxy
+  (Caddy/Nginx/Traefik) di depan `fasty-bill:80` dengan sertifikat Let's
+  Encrypt, atau set `CORS_ORIGIN` ke domain HTTPS Anda.
+- **WhatsApp session**: volume `whatsapp_storages` menyimpan session QR — jangan
+  hapus agar tidak perlu scan ulang. Untuk webhook pesan masuk, isi `WA_WEBHOOK`
+  di `.env` dengan endpoint backend Anda.
+- **Keamanan**: ganti semua password/default, jangan expose port MySQL &
+  `fasty-api` ke publik (sudah dibatasi `127.0.0.1` di compose).
+- **Update image WA**:
+  `docker compose pull whatsapp && docker compose up -d whatsapp`.
 
 ## Main Features
 
@@ -275,8 +275,8 @@ Fastify-Billing/
 After migration, the default login credentials are usually:
 
 ```text
-Email: admin@rtrw.net
-Password: admin123
+Username: admin
+Password: admin
 ```
 
 ## Scripts

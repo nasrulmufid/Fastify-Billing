@@ -24,7 +24,7 @@ function check(name: string, cond: boolean, extra = "") {
 
 async function main() {
   // 1. login
-  const login = await req("/auth/login", { method: "POST", body: { email: "admin@rtrw.net", password: "admin123" } })
+  const login = await req("/auth/login", { method: "POST", body: { username: "admin", password: "admin" } })
   check("login 200", login.status === 200, JSON.stringify(login.json.data?.user))
   const token = login.json.data?.token
   if (!token) return

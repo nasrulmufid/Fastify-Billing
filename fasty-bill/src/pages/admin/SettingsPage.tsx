@@ -93,6 +93,7 @@ type UserStatus = "Aktif" | "Nonaktif"
 type SettingsUser = {
   id: string
   name: string
+  username: string
   email: string
   role: UserRole
   status: UserStatus
@@ -147,7 +148,8 @@ function getInitials(name: string): string {
 
 const userFormSchema = z.object({
   name: z.string().min(3, "Nama minimal 3 karakter"),
-  email: z.string().email("Email tidak valid"),
+  username: z.string().min(3, "Username minimal 3 karakter"),
+  email: z.string().email("Email tidak valid").or(z.literal("")),
   role: z.enum(ROLE_OPTIONS),
   password: z.string(),
   status: z.enum(["Aktif", "Nonaktif"]),
@@ -160,7 +162,7 @@ type UserFormDialogProps = {
   onOpenChange: (open: boolean) => void
   /** Jika diberikan -> edit, jika tidak -> tambah baru */
   user?: SettingsUser
-  onSave: (input: { name: string; email: string; role: UserRole; password?: string; status: UserStatus }) => void
+  onSave: (input: { name: string; username: string; email: string; role: UserRole; password?: string; status: UserStatus }) => void
 }
 
 function UserFormDialog({ open, onOpenChange, user, onSave }: UserFormDialogProps) {
@@ -169,9 +171,9 @@ function UserFormDialog({ open, onOpenChange, user, onSave }: UserFormDialogProp
 
   const defaultValues = useMemo<UserFormValues>(() => {
     if (user) {
-      return { name: user.name, email: user.email, role: user.role, password: "", status: user.status }
+      return { name: user.name, username: user.username, email: user.email, role: user.role, password: "", status: user.status }
     }
-    return { name: "", email: "", role: "admin", password: "", status: "Aktif" }
+    return { name: "", username: "", email: "", role: "admin", password: "", status: "Aktif" }
   }, [user])
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<UserFormValues>({
@@ -198,6 +200,7 @@ function UserFormDialog({ open, onOpenChange, user, onSave }: UserFormDialogProp
     setTimeout(() => {
       onSave({
         name: values.name.trim(),
+        username: values.username.trim(),
         email: values.email.trim(),
         role: values.role,
         password: isEdit ? undefined : values.password,
@@ -233,7 +236,19 @@ function UserFormDialog({ open, onOpenChange, user, onSave }: UserFormDialogProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="user-email">Email</Label>
+            <Label htmlFor="user-username">Username</Label>
+            <Input
+              id="user-username"
+              placeholder="nama.staf"
+              className="h-9"
+              aria-invalid={!!errors.username}
+              {...register("username")}
+            />
+            {errors.username && <p className="text-xs text-destructive">{errors.username.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="user-email">Email <span className="text-muted-foreground">(opsional)</span></Label>
             <Input
               id="user-email"
               type="email"
@@ -424,6 +439,7 @@ function ResetPasswordDialog({
 function TabAkun() {
   const { user, updateUser } = useAuthStore()
   const [name, setName] = useState(user?.name ?? "")
+  const [username, setUsername] = useState(user?.username ?? "")
   const [email, setEmail] = useState(user?.email ?? "")
   const [savingProfile, setSavingProfile] = useState(false)
 
@@ -436,6 +452,7 @@ function TabAkun() {
   useEffect(() => {
     if (user) {
       setName(user.name)
+      setUsername(user.username)
       setEmail(user.email)
     }
   }, [user])
@@ -445,15 +462,19 @@ function TabAkun() {
       toast.error("Nama minimal 3 karakter")
       return
     }
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+    if (username.trim().length < 3) {
+      toast.error("Username minimal 3 karakter")
+      return
+    }
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) {
       toast.error("Email tidak valid")
       return
     }
     setSavingProfile(true)
     setTimeout(() => {
-      updateUser({ name: name.trim(), email: email.trim() })
+      updateUser({ name: name.trim(), username: username.trim(), email: email.trim() })
       setSavingProfile(false)
-      toast.success("Profil diperbarui", { description: "Perubahan nama & email telah disimpan." })
+      toast.success("Profil diperbarui", { description: "Perubahan profil telah disimpan." })
     }, 800)
   }
 
@@ -518,7 +539,12 @@ function TabAkun() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="acc-email">Email</Label>
+            <Label htmlFor="acc-username">Username</Label>
+            <Input id="acc-username" className="h-9" value={username} onChange={(e) => setUsername(e.target.value)} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="acc-email">Email <span className="text-muted-foreground">(opsional)</span></Label>
             <Input
               id="acc-email"
               type="email"
@@ -634,11 +660,11 @@ function TabUser() {
 
   const activeCount = users.filter((u) => u.status === "Aktif").length
 
-  function handleSave(input: { name: string; email: string; role: UserRole; password?: string; status: UserStatus }) {
+  function handleSave(input: { name: string; username: string; email: string; role: UserRole; password?: string; status: UserStatus }) {
     if (editing) {
       setUsers((prev) =>
         prev.map((u) =>
-          u.id === editing.id ? { ...u, name: input.name, email: input.email, role: input.role, status: input.status } : u,
+          u.id === editing.id ? { ...u, name: input.name, username: input.username, email: input.email, role: input.role, status: input.status } : u,
         ),
       )
       toast.success("User diperbarui", { description: `${input.name} — role ${roleMeta[input.role].label}.` })
@@ -646,6 +672,7 @@ function TabUser() {
       const newUser: SettingsUser = {
         id: `u-${Date.now()}`,
         name: input.name,
+        username: input.username,
         email: input.email,
         role: input.role,
         status: input.status,
@@ -806,7 +833,7 @@ function TabUser() {
                             {u.name}
                             {isMe && <Badge className="text-[0.625rem]">Anda</Badge>}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                          <p className="truncate text-xs text-muted-foreground">@{u.username}</p>
                         </div>
                       </div>
                     </TableCell>
