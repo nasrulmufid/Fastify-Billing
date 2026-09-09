@@ -61,6 +61,7 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useCustomers } from "@/lib/customerStore"
 import api from "@/lib/axios"
+import { renderWhatsApp, WHATSAPP_FORMAT_HINT } from "@/lib/whatsappFormat"
 
 /* ================================================================
    Types & Data
@@ -656,6 +657,17 @@ function KirimPesanTab() {
             <p className="text-xs text-muted-foreground">
               Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
             </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Pratinjau</Label>
+              <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed">
+                {message.trim()
+                  ? renderWhatsApp(message)
+                  : <span className="text-xs text-muted-foreground">Pesan akan tampil di sini…</span>}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Format didukung: *tebal*, _miring_, ~coret~, `kode`, dan baris baru (Enter).
+              </p>
+            </div>
           </div>
 
           <Button
@@ -712,6 +724,19 @@ function KirimPesanTab() {
             <ExternalLink className="mt-0.5 size-3 shrink-0" />
             <span>{"{payment_link}"} berisi link QRIS SumoPod untuk invoice belum lunas.</span>
           </p>
+          <Separator className="my-1" />
+          <p className="text-xs font-medium">Format Teks WhatsApp</p>
+          <div className="grid gap-2 text-xs">
+            {WHATSAPP_FORMAT_HINT.map(([syntax, description]) => (
+              <div
+                key={syntax}
+                className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-2.5 py-2"
+              >
+                <code className="font-medium text-primary">{syntax}</code>
+                <span className="text-right text-muted-foreground">{description}</span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -1005,6 +1030,17 @@ function TemplatePesanTab() {
               <p className="text-xs text-muted-foreground">
                 Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
               </p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Pratinjau</Label>
+                <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed">
+                  {formBody.trim()
+                    ? renderWhatsApp(formBody)
+                    : <span className="text-xs text-muted-foreground">Pesan akan tampil di sini…</span>}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Format didukung: *tebal*, _miring_, ~coret~, `kode`, dan baris baru (Enter).
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>
