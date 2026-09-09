@@ -33,6 +33,17 @@ async function runSqlFile(conn: mysql.Connection, file: string) {
   console.log(`✔ ${file} dieksekusi`)
 }
 
+/**
+ * Jalankan file SQL sebagai satu query multi-statement.
+ * Dipakai untuk migrasi yang memanfaatkan PREPARE/EXECUTE (cek kolom ada/tidak)
+ * yang tidak bisa dipisah per-statement.
+ */
+async function runRawSqlFile(conn: mysql.Connection, file: string) {
+  const raw = await readFile(path.join(sqlDir, file), "utf8")
+  await conn.query(raw)
+  console.log(`✔ ${file} dieksekusi`)
+}
+
 async function main() {
   const conn = await mysql.createConnection({
     host: config.db.host,
@@ -48,6 +59,11 @@ async function main() {
 
     console.log("Menjalankan seed.sql ...")
     await runSqlFile(conn, "seed.sql")
+
+    // Migrasi penambahan kolom username (idempoten — aman dijalankan berulang).
+    // Diperlukan bila DB sudah dibuat dengan schema lama (tanpa kolom username).
+    console.log("Menjalankan migration_add_username.sql ...")
+    await runRawSqlFile(conn, "migration_add_username.sql")
 
     // Upsert user admin super_admin (bcrypt hash valid utk "admin")
     const hash = await bcrypt.hash("admin", 10)
