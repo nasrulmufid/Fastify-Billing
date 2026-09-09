@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs"
 import { toDbDateTime } from "../utils/date.js"
 
 const loginSchema = z.object({
-  email: z.string().email("Format email tidak valid"),
+  username: z.string().min(1, "Username wajib diisi"),
   password: z.string().min(1, "Password wajib diisi"),
 })
 
@@ -14,7 +14,7 @@ const customerLoginSchema = z.object({
   password: z.string().min(1, "Password wajib diisi"),
 })
 
-const forgotSchema = z.object({ email: z.string().email("Format email tidak valid") })
+const forgotSchema = z.object({ username: z.string().min(1, "Username wajib diisi") })
 
 const resetSchema = z.object({
   token: z.string().min(1, "Token wajib diisi"),
@@ -24,6 +24,7 @@ const resetSchema = z.object({
 const updateProfileSchema = z.object({
   name: z.string().min(3, "Nama minimal 3 karakter").optional(),
   email: z.string().email("Email tidak valid").optional(),
+  username: z.string().min(3, "Username minimal 3 karakter").optional(),
 })
 
 const changePasswordSchema = z.object({
@@ -35,6 +36,7 @@ function publicUser(row: Record<string, unknown>) {
   return {
     id: row.id,
     name: row.name,
+    username: row.username,
     email: row.email,
     role: row.role,
   }
@@ -69,20 +71,20 @@ export async function authRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, reply: FastifyReply) => {
       const body = loginSchema.parse(req.body)
       const [row] = (await app.db.query(
-        "SELECT * FROM users WHERE email = ? LIMIT 1",
-        [body.email.toLowerCase()],
+        "SELECT * FROM users WHERE username = ? LIMIT 1",
+        [body.username.trim()],
       )) as Record<string, unknown>[]
 
       if (!row || row.status !== "Aktif") {
         return reply.code(401).send({
-          error: { code: "INVALID_CREDENTIALS", message: "Email atau password salah" },
+          error: { code: "INVALID_CREDENTIALS", message: "Username atau password salah" },
         })
       }
 
       const ok = await bcrypt.compare(body.password, String(row.password_hash))
       if (!ok) {
         return reply.code(401).send({
-          error: { code: "INVALID_CREDENTIALS", message: "Email atau password salah" },
+          error: { code: "INVALID_CREDENTIALS", message: "Username atau password salah" },
         })
       }
 
@@ -135,7 +137,7 @@ export async function authRoutes(app: FastifyInstance) {
     // Simulasi: kirim instruksi reset via email (belum ada mailer)
     await app.db.query(
       "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Permintaan reset password', ?)",
-      [body.email],
+      [body.username],
     )
     return reply.send({ data: { message: "Instruksi reset password terkirim ke email Anda." } })
   })
@@ -143,12 +145,12 @@ export async function authRoutes(app: FastifyInstance) {
   // POST /auth/reset-password
   app.post("/auth/reset-password", async (req, reply) => {
     const body = resetSchema.parse(req.body)
-    // Token dinormalisasi menjadi email (simulasi sederhana — produksi pakai token aman)
-    const email = body.token.replace(/^reset:/, "").toLowerCase()
+    // Token dinormalisasi menjadi username (simulasi sederhana — produksi pakai token aman)
+    const username = body.token.replace(/^reset:/, "").toLowerCase()
     const hash = await bcrypt.hash(body.newPassword, 10)
     const result = (await app.db.query(
-      "UPDATE users SET password_hash = ? WHERE email = ?",
-      [hash, email],
+      "UPDATE users SET password_hash = ? WHERE username = ?",
+      [hash, username],
     )) as unknown as { affectedRows: number }
     if (!result.affectedRows) {
       return reply.code(400).send({
@@ -181,9 +183,10 @@ export async function authRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, reply: FastifyReply) => {
       const body = updateProfileSchema.parse(req.body)
       const payload = req.user as { sub: string }
-      await app.db.query("UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email) WHERE id = ?", [
+      await app.db.query("UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), username = COALESCE(?, username) WHERE id = ?", [
         body.name ?? null,
         body.email ? body.email.toLowerCase() : null,
+        body.username ? body.username.trim() : null,
         payload.sub,
       ])
       const [row] = (await app.db.query("SELECT * FROM users WHERE id = ? LIMIT 1", [

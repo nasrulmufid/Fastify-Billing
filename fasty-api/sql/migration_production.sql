@@ -15,7 +15,8 @@ USE fasty_bill;
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
-  email VARCHAR(160) NOT NULL UNIQUE,
+  username VARCHAR(60) NOT NULL UNIQUE,
+  email VARCHAR(160) NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('super_admin','admin','finance','teknisi') NOT NULL DEFAULT 'admin',
   status ENUM('Aktif','Nonaktif') NOT NULL DEFAULT 'Aktif',
@@ -243,11 +244,11 @@ CREATE TABLE IF NOT EXISTS payment_gateway_config (
 -- Email: admin@rtrw.net | Password: admin123
 -- Hash bcrypt di bawah ini valid untuk "admin123" (salt bcryptjs).
 -- ============================================================
-INSERT INTO users (name, email, password_hash, role, status) VALUES
-('Admin', 'admin@rtrw.net', '$2a$10$qn8qf.ZxTm4MdCTUHUM4He.uIu3fFtOLJMNZUceoTUJOIwCtMsbE2', 'super_admin', 'Aktif')
+INSERT INTO users (name, username, email, password_hash, role, status) VALUES
+('Admin', 'admin', 'admin@rtrw.net', '$2a$10$Ku5HmEISVl7rjkSe6kcp2u1wtQ0v2dTJxfvTZ18IGgYhAspkep58K', 'super_admin', 'Aktif')
 ON DUPLICATE KEY UPDATE
   name = 'Admin',
-  password_hash = '$2a$10$qn8qf.ZxTm4MdCTUHUM4He.uIu3fFtOLJMNZUceoTUJOIwCtMsbE2',
+  password_hash = '$2a$10$Ku5HmEISVl7rjkSe6kcp2u1wtQ0v2dTJxfvTZ18IGgYhAspkep58K',
   role = 'super_admin',
   status = 'Aktif';
 

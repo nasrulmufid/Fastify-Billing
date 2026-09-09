@@ -9,22 +9,22 @@ import api from "@/lib/axios"
 import { toast } from "sonner"
 
 export function ForgotPasswordPage() {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (!email.trim()) return
+    if (!username.trim()) return
     setLoading(true)
     api
-      .post("/auth/forgot-password", { email: email.trim() })
+      .post("/auth/forgot-password", { username: username.trim() })
       .then(() => {
         setLoading(false)
         toast.success("Instruksi reset password terkirim ke email Anda.")
       })
       .catch(() => {
         setLoading(false)
-        toast.error("Gagal mengirim instruksi. Periksa email Anda.")
+        toast.error("Gagal mengirim instruksi. Periksa username Anda.")
       })
   }
 
@@ -42,21 +42,21 @@ export function ForgotPasswordPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
           <h1 className="text-xl font-bold tracking-tight">Atur ulang akses akun</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Masukkan email Anda dan kami akan kirimkan instruksi untuk mengatur ulang password.
+            Masukkan username Anda dan kami akan kirimkan instruksi untuk mengatur ulang password.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="fp-email">Email</Label>
+              <Label htmlFor="fp-username">Username</Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="fp-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="admin@rtrw.net"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="fp-username"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="admin"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="h-10 pl-9"
                 />
               </div>

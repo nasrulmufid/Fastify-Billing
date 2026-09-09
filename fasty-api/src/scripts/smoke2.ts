@@ -35,7 +35,7 @@ function svixSignature(secret: string, svixId: string, ts: string, rawBody: stri
 }
 
 async function main() {
-  const login = await req("/auth/login", { method: "POST", body: { email: "admin@rtrw.net", password: "admin123" } })
+  const login = await req("/auth/login", { method: "POST", body: { username: "admin", password: "admin" } })
   const token = login.json.data?.token
   check("login", !!token)
   if (!token) return

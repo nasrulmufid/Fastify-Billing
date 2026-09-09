@@ -7,7 +7,8 @@ const STATUS_ENUM = z.enum(["Aktif", "Nonaktif"])
 
 const createUserSchema = z.object({
   name: z.string().min(3, "Nama minimal 3 karakter"),
-  email: z.string().email("Email tidak valid"),
+  username: z.string().min(3, "Username minimal 3 karakter"),
+  email: z.string().email("Email tidak valid").optional(),
   password: z.string().min(6, "Password minimal 6 karakter"),
   role: ROLE_ENUM,
   status: STATUS_ENUM.default("Aktif"),
@@ -15,6 +16,7 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   name: z.string().min(3).optional(),
+  username: z.string().min(3).optional(),
   email: z.string().email().optional(),
   role: ROLE_ENUM.optional(),
   status: STATUS_ENUM.optional(),
@@ -33,6 +35,7 @@ function publicUser(row: Record<string, unknown>) {
   return {
     id: row.id,
     name: row.name,
+    username: row.username,
     email: row.email,
     role: row.role,
     status: row.status,
@@ -49,8 +52,8 @@ export async function usersRoutes(app: FastifyInstance) {
     const where: string[] = []
     const params: unknown[] = []
     if (q.search) {
-      where.push("(name LIKE ? OR email LIKE ?)")
-      params.push(`%${q.search}%`, `%${q.search}%`)
+      where.push("(name LIKE ? OR email LIKE ? OR username LIKE ?)")
+      params.push(`%${q.search}%`, `%${q.search}%`, `%${q.search}%`)
     }
     if (q.role) {
       where.push("role = ?")
@@ -73,8 +76,8 @@ export async function usersRoutes(app: FastifyInstance) {
     const body = createUserSchema.parse(req.body)
     const hash = await bcrypt.hash(body.password, 10)
     const result = (await app.db.query(
-      "INSERT INTO users (name, email, password_hash, role, status) VALUES (?, ?, ?, ?, ?)",
-      [body.name, body.email.toLowerCase(), hash, body.role, body.status],
+      "INSERT INTO users (name, username, email, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)",
+      [body.name, body.username.trim(), body.email ? body.email.toLowerCase() : null, hash, body.role, body.status],
     )) as unknown as { insertId: number }
     const [row] = (await app.db.query("SELECT * FROM users WHERE id = ?", [
       result.insertId,
@@ -87,8 +90,8 @@ export async function usersRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string }
     const body = updateUserSchema.parse(req.body)
     await app.db.query(
-      "UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), role = COALESCE(?, role), status = COALESCE(?, status) WHERE id = ?",
-      [body.name ?? null, body.email ? body.email.toLowerCase() : null, body.role ?? null, body.status ?? null, id],
+      "UPDATE users SET name = COALESCE(?, name), username = COALESCE(?, username), email = COALESCE(?, email), role = COALESCE(?, role), status = COALESCE(?, status) WHERE id = ?",
+      [body.name ?? null, body.username ? body.username.trim() : null, body.email ? body.email.toLowerCase() : null, body.role ?? null, body.status ?? null, id],
     )
     const [row] = (await app.db.query("SELECT * FROM users WHERE id = ?", [
       id,

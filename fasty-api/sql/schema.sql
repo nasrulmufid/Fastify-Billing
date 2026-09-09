@@ -13,7 +13,8 @@ USE fasty_bill;
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
-  email VARCHAR(160) NOT NULL UNIQUE,
+  username VARCHAR(60) NOT NULL UNIQUE,
+  email VARCHAR(160) NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('super_admin','admin','finance','teknisi') NOT NULL DEFAULT 'admin',
   status ENUM('Aktif','Nonaktif') NOT NULL DEFAULT 'Aktif',

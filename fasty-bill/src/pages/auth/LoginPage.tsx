@@ -48,7 +48,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
 
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
@@ -59,16 +59,16 @@ export function LoginPage() {
     e.preventDefault()
     setError("")
 
-    const trimmed = email.trim()
+    const trimmed = username.trim()
     if (!trimmed || !password) {
-      setError("Email dan password wajib diisi.")
+      setError("Username dan password wajib diisi.")
       return
     }
 
     setLoading(true)
     // Autentikasi ke backend Fastify (fasty-api)
     api
-      .post("/auth/login", { email: trimmed, password })
+      .post("/auth/login", { username: trimmed, password })
       .then(({ data }) => {
         const { token, user } = data.data
         login(user, token)
@@ -161,18 +161,18 @@ export function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            {/* Email */}
+            {/* Username */}
             <div className="space-y-1.5">
-              <Label htmlFor="login-email">Email</Label>
+              <Label htmlFor="login-username">Username</Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="login-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="admin@rtrw.net"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="login-username"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="admin"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="h-10 pl-9"
                 />
               </div>

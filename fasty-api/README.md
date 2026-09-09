@@ -19,7 +19,7 @@ npm install
 
 # 3. Migrasi database (buat skema + seed + user admin)
 npm run db:migrate
-#   Login admin: admin@rtrw.net / admin123
+#   Login admin: admin / admin
 
 # 4. Jalankan dev server (tsx watch, port 3000)
 npm run dev

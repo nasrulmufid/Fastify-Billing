@@ -3,6 +3,7 @@ import { create } from "zustand"
 type User = {
   id: string
   name: string
+  username: string
   email: string
   role: "admin" | "super_admin" | "finance" | "teknisi"
 }
@@ -13,8 +14,8 @@ type AuthState = {
   isAuthenticated: boolean
   login: (user: User, token: string) => void
   logout: () => void
-  /** Perbarui profil user yang sedang login (nama/email). */
-  updateUser: (patch: Partial<Pick<User, "name" | "email">>) => void
+  /** Perbarui profil user yang sedang login (nama/email/username). */
+  updateUser: (patch: Partial<Pick<User, "name" | "email" | "username">>) => void
 }
 
 type SidebarState = {
@@ -34,7 +35,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const parsed = JSON.parse(raw) as Partial<User>
       // Validasi struktur: data localStorage dari aplikasi lain (mis. SalesTrack)
       // tidak boleh dianggap user aplikasi ini.
-      if (typeof parsed?.name !== "string" || typeof parsed?.email !== "string") return null
+      if (typeof parsed?.name !== "string" || typeof parsed?.username !== "string") return null
       return parsed as User
     } catch {
       return null
