@@ -31,6 +31,21 @@ export const config = {
   },
 
   encryptionKey: process.env.ENCRYPTION_KEY ?? "dev-encryption-key-placeholder!!",
+
+  genieacs: {
+    baseUrl: process.env.GENIEACS_URL ?? "http://localhost:7557",
+    apiKey: process.env.GENIEACS_API_KEY ?? "",
+    syncIntervalMinutes: Number(process.env.GENIEACS_SYNC_INTERVAL ?? 30),
+    autoSyncOnAccess: process.env.GENIEACS_AUTO_SYNC !== "false",
+  },
+
+  radius: {
+    host: process.env.RADIUS_HOST ?? "freeradius",
+    authPort: Number(process.env.RADIUS_AUTH_PORT ?? 1812),
+    acctPort: Number(process.env.RADIUS_ACCT_PORT ?? 1813),
+    coaPort: Number(process.env.RADIUS_COA_PORT ?? 3799),
+    enabled: process.env.RADIUS_ENABLED === "true",
+  },
 }
 
 export const isProd = config.nodeEnv === "production"

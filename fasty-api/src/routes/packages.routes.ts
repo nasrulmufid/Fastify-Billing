@@ -7,6 +7,7 @@ import {
   syncPackagesToRouter,
   type RouterWarning,
 } from "../services/router.service.js"
+import { syncAllPackageGroups } from "../services/radius.service.js"
 
 const PKG_TYPE_ENUM = z.enum(["PPPoE"])
 const PKG_STATUS_ENUM = z.enum(["Aktif", "Nonaktif"])
@@ -17,6 +18,7 @@ const createPkgSchema = z.object({
   uploadSpeed: z.coerce.number().min(1),
   price: z.coerce.number().min(1000, "Harga minimal Rp 1.000"),
   type: PKG_TYPE_ENUM.default("PPPoE"),
+  profileName: z.string().optional(),
   description: z.string().optional(),
 })
 
@@ -32,6 +34,7 @@ function mapPkg(row: Record<string, unknown>) {
     uploadSpeed: row.upload_speed,
     price: Number(row.price),
     type: row.type,
+    profileName: row.profile_name ?? "",
     status: row.status,
     description: row.description,
     createdAt: row.created_at,
@@ -98,8 +101,8 @@ export async function packagesRoutes(app: FastifyInstance) {
       return nextCode(q.query, "packages", "PKG-", { minStart: 1, pad: 2 })
     })
     const result = (await app.db.query(
-      "INSERT INTO packages (code, name, download_speed, upload_speed, price, type, status, description) VALUES (?, ?, ?, ?, ?, ?, 'Aktif', ?)",
-      [code, body.name, body.downloadSpeed, body.uploadSpeed, body.price, body.type, body.description ?? ""],
+      "INSERT INTO packages (code, name, download_speed, upload_speed, price, type, profile_name, status, description) VALUES (?, ?, ?, ?, ?, ?, ?, 'Aktif', ?)",
+      [code, body.name, body.downloadSpeed, body.uploadSpeed, body.price, body.type, body.profileName || `PKG-${code}`, body.description ?? ""],
     )) as unknown as { insertId: number }
     const [row] = (await app.db.query("SELECT * FROM packages WHERE id = ?", [
       result.insertId,
@@ -118,6 +121,7 @@ export async function packagesRoutes(app: FastifyInstance) {
         upload_speed = COALESCE(?, upload_speed),
         price = COALESCE(?, price),
         type = COALESCE(?, type),
+        profile_name = COALESCE(?, profile_name),
         description = COALESCE(?, description)
        WHERE id = ?`,
       [
@@ -126,6 +130,7 @@ export async function packagesRoutes(app: FastifyInstance) {
         body.uploadSpeed ?? null,
         body.price ?? null,
         body.type ?? null,
+        body.profileName ?? null,
         body.description ?? null,
         id,
       ],
@@ -175,6 +180,7 @@ export async function packagesRoutes(app: FastifyInstance) {
       })
     }
     const { syncedCount, routerResults, warnings } = await syncPackagesToAllRouters(app, pkgRows)
+    await syncAllPackageGroups(app)
     const payload: Record<string, unknown> = { data: { syncedCount, routerResults } }
     if (warnings.length) payload.warning = warnings[0]
     return reply.send(payload)

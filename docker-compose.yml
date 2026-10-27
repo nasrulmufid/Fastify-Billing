@@ -97,6 +97,36 @@ services:
       - fasty-net
 
   # ----------------------------------------------------------
+  # freeradius — Autentikasi PPPoE (rlm_sql ke MySQL fasty_bill)
+  # Konfigurasi lengkap: sql/radius/ (clients.conf, mods-enabled, sites-enabled)
+  # ----------------------------------------------------------
+  freeradius:
+    image: freeradius/freeradius-server:3.2-alpine
+    container_name: fasty-freeradius
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-fasty_bill}
+      DB_USER: ${DB_USER:-fasty}
+      DB_PASS: ${DB_PASS:-changeme_db}
+      RADIUS_SECRET: ${RADIUS_SECRET:-testing123}
+    entrypoint: ["/bin/sh", "/etc/raddb/custom/entrypoint.sh"]
+    volumes:
+      # Mount konfigurasi: clients.conf + modul sql + site default
+      - ./fasty-api/sql/radius:/etc/raddb/custom:ro
+    # 1812/1813: auth+acct dari NAS, 3799: CoA/Disconnect (diteruskan ke NAS)
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+      - "3799:3799/udp"
+    networks:
+      - fasty-net
+
+  # ----------------------------------------------------------
   # whatsapp — Go WhatsApp Web Multidevice Gateway
   # (https://github.com/aldinokemal/go-whatsapp-web-multidevice)
   # ----------------------------------------------------------

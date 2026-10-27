@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Server,
   Settings2,
+  ShieldCheck,
   Trash2,
   Users,
   Wifi,
@@ -46,6 +47,10 @@ type NetworkRouter = {
   ipPool?: string
   ipPoolPppoe?: string
   ipPoolIsolir?: string
+  radiusEnabled?: boolean
+  nasSecret?: string
+  nasIdentifier?: string
+  coaPort?: number
 }
 
 const statusBadge: Record<RouterStatus, string> = {
@@ -70,8 +75,9 @@ export function NetworkPage() {
   const [deleting, setDeleting] = useState(false)
   const [settingsTarget, setSettingsTarget] = useState<NetworkRouter | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [enablingRadius, setEnablingRadius] = useState<string | null>(null)
 
-  const busy = testing !== null || syncing !== null
+  const busy = testing !== null || syncing !== null || enablingRadius !== null
   const online = routers.filter((r) => r.status === "Connected").length
   const totalClients = routers.reduce((sum, r) => sum + r.clientCount, 0)
 
@@ -285,6 +291,40 @@ export function NetworkPage() {
     }
   }
 
+  const handleEnableRadius = async (router: NetworkRouter) => {
+    setEnablingRadius(router.name)
+    try {
+      const { data } = await api.post<{ data: { nasSecret: string; synced: number } }>(
+        `/routers/${router.id}/radius-enable`,
+        {},
+      )
+      await loadRouters()
+      toast.success(`RADIUS aktif untuk ${router.name}`, {
+        description: `${data.data.synced} pelanggan dimigrasi. Secret NAS: ${data.data.nasSecret}`,
+        duration: 15000,
+      })
+    } catch {
+      toast.error(`Gagal mengaktifkan RADIUS di ${router.name}`, {
+        description: "Periksa koneksi database RADIUS lalu coba lagi.",
+      })
+    } finally {
+      setEnablingRadius(null)
+    }
+  }
+
+  const handleDisableRadius = async (router: NetworkRouter) => {
+    setEnablingRadius(router.name)
+    try {
+      await api.post(`/routers/${router.id}/radius-disable`, {})
+      await loadRouters()
+      toast.success(`RADIUS dinonaktifkan untuk ${router.name}`)
+    } catch {
+      toast.error(`Gagal menonaktifkan RADIUS di ${router.name}`)
+    } finally {
+      setEnablingRadius(null)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -365,6 +405,19 @@ export function NetworkPage() {
                   </span>
                   <span className="font-medium">{router.uptime}</span>
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <ShieldCheck className="size-3.5" />
+                    Autentikasi
+                  </span>
+                  {router.radiusEnabled ? (
+                    <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
+                      FreeRADIUS
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Mikrotik lokal</Badge>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -405,6 +458,22 @@ export function NetworkPage() {
                 >
                   <Settings2 className="mr-1.5 size-4" />
                   Setting IP Pool
+                </Button>
+                {/* Aktifkan/nonaktifkan FreeRADIUS untuk router ini */}
+                <Button
+                  variant={router.radiusEnabled ? "secondary" : "outline"}
+                  className="flex-1 justify-center text-sky-700 hover:bg-sky-500/10 hover:text-sky-700 dark:text-sky-300"
+                  disabled={busy}
+                  onClick={() =>
+                    router.radiusEnabled ? handleDisableRadius(router) : handleEnableRadius(router)
+                  }
+                >
+                  {enablingRadius === router.name ? (
+                    <Loader2 className="mr-1.5 size-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="mr-1.5 size-4" />
+                  )}
+                  {router.radiusEnabled ? "Nonaktifkan RADIUS" : "Aktifkan RADIUS"}
                 </Button>
                 {/* Mobile: tombol berlabel lebar penuh. Desktop: ikon di ujung kanan. */}
                 <Button

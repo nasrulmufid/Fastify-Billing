@@ -21,6 +21,10 @@ import {
   X,
   AlertTriangle,
   Wallet,
+  Cpu,
+  ShieldCheck,
+  BarChart3,
+  Server,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ComponentType } from "react"
 
@@ -84,6 +88,23 @@ const navGroups: NavGroup[] = [
       { to: "/admin/wa-gateway", label: "WA Gateway", icon: MessageCircle },
     ],
   },
+  {
+    title: "ACS",
+    items: [
+      { to: "/admin/acs", label: "Devices", icon: Cpu },
+      { to: "/admin/acs/config", label: "Config", icon: Settings },
+    ],
+  },
+  {
+    title: "RADIUS",
+    items: [
+      { to: "/admin/radius/status", label: "Status", icon: ShieldCheck },
+      { to: "/admin/radius/sessions", label: "Sesi Online", icon: Wifi },
+      { to: "/admin/radius/usage", label: "Pemakaian", icon: BarChart3 },
+      { to: "/admin/radius/nas", label: "NAS Client", icon: Server },
+      { to: "/admin/radius/config", label: "Pengaturan", icon: Settings },
+    ],
+  },
 ]
 
 function NavGroupSection({
@@ -105,7 +126,7 @@ function NavGroupSection({
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === "/admin"}
+            end={item.to !== "/admin"}
             onClick={onNavigate}
             title={item.label}
             className={({ isActive }) =>
@@ -142,7 +163,7 @@ function NavGroupSection({
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/admin"}
+              end={item.to !== "/admin"}
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(

@@ -47,6 +47,7 @@ const formSchema = z.object({
   uploadSpeed: z.coerce.number().min(1, "Kecepatan upload minimal 1 Mbps"),
   price: z.coerce.number().min(1000, "Harga minimal Rp 1.000"),
   type: z.enum(PACKAGE_TYPE_OPTIONS),
+  profileName: z.string(),
   description: z.string(),
 })
 
@@ -76,6 +77,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
         uploadSpeed: pkg.uploadSpeed,
         price: pkg.price,
         type: pkg.type,
+        profileName: pkg.profileName,
         description: pkg.description,
       }
     }
@@ -85,6 +87,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
       uploadSpeed: 10,
       price: 150000,
       type: "PPPoE",
+      profileName: "",
       description: "",
     }
   }, [pkg])
@@ -117,6 +120,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
       uploadSpeed: values.uploadSpeed,
       price: values.price,
       type: values.type,
+      profileName: values.profileName,
       description: values.description,
     }
 
@@ -244,6 +248,20 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="p-profile">
+                  Profil RADIUS <span className="text-muted-foreground">(opsional)</span>
+                </Label>
+                <Input
+                  id="p-profile"
+                  placeholder="Otomatis: PKG-<kode>"
+                  {...register("profileName")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nama grup di FreeRADIUS (Mikrotik-Rate-Limit diambil dari kecepatan paket).
+                </p>
               </div>
             </section>
 

@@ -1,0 +1,37 @@
+# ============================================================
+# Modul SQL FreeRADIUS → MySQL fasty_bill
+# Diletakkan di /etc/raddb/mods-enabled/sql oleh entrypoint.
+# ============================================================
+sql {
+    driver = "rlm_sql_mysql"
+    dialect = "mysql"
+
+    server = "${DB_HOST}"
+    port = ${DB_PORT}
+    login = "${DB_USER}"
+    password = "${DB_PASS}"
+
+    radius_db = "${DB_NAME}"
+
+    acct_table1 = "radacct"
+    acct_table2 = "radacct"
+    postauth_table = "radpostauth"
+
+    authcheck_table = "radcheck"
+    authreply_table = "radreply"
+    groupcheck_table = "radgroupcheck"
+    groupreply_table = "radgroupreply"
+    usergroup_table = "radusergroup"
+
+    delete_stale_sessions = yes
+
+    pool {
+        start = 5
+        min = 2
+        max = 10
+    }
+
+    # Baca daftar NAS dari tabel nas
+    read_clients = yes
+    client_table = "nas"
+}

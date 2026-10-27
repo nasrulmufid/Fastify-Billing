@@ -23,7 +23,9 @@ import { settingsRoutes } from "./routes/settings.routes.js"
 import { ticketsRoutes } from "./routes/tickets.routes.js"
 import { usersRoutes } from "./routes/users.routes.js"
 import { waGatewayRoutes } from "./routes/wa-gateway.routes.js"
+import { acsRoutes } from "./routes/acs.routes.js"
 import { webhookRoutes } from "./routes/webhook.routes.js"
+import { radiusRoutes } from "./routes/radius.routes.js"
 import { registerJobs } from "./jobs/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -74,7 +76,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       await api.register(notificationsRoutes)
       await api.register(activityLogsRoutes)
       await api.register(settingsRoutes)
+      await api.register(acsRoutes)
       await api.register(dashboardRoutes)
+      await api.register(radiusRoutes)
 
       // Portal pelanggan (role customer)
       await api.register(portalRoutes)

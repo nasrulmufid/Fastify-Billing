@@ -23,6 +23,7 @@ export interface ServicePackage {
   uploadSpeed: number
   price: number
   type: PackageType
+  profileName: string
   status: PackageStatus
   description: string
   createdAt: string
@@ -88,6 +89,7 @@ function mapPackageFromApi(p: any): ServicePackage {
     uploadSpeed: Number(p.uploadSpeed),
     price: Number(p.price),
     type: p.type,
+    profileName: p.profileName ?? "",
     status: p.status,
     description: p.description ?? "",
     createdAt: p.createdAt ?? "",

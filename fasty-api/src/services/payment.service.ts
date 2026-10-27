@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify"
 import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { recordRouterWarning, withRouter, type RouterWarning } from "./router.service.js"
+import { isRadiusRouter, syncCustomerById } from "./radius.service.js"
 
 /**
  * Selesaikan pembayaran (flow bersama):
@@ -107,6 +108,17 @@ export async function syncRouterAfterPayment(
   customer: Record<string, unknown>,
   method: "QRIS" | "Tunai" | "Transaksi" = "Transaksi",
 ): Promise<boolean> {
+  if (await isRadiusRouter(app, customer.router_id as number)) {
+    const res = await syncCustomerById(app, Number(customer.id))
+    if (res.ok) return true
+    await recordRouterWarning(app, {
+      routerId: Number(customer.router_id),
+      customerId: Number(customer.id),
+      action: `RADIUS gagal — pembayaran ${method}`,
+      warning: { code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" },
+    })
+    return false
+  }
   const [pkg] = (await app.db.query(
     "SELECT name, download_speed, upload_speed FROM packages WHERE id = ?",
     [customer.package_id],

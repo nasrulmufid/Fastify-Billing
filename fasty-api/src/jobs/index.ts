@@ -6,6 +6,7 @@ import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../util
 import { fillPlaceholders } from "../utils/template.js"
 import { recordRouterWarning, withRouter } from "../services/router.service.js"
 import { syncRouterAfterPayment } from "../services/payment.service.js"
+import { isRadiusRouter, syncCustomerById } from "../services/radius.service.js"
 import { getReminderTemplate, sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
 
 /**
@@ -120,6 +121,18 @@ export function registerJobs(app: FastifyInstance) {
           )
           if (!isoResult.ok) {
             app.log.warn({ customerId: cust.customer_id, error: isoResult.error }, "Gagal kirim notif isolir WA")
+          }
+          if (cust.router_id && cust.pppoe_username && (await isRadiusRouter(app, cust.router_id as number))) {
+            const res = await syncCustomerById(app, Number(cust.customer_id))
+            if (!res.ok) {
+              await recordRouterWarning(app, {
+                routerId: Number(cust.router_id),
+                customerId: Number(cust.customer_id),
+                action: "Isolir otomatis (RADIUS)",
+                warning: { code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" },
+              })
+            }
+            continue
           }
           // Sinkron ke Mikrotik: ubah profile ke ISOLIR dengan ip-pool isolir
           if (cust.router_id && cust.pppoe_username) {
@@ -275,6 +288,13 @@ export function registerJobs(app: FastifyInstance) {
     }
   })
 
-  // 5. Setiap 15 menit — hapus job voucher hotspot (sudah tidak digunakan)
-  // TODO: tambahkan job lain jika diperlukan
+  // Harian 03:00 — hapus riwayat accounting RADIUS > 90 hari
+  cron.schedule("0 3 * * *", async () => {
+    try {
+      await app.db.query("DELETE FROM radacct WHERE acctstoptime < DATE_SUB(NOW(), INTERVAL 90 DAY)")
+      app.log.info("Retensi radacct selesai")
+    } catch (err) {
+      app.log.error(err, "Gagal retensi radacct")
+    }
+  })
 }
