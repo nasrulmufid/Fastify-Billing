@@ -225,8 +225,8 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Stat cards — mobile 2 kolom (teks & icon responsif), sm+ 2 kolom, xl 4 kolom */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {statCards.map((item) => {
           const Icon = item.icon
           return (
@@ -234,14 +234,14 @@ export function AdminDashboard() {
               key={item.label}
               className={`relative overflow-hidden border-border bg-gradient-to-br ${item.gradient}`}
             >
-              <CardContent className="px-5 py-2">
-                <div className={`absolute right-4 top-4 rounded-2xl p-3.5 opacity-50 ${item.iconBg}`}>
-                  <Icon className="h-8 w-8" />
+              <CardContent className="px-4 py-2 sm:px-5">
+                <div className={`absolute right-3 top-3 rounded-xl p-2 sm:right-4 sm:top-4 sm:rounded-2xl sm:p-3.5 opacity-50 ${item.iconBg}`}>
+                  <Icon className="size-6 sm:size-8" />
                 </div>
-                <div className="mt-4 pr-16">
-                  <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
-                  <p className="mt-1 text-2xl font-semibold tracking-tight">{item.value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{item.change}</p>
+                <div className="mt-3 pr-12 sm:mt-4 sm:pr-16">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">{item.label}</p>
+                  <p className="mt-1 text-lg sm:text-2xl font-semibold tracking-tight">{item.value}</p>
+                  <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">{item.change}</p>
                 </div>
               </CardContent>
             </Card>
