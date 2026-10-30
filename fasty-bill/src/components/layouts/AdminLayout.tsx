@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   Package,
   FileText,
-  CreditCard,
   Ticket,
   Wifi,
   BellRing,
@@ -72,7 +71,7 @@ const navGroups: NavGroup[] = [
     title: "Transaksi",
     items: [
       { to: "/admin/invoices", label: "Invoice", icon: FileText },
-      { to: "/admin/payments", label: "Pembayaran", icon: CreditCard },
+      { to: "/admin/payments", label: "Laporan Pendapatan", icon: Wallet },
     ],
   },
   {
