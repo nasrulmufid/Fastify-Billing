@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, type ReactNode } from "react"
 import {
   Area,
   AreaChart,
@@ -12,6 +12,38 @@ import {
   YAxis,
 } from "recharts"
 import { Users, FileText, AlertTriangle, Wallet, Clock, Loader2 } from "lucide-react"
+
+/**
+ * Sizer utk pie chart: mengukur lebar card & memberi tinggi container yang cukup
+ * agar pie (radius % dari sisi terkecil) mengisi penuh lebar pada layar sempit.
+ * Mobile: tinggi = lebar (persegi, pie full-width); sm+: tinggi tetap 240px.
+ */
+function PieHeightSizer({ children }: { children: (height: number) => ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [height, setHeight] = useState(240)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => {
+      const w = el.clientWidth
+      // Pada layar sempit (<640px) tinggi = lebar agar pie (radius % dari sisi
+      // terkecil) berdiameter ~= lebar card (mengisi penuh, tanpa ruang kosong).
+      // Pada desktop tinggi tetap 240 (layout 3 kolom, card sudah cukup lebar).
+      setHeight(w < 640 ? Math.round(w * 0.95) : 240)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} className="w-full">
+      {children(height)}
+    </div>
+  )
+}
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -63,7 +95,7 @@ function formatRevenue(valueInMillions: number): string {
 
 /**
  * Format rupiah singkat utk stat card: nilai rupiah penuh -> "500 rb" /
- * "1,5 jt" (format id-ID). Tanpa desimal pecahan aneh seperti "0.5 jt".
+ * "1,6 jt" (desimal koma id-ID, tanpa pecahan aneh seperti "0.5 jt").
  */
 function formatRupiahSingkat(rupiah: number): string {
   if (rupiah >= 1_000_000) {
@@ -342,32 +374,39 @@ export function AdminDashboard() {
             <p className="text-sm text-muted-foreground">Total pelanggan per status</p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={customerStatusDist}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {customerStatusDist.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<PieTooltip total={customers.length} />} />
-              </PieChart>
-            </ResponsiveContainer>
+            {/* Tinggi container menyesuaikan lebar card (via PieHeightSizer) sehingga
+                pie dengan radius persentase mengisi penuh lebar — tidak ada ruang
+                kosong di kanan/kiri pada mobile. Desktop tetap height 240. */}
+            <PieHeightSizer>
+              {(pieHeight) => (
+                <ResponsiveContainer width="100%" height={pieHeight}>
+                  <PieChart>
+                    <Pie
+                      data={customerStatusDist}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="58%"
+                      outerRadius="90%"
+                      paddingAngle={3}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {customerStatusDist.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<PieTooltip total={customers.length} />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </PieHeightSizer>
             {/* Legend */}
-            <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 text-sm">
               {customerStatusDist.map((st) => (
                 <div key={st.name} className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ background: st.color }} />
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: st.color }} />
                   <span className="text-muted-foreground">{st.name}</span>
-                  <span className="ml-auto mr-4 font-medium tabular-nums">{st.value}</span>
+                  <span className="ml-auto font-medium tabular-nums">{st.value}</span>
                 </div>
               ))}
             </div>
