@@ -62,19 +62,18 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
     views: [{ state: "frozen", ySplit: 5 }], // header tetap terlihat saat scroll
   })
 
-  // Lebar kolom (A..G)
+  // Lebar kolom (A..F)
   sheet.columns = [
     { width: 14 }, // Kode
-    { width: 26 }, // Pelanggan
+    { width: 28 }, // Pelanggan
     { width: 14 }, // Invoice
     { width: 12 }, // Metode
     { width: 20 }, // Tanggal
-    { width: 16 }, // Jumlah
-    { width: 12 }, // Status
+    { width: 18 }, // Jumlah
   ]
 
   /* ---------- Judul laporan ---------- */
-  sheet.mergeCells("A1:G1")
+  sheet.mergeCells("A1:F1")
   const titleCell = sheet.getCell("A1")
   titleCell.value = meta.title
   titleCell.font = { size: 16, bold: true, color: { argb: "FFFFFFFF" } }
@@ -82,7 +81,7 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
   titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BRAND_COLOR}` } }
   sheet.getRow(1).height = 30
 
-  sheet.mergeCells("A2:G2")
+  sheet.mergeCells("A2:F2")
   const periodCell = sheet.getCell("A2")
   periodCell.value = `Periode: ${meta.periodLabel}`
   periodCell.font = { size: 11, italic: true, color: { argb: "FF64748B" } }
@@ -90,7 +89,7 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
   sheet.getRow(2).height = 20
 
   // Ringkasan (baris 3)
-  sheet.mergeCells("A3:G3")
+  sheet.mergeCells("A3:F3")
   sheet.getCell("A3").value = meta.summary.map((s) => `${s.label}: ${s.value}`).join("    |    ")
   sheet.getCell("A3").font = { size: 10, color: { argb: "FF64748B" } }
   sheet.getCell("A3").alignment = { horizontal: "center" }
@@ -98,7 +97,7 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
 
   /* ---------- Header tabel (baris 5) ---------- */
   const headerRowIndex = 5
-  const headers = ["Kode", "Pelanggan", "Invoice", "Metode", "Tanggal", "Jumlah", "Status"]
+  const headers = ["Kode", "Pelanggan", "Invoice", "Metode", "Tanggal", "Jumlah"]
   const headerRow = sheet.getRow(headerRowIndex)
   headerRow.values = headers
   headerRow.eachCell((cell) => {
@@ -117,11 +116,10 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
   /* ---------- Data rows ---------- */
   rows.forEach((r, i) => {
     const row = sheet.getRow(headerRowIndex + 1 + i)
-    row.values = [r.code, r.customer, r.invoice, r.method, r.date, r.amount, r.status]
+    row.values = [r.code, r.customer, r.invoice, r.method, r.date, r.amount]
     // Format kolom Jumlah (F) sebagai rupiah
     row.getCell(6).numFmt = '"Rp"#,##0'
     row.getCell(6).alignment = { horizontal: "right" }
-    row.getCell(7).alignment = { horizontal: "center" }
     // Zebra striping
     if (i % 2 === 1) {
       row.eachCell({ includeEmpty: true }, (cell) => {
@@ -149,7 +147,6 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
   totalRow.getCell(6).numFmt = '"Rp"#,##0'
   totalRow.getCell(6).font = { bold: true, size: 11, color: { argb: `FF${SUCCESS_COLOR}` } }
   totalRow.getCell(6).alignment = { horizontal: "right" }
-  totalRow.getCell(7).value = ""
   totalRow.eachCell({ includeEmpty: true }, (cell) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1FAE5" } } // emerald-100
     cell.border = { top: { style: "medium" } }
@@ -159,11 +156,11 @@ export async function exportReportXlsx(rows: ReportRow[], meta: ReportMeta): Pro
   /* ---------- Auto filter & footer ---------- */
   sheet.autoFilter = {
     from: { row: headerRowIndex, column: 1 },
-    to: { row: headerRowIndex, column: 7 },
+    to: { row: headerRowIndex, column: 6 },
   }
 
   const footerRow = sheet.getRow(headerRowIndex + rows.length + 3)
-  sheet.mergeCells(`A${footerRow.number}:G${footerRow.number}`)
+  sheet.mergeCells(`A${footerRow.number}:F${footerRow.number}`)
   footerRow.getCell(1).value = `Dicetak dari Fastify Billing — ${new Date().toLocaleString("id-ID")}`
   footerRow.getCell(1).font = { size: 9, italic: true, color: { argb: "FF94A3B8" } }
 
@@ -217,7 +214,7 @@ export function exportReportPdf(rows: ReportRow[], meta: ReportMeta): void {
   const totalSukses = rows.filter((r) => r.status === "Sukses").reduce((s, r) => s + r.amount, 0)
   autoTable(doc, {
     startY: y + 22,
-    head: [["Kode", "Pelanggan", "Invoice", "Metode", "Tanggal", "Jumlah", "Status"]],
+    head: [["Kode", "Pelanggan", "Invoice", "Metode", "Tanggal", "Jumlah"]],
     body: rows.map((r) => [
       r.code,
       r.customer,
@@ -225,10 +222,8 @@ export function exportReportPdf(rows: ReportRow[], meta: ReportMeta): void {
       r.method,
       r.date,
       formatRupiah(r.amount),
-      r.status,
     ]),
     foot: [[
-      "",
       "",
       "",
       "",
@@ -242,22 +237,11 @@ export function exportReportPdf(rows: ReportRow[], meta: ReportMeta): void {
     alternateRowStyles: { fillColor: [248, 250, 252] },
     footStyles: { fillColor: [209, 250, 229], textColor: [6, 95, 70], fontStyle: "bold", fontSize: 8.5 },
     columnStyles: {
-      0: { cellWidth: 22 },
-      2: { cellWidth: 22, textColor: [100, 116, 139] },
-      3: { cellWidth: 16, halign: "center" },
-      4: { cellWidth: 26 },
+      0: { cellWidth: 24 },
+      2: { cellWidth: 24, textColor: [100, 116, 139] },
+      3: { cellWidth: 18, halign: "center" },
+      4: { cellWidth: 28 },
       5: { halign: "right", fontStyle: "bold" },
-      6: { cellWidth: 18, halign: "center" },
-    },
-    didParseCell: (data) => {
-      // Warna status di kolom terakhir
-      if (data.section === "body" && data.column.index === 6) {
-        const v = String(data.cell.raw)
-        if (v === "Sukses") data.cell.styles.textColor = [5, 150, 105]
-        else if (v === "Pending") data.cell.styles.textColor = [217, 119, 6]
-        else if (v === "Ditolak") data.cell.styles.textColor = [225, 29, 72]
-        data.cell.styles.fontStyle = "bold"
-      }
     },
   })
 
