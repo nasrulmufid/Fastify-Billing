@@ -17,7 +17,6 @@ import { PageHeader } from "@/components/layouts/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -76,7 +75,6 @@ export function NotificationsPage() {
   const [logs, setLogs] = useState<NotificationLog[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterKey>("Semua")
-  const [telegramEnabled, setTelegramEnabled] = useState(true)
   const [resending, setResending] = useState<string | null>(null)
 
   /* Load notifications from backend */
@@ -201,31 +199,13 @@ export function NotificationsPage() {
               <div className="min-w-0">
                 <h3 className="font-semibold">Telegram admin</h3>
                 <p className="truncate text-sm text-muted-foreground">
-                  Notifikasi operasional ke grup internal.
+                  Notifikasi transaksi & status Mikrotik ke bot Telegram.
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {telegramEnabled ? "Aktif" : "Nonaktif"}
-              </span>
-              <Switch
-                checked={telegramEnabled}
-                onCheckedChange={(v) => {
-                  const on = v === true
-                  setTelegramEnabled(on)
-                  if (on) {
-                    toast.success("Telegram diaktifkan", {
-                      description: "Notifikasi operasional akan dikirim ke grup internal.",
-                    })
-                  } else {
-                    toast.info("Telegram dinonaktifkan", {
-                      description: "Notifikasi Telegram dihentikan sementara.",
-                    })
-                  }
-                }}
-              />
-            </div>
+            <Link to="/admin/telegram">
+              <Button variant="outline">Kelola</Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

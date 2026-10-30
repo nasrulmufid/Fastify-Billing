@@ -18,6 +18,7 @@ import {
   Settings,
   Activity,
   MessageCircle,
+  Send,
   X,
   AlertTriangle,
   Wallet,
@@ -79,6 +80,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/admin/network", label: "Jaringan", icon: Wifi },
       { to: "/admin/notifications", label: "Notifikasi", icon: BellRing },
+      { to: "/admin/telegram", label: "Telegram", icon: Send },
       { to: "/admin/tickets", label: "Tiket", icon: Ticket },
       { to: "/admin/activity-log", label: "Log Aktivitas", icon: Activity },
       { to: "/admin/settings", label: "Pengaturan", icon: Settings },

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
 import { completePaymentFlow } from "../services/payment.service.js"
+import { notifyTelegram } from "../services/telegram.service.js"
 import { config } from "../config.js"
 import { decryptSecret } from "../utils/crypto.js"
 import { verifyWebhookSignature, verifyWebhookToken } from "../utils/sumopod.js"
@@ -33,6 +34,17 @@ export async function webhookRoutes(app: FastifyInstance) {
       webhookToken:
         decryptSecret(String(row.webhook_token ?? "")) || config.sumopod.webhookToken,
     }
+  }
+
+  /** Data pelanggan + invoice utk variabel notifikasi Telegram. */
+  async function loadNotifyContext(customerId: unknown) {
+    const [ctx] = (await app.db.query(
+      `SELECT c.name AS customer_name, p.name AS package_name
+       FROM customers c LEFT JOIN packages p ON p.id = c.package_id
+       WHERE c.id = ?`,
+      [customerId],
+    )) as Record<string, unknown>[]
+    return ctx ?? {}
   }
 
   app.post("/webhook/payment", async (req: FastifyRequest, reply: FastifyReply) => {
@@ -89,12 +101,51 @@ export async function webhookRoutes(app: FastifyInstance) {
         const result = await app.db.transaction(async (q) =>
           completePaymentFlow(q, String(payment.id), "QRIS", "Sistem", app),
         )
+        // Notifikasi Telegram: transaksi sukses (fire-and-forget, tidak blokir webhook)
+        setImmediate(() => {
+          void (async () => {
+            const ctx = await loadNotifyContext(payment.customer_id)
+            await notifyTelegram(app, {
+              type: "paymentSuccess",
+              vars: {
+                customerId: String(payment.customer_id ?? ""),
+                nama: String(ctx.customer_name ?? ""),
+                paket: String(ctx.package_name ?? ""),
+                kode: String(result.payment.code ?? ""),
+                jumlah: String(payment.amount ?? ""),
+                metode: "QRIS",
+                tanggal: new Date().toLocaleString("id-ID"),
+              },
+            })
+          })().catch(() => {})
+        })
         return reply.send({ data: { ok: true, matched: true, payment: result.payment.code } })
       }
       case "payment.failed":
       case "payment.expired": {
         await app.db.query("UPDATE payments SET status = 'Ditolak' WHERE id = ?", [payment.id])
-        return reply.send({ data: { ok: true, matched: true, status: "Ditolak" } })
+        // Notifikasi Telegram: gagal / kadaluarsa (fire-and-forget)
+        const isExpired = eventType === "payment.expired"
+        setImmediate(() => {
+          void (async () => {
+            const ctx = await loadNotifyContext(payment.customer_id)
+            await notifyTelegram(app, {
+              type: isExpired ? "paymentExpired" : "paymentFailed",
+              vars: {
+                customerId: String(payment.customer_id ?? ""),
+                nama: String(ctx.customer_name ?? ""),
+                paket: String(ctx.package_name ?? ""),
+                kode: String(payment.code ?? ""),
+                jumlah: String(payment.amount ?? ""),
+                metode: "QRIS",
+                tanggal: new Date().toLocaleString("id-ID"),
+              },
+            })
+          })().catch(() => {})
+        })
+        return reply.send({
+          data: { ok: true, matched: true, status: isExpired ? "Expired" : "Ditolak" },
+        })
       }
       case "payment.test":
         return reply.send({ data: { ok: true, test: true } })

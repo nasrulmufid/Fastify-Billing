@@ -228,7 +228,9 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
--- app_settings — pengaturan umum (single-row)
+-- app_settings — pengaturan umum (single-row) + key-value config
+-- setting_key dipakai untuk: acs_config, radius_config (legacy),
+-- telegram_config (token bot, chat id, template notifikasi).
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_settings (
   id TINYINT UNSIGNED NOT NULL DEFAULT 1 PRIMARY KEY,

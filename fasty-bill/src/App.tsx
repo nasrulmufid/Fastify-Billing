@@ -21,6 +21,7 @@ import { InvoiceCreatePage, InvoiceDetailPage } from "@/pages/admin/InvoiceDetai
 import { InvoicesPage } from "@/pages/admin/InvoicesPage"
 import { NetworkPage } from "@/pages/admin/NetworkPage"
 import { NotificationsPage } from "@/pages/admin/NotificationsPage"
+import { TelegramSettingsPage } from "@/pages/admin/TelegramSettingsPage"
 import { PaymentApprovalPage, PaymentDetailPage } from "@/pages/admin/PaymentDetail"
 import { PaymentsPage } from "@/pages/admin/PaymentsPage"
 import { WAGatewayPage } from "@/pages/admin/WAGatewayPage"
@@ -91,6 +92,7 @@ export function App() {
               <Route path="payments/:id" element={<PaymentDetailPage />} />
               <Route path="network" element={<NetworkPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="telegram" element={<TelegramSettingsPage />} />
               <Route path="tickets" element={<TicketsPage />} />
               <Route path="tickets/:id" element={<TicketDetailPage />} />
               <Route path="activity-log" element={<ActivityLogPage />} />

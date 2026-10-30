@@ -23,6 +23,7 @@ import { settingsRoutes } from "./routes/settings.routes.js"
 import { ticketsRoutes } from "./routes/tickets.routes.js"
 import { usersRoutes } from "./routes/users.routes.js"
 import { waGatewayRoutes } from "./routes/wa-gateway.routes.js"
+import { telegramRoutes } from "./routes/telegram.routes.js"
 import { acsRoutes } from "./routes/acs.routes.js"
 import { webhookRoutes } from "./routes/webhook.routes.js"
 import { registerJobs } from "./jobs/index.js"
@@ -72,6 +73,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       // Fase 3 — dukungan & operasional
       await api.register(ticketsRoutes)
       await api.register(waGatewayRoutes)
+      await api.register(telegramRoutes)
       await api.register(notificationsRoutes)
       await api.register(activityLogsRoutes)
       await api.register(settingsRoutes)

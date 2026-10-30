@@ -7,6 +7,7 @@ import { fillPlaceholders } from "../utils/template.js"
 import { recordRouterWarning, withRouter, enqueueRouterSync, loadPendingSyncQueue, markSyncQueueEntry } from "../services/router.service.js"
 import { syncRouterAfterPayment } from "../services/payment.service.js"
 import { getReminderTemplate, sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
+import { getTelegramConfig, notifyTelegram } from "../services/telegram.service.js"
 
 /**
  * Scheduler (node-cron) — sesuai Backend.PRD.md bagian 10.
@@ -296,5 +297,91 @@ export function registerJobs(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err, "Gagal memproses antrian sync router")
     }
+  })
+
+  // ==========================================================
+  // Monitor status Mikrotik + notifikasi Telegram saat offline
+  // ==========================================================
+  // Interval dibaca dari konfigurasi Telegram (routerCheckIntervalMinutes,
+  // default 5 menit) sehingga bisa diubah dari UI tanpa restart.
+  // Implementasi pakai setInterval (bukan node-cron) agar interval dinamis.
+  // Debounce: notif offline hanya dikirim sekali per episode offline
+  // (ditandai router.status='Disconnected'), dan notif "online kembali"
+  // dikirim saat status pulih.
+  const monitor = async () => {
+    try {
+      const cfg = await getTelegramConfig(app)
+      const routers = (await app.db.query("SELECT id, name, host, status FROM routers")) as Record<
+        string,
+        unknown
+      >[]
+      for (const r of routers) {
+        const routerId = Number(r.id)
+        const prevStatus = String(r.status ?? "Standby")
+        const ping = await withRouter(app, routerId, (client) => client.ping())
+        const isOnline = ping.ok
+
+        // Update status di DB (Connected/Disconnected); Standby hanya sebelum pengecekan pertama
+        const newStatus = isOnline ? "Connected" : "Disconnected"
+        if (newStatus !== prevStatus) {
+          await app.db.query("UPDATE routers SET status = ? WHERE id = ?", [newStatus, routerId])
+        }
+
+        if (!isOnline && cfg.enabled && cfg.notifyRouterOffline && prevStatus !== "Disconnected") {
+          // Baru terdeteksi offline -> kirim notif Telegram (sekali per episode)
+          const res = await notifyTelegram(app, {
+            type: "routerOffline",
+            vars: {
+              router: String(r.name ?? routerId),
+              host: String(r.host ?? ""),
+              tanggal: new Date().toLocaleString("id-ID"),
+            },
+          })
+          if (!res.ok) {
+            app.log.warn({ routerId, error: res.error }, "Gagal kirim notif Telegram router offline")
+          }
+          await app.db.query(
+            "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Mikrotik offline terdeteksi', ?)",
+            [String(r.name ?? routerId)],
+          )
+        }
+        if (isOnline && prevStatus === "Disconnected" && cfg.enabled) {
+          await app.db.query(
+            "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Mikrotik online kembali', ?)",
+            [String(r.name ?? routerId)],
+          )
+          app.log.info({ routerId }, "Router online kembali")
+        }
+      }
+    } catch (err) {
+      app.log.error(err, "Gagal monitor status router")
+    }
+  }
+
+  // Jalankan pengecekan pertama setelah 15 detik, lalu ulang sesuai interval konfigurasi.
+  // Interval dibaca ulang setiap eksekusi: jika admin mengubah nilai di UI, pengecekan
+  // berikutnya memakai nilai baru tanpa restart (max 10 menit adopsi nilai baru).
+  let currentIntervalMs = 0
+  let timer: NodeJS.Timeout | null = null
+  const scheduleNext = async () => {
+    try {
+      const cfg = await getTelegramConfig(app)
+      currentIntervalMs = Math.max(1, cfg.routerCheckIntervalMinutes) * 60_000
+    } catch {
+      currentIntervalMs = 5 * 60_000
+    }
+    timer = setTimeout(async () => {
+      await monitor()
+      scheduleNext()
+    }, currentIntervalMs)
+  }
+  timer = setTimeout(async () => {
+    await monitor()
+    scheduleNext()
+  }, 15_000)
+
+  // Bersihkan timer saat app ditutup (agar proses bisa exit)
+  app.addHook("onClose", async () => {
+    if (timer) clearTimeout(timer)
   })
 }
