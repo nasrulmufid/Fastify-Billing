@@ -3,7 +3,7 @@ import { z } from "zod"
 
 import { nextCode, nextCustomerCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, toDbDateTime, MONTHS_ID } from "../utils/date.js"
-import { recordRouterWarning, withRouter, enqueueRouterSync, type RouterWarning } from "../services/router.service.js"
+import { recordRouterWarning, withRouter, enqueueRouterSync, firstIpFromCidr, type RouterWarning } from "../services/router.service.js"
 import { completePaymentFlow } from "../services/payment.service.js"
 import {
   generateCustomerWorkbook,
@@ -617,18 +617,19 @@ export async function customersRoutes(app: FastifyInstance) {
           "SELECT ip_pool_isolir FROM routers WHERE id = ?",
           [row.router_id],
         )) as Record<string, unknown>[]
-        const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : undefined
+        const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : ""
         if (body.isolate) {
-          // Isolir: ubah profile ke ISOLIR dengan ip-pool isolir (auto-create jika belum ada)
+          // Isolir: ubah profile ke ISOLIR (auto-create jika belum ada).
+          // remote-address = IP TUNGGAL dari pool isolir (CIDR ditolak RouterOS).
           const isolirProfile = await client.ensureIsolirProfile()
           await client.changePppProfile({
             name: String(row.pppoe_username),
             password: String(row.pppoe_password ?? ""),
             profile: isolirProfile,
-            ipPool: ipPoolIsolir,
+            remoteAddress: firstIpFromCidr(ipPoolIsolir),
           })
         } else {
-          // Unisolir: kembalikan ke profile paket pelanggan
+          // Unisolir: kembalikan ke profile paket + remote-address IP asli pelanggan.
           const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
             row.package_id,
           ])) as Record<string, unknown>[]
@@ -638,6 +639,7 @@ export async function customersRoutes(app: FastifyInstance) {
               name: String(row.pppoe_username),
               password: String(row.pppoe_password ?? ""),
               profile,
+              remoteAddress: row.ip_address ? String(row.ip_address) : undefined,
             })
           }
         }

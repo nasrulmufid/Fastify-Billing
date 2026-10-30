@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify"
 import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { fillPlaceholders } from "../utils/template.js"
-import { recordRouterWarning, withRouter, enqueueRouterSync, loadPendingSyncQueue, markSyncQueueEntry } from "../services/router.service.js"
+import { recordRouterWarning, withRouter, enqueueRouterSync, loadPendingSyncQueue, markSyncQueueEntry, firstIpFromCidr } from "../services/router.service.js"
 import { syncRouterAfterPayment } from "../services/payment.service.js"
 import { getReminderTemplate, sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
 import { getTelegramConfig, notifyTelegram } from "../services/telegram.service.js"
@@ -141,12 +141,12 @@ export function registerJobs(app: FastifyInstance) {
                 "SELECT ip_pool_isolir FROM routers WHERE id = ?",
                 [cust.router_id],
               )) as Record<string, unknown>[]
-              const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : undefined
+              const ipPoolIsolir = routerRow?.ip_pool_isolir ? String(routerRow.ip_pool_isolir) : ""
               await client.changePppProfile({
                 name: String(cust.pppoe_username),
                 password: String(cust.pppoe_password ?? ""),
                 profile: "ISOLIR",
-                ipPool: ipPoolIsolir,
+                remoteAddress: firstIpFromCidr(ipPoolIsolir),
               })
             })
             if (!res.ok) {

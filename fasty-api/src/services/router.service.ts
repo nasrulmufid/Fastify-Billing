@@ -266,14 +266,19 @@ class MikrotikClient {
   }
 
   /**
-   * Ubah profile secret PPPoE ke ISOLIR (dengan ip-pool isolir) atau kembali ke profile normal.
-   * Tidak mengubah disabled — hanya mengganti profile dan local-address.
+   * Ubah profile secret PPPoE ke ISOLIR (dengan remote-address dari pool isolir)
+   * atau kembali ke profile normal (remote-address dikembalikan ke ip_address DB).
+   * Tidak mengubah disabled — hanya mengganti profile dan remote-address.
+   *
+   * PENTING: `remoteAddress` harus IP TUNGGAL (mis. "172.1.1.10"), BUKAN CIDR
+   * ("172.1.1.0/24") — RouterOS menolak CIDR pada remote-address secret dengan
+   * HTTP 400 "invalid value for argument remote-address".
    */
   async changePppProfile(opts: {
     name: string
     password: string
     profile: string
-    ipPool?: string
+    remoteAddress?: string
   }): Promise<void> {
     const id = await this.findSecretId(opts.name)
     const payload: Record<string, unknown> = {
@@ -283,8 +288,7 @@ class MikrotikClient {
       profile: opts.profile,
       disabled: false,
     }
-    // Bila ada ip_pool_isolir, tambahkan remote-address untuk membatasi IP pelanggan isolir
-    if (opts.ipPool) payload["remote-address"] = opts.ipPool
+    if (opts.remoteAddress) payload["remote-address"] = opts.remoteAddress
     if (id) {
       await this.updateResource("ppp/secret", id, payload)
     } else {
@@ -307,6 +311,24 @@ class MikrotikClient {
   // ========================================================
   // PPPoE Secret — /ppp secret
   // ========================================================
+}
+
+/**
+ * Ambil IP tunggal yang aman dari string CIDR pool isolir (mis. "172.1.1.0/24"
+ * -> "172.1.1.2"; oktet .0/.1 dihindari karena biasanya network/gateway).
+ * RouterOS menolak CIDR pada remote-address secret (HTTP 400), jadi isolir
+ * selalu memakai IP tunggal hasil helper ini.
+ */
+export function firstIpFromCidr(cidr: string | undefined | null): string | undefined {
+  if (!cidr) return undefined
+  const [base, prefixStr] = cidr.trim().split("/")
+  const parts = base.split(".").map(Number)
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return undefined
+  const prefix = Number(prefixStr ?? 24)
+  if (Number.isNaN(prefix) || prefix < 8 || prefix > 32) return undefined
+  // IP pertama yang usable: network address + 2 (lewati network .0 dan gateway .1)
+  const lastOctet = Math.min(parts[3] + 2, 254)
+  return `${parts[0]}.${parts[1]}.${parts[2]}.${lastOctet}`
 }
 
 /**
