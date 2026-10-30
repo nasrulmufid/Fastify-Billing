@@ -26,7 +26,7 @@ import { waGatewayRoutes } from "./routes/wa-gateway.routes.js"
 import { telegramRoutes } from "./routes/telegram.routes.js"
 import { acsRoutes } from "./routes/acs.routes.js"
 import { webhookRoutes } from "./routes/webhook.routes.js"
-import { registerJobs } from "./jobs/index.js"
+import { registerJobs, registerAlwaysOnJobs } from "./jobs/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -89,7 +89,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Health check
   app.get("/health", async () => ({ data: { ok: true } }))
 
-  // Scheduler — hanya di production
+  // Scheduler — monitor Mikrotik & antrian sync SELALU aktif (juga di dev);
+  // job billing (invoice otomatis, reminder, isolir otomatis) hanya production.
+  registerAlwaysOnJobs(app)
   if (config.nodeEnv === "production") {
     registerJobs(app)
   }

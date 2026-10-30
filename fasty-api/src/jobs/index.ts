@@ -11,8 +11,18 @@ import { getTelegramConfig, notifyTelegram } from "../services/telegram.service.
 
 /**
  * Scheduler (node-cron) — sesuai Backend.PRD.md bagian 10.
- * Diaktifkan hanya di production (NODE_ENV=production) agar tidak mengganggu dev.
+ * Dua kelompok:
+ *   - registerAlwaysOnJobs  : monitor Mikrotik + antrian sync — SELALU jalan
+ *     (termasuk dev) karena fungsinya kritis utk notifikasi & pemulihan.
+ *   - registerJobs          : job billing (invoice, reminder, isolir otomatis,
+ *     retensi) — hanya production agar tidak mengganggu dev.
  */
+export function registerAlwaysOnJobs(app: FastifyInstance) {
+  // Cron antrian sync (5 menit) + monitor status Mikrotik (interval dinamis)
+  registerSyncQueueJob(app)
+  registerRouterMonitor(app)
+}
+
 export function registerJobs(app: FastifyInstance) {
   // 1. Anniversary billing — buat invoice menjelang expiry_at masing-masing customer
   //    (bukan serentak tgl 1). due_at = expiry_at (tanggal anniversary customer) agar
@@ -249,11 +259,15 @@ export function registerJobs(app: FastifyInstance) {
   cron.schedule("15 8 * * *", async () => {
     await sendReminderBatch("h1", 1)
   })
+}
 
-  // Setiap 5 menit — proses antrian sinkronisasi (router_sync_queue).
-  // Antrian berisi pelanggan yang pembayaran/aktivasi/isolir-nya belum sempat
-  // diterapkan ke Mikrotik karena router offline saat itu. Begitu router online
-  // kembali, perubahan profile PPPoE (ISOLIR <-> profile paket) diterapkan otomatis.
+/**
+ * Antrian sinkronisasi (router_sync_queue) — SELALU aktif.
+ * Antrian berisi pelanggan yang pembayaran/aktivasi/isolir-nya belum sempat
+ * diterapkan ke Mikrotik karena router offline saat itu. Begitu router online
+ * kembali, perubahan profile PPPoE (ISOLIR <-> profile paket) diterapkan otomatis.
+ */
+function registerSyncQueueJob(app: FastifyInstance) {
   cron.schedule("*/5 * * * *", async () => {
     try {
       const queue = await loadPendingSyncQueue(app, 50)
@@ -298,16 +312,18 @@ export function registerJobs(app: FastifyInstance) {
       app.log.error(err, "Gagal memproses antrian sync router")
     }
   })
+}
 
-  // ==========================================================
-  // Monitor status Mikrotik + notifikasi Telegram saat offline
-  // ==========================================================
-  // Interval dibaca dari konfigurasi Telegram (routerCheckIntervalMinutes,
-  // default 5 menit) sehingga bisa diubah dari UI tanpa restart.
-  // Implementasi pakai setInterval (bukan node-cron) agar interval dinamis.
-  // Debounce: notif offline hanya dikirim sekali per episode offline
-  // (ditandai router.status='Disconnected'), dan notif "online kembali"
-  // dikirim saat status pulih.
+/**
+ * Monitor status Mikrotik + notifikasi Telegram offline/online — SELALU aktif.
+ * Interval dibaca dari konfigurasi Telegram (routerCheckIntervalMinutes,
+ * default 5 menit) sehingga bisa diubah dari UI tanpa restart.
+ * Implementasi pakai setTimeout berantai (bukan node-cron) agar interval dinamis.
+ * Debounce: notif offline hanya dikirim sekali per episode offline
+ * (ditandai router.status='Disconnected'), dan notif "online kembali"
+ * dikirim saat status pulih.
+ */
+function registerRouterMonitor(app: FastifyInstance) {
   const monitor = async () => {
     try {
       const cfg = await getTelegramConfig(app)
