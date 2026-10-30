@@ -331,6 +331,7 @@ export function PackagesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Select
+            items={{ all: "Semua tipe", ...Object.fromEntries(TYPE_OPTIONS.map((t) => [t, t])) }}
             value={typeFilter}
             onValueChange={(val) => {
               setTypeFilter(val ?? "all")
@@ -351,6 +352,7 @@ export function PackagesPage() {
           </Select>
 
           <Select
+            items={{ all: "Semua status", Aktif: "Aktif", Nonaktif: "Nonaktif" }}
             value={statusFilter}
             onValueChange={(val) => {
               setStatusFilter(val ?? "all")

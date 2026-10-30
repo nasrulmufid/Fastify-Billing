@@ -128,8 +128,6 @@ export function useAcsSync() {
 // ---------------------------------------------------------------------------
 
 export function useAcsRebootDevice() {
-  const qc = useQueryClient()
-
   return useMutation({
     mutationFn: async (deviceId: string) => {
       const { data } = await api.post(`/acs/devices/${encodeURIComponent(deviceId)}/reboot`)

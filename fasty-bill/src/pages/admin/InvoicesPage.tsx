@@ -219,6 +219,7 @@ export function InvoicesPage() {
           />
         </div>
         <Select
+          items={{ all: "Semua status", ...Object.fromEntries(STATUS_OPTIONS.map((s) => [s, statusLabel[s]])) }}
           value={statusFilter}
           onValueChange={(val) => {
             setStatusFilter(val ?? "all")

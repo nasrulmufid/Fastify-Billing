@@ -324,6 +324,7 @@ export function PaymentsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Select
+            items={{ all: "Semua status", ...Object.fromEntries(STATUS_OPTIONS.map((s) => [s, s])) }}
             value={statusFilter}
             onValueChange={(val) => {
               setStatusFilter(val ?? "all")
@@ -344,6 +345,7 @@ export function PaymentsPage() {
           </Select>
 
           <Select
+            items={{ all: "Semua metode", ...Object.fromEntries(METHOD_OPTIONS.map((m) => [m, m])) }}
             value={methodFilter}
             onValueChange={(val) => {
               setMethodFilter(val ?? "all")

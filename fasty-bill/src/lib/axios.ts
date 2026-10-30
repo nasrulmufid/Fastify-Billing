@@ -33,13 +33,20 @@ api.interceptors.response.use(
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
         const url = error.config?.url ?? ""
-        const isCustomerRoute = CUSTOMER_ROUTES.some((p) => url.startsWith(p))
-        if (isCustomerRoute) {
-          useCustomerStore.getState().logout()
-          window.location.href = "/portal/login"
-        } else {
-          useAuthStore.getState().logout()
-          window.location.href = "/login"
+        // Endpoint login ditangani form-nya masing-masing (inline error).
+        // Jangan logout + redirect di sini, karena full page reload akan
+        // menghapus pesan error sebelum user sempat membacanya.
+        const isLoginEndpoint =
+          url.startsWith("/auth/login") || url.startsWith("/auth/customer-login")
+        if (!isLoginEndpoint) {
+          const isCustomerRoute = CUSTOMER_ROUTES.some((p) => url.startsWith(p))
+          if (isCustomerRoute) {
+            useCustomerStore.getState().logout()
+            window.location.href = "/portal/login"
+          } else {
+            useAuthStore.getState().logout()
+            window.location.href = "/login"
+          }
         }
       }
     }

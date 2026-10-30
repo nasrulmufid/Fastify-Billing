@@ -10,7 +10,6 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Loader2, Save, Settings } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageHeader } from "@/components/layouts/PageHeader"
 import { Button } from "@/components/ui/button"

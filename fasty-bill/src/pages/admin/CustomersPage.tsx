@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Calendar,
   Download,
   Edit,
@@ -62,6 +65,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import {
   useCustomerActions,
   useCustomers,
@@ -86,6 +90,31 @@ const statusLabel: Record<string, string> = {
 }
 
 const PAGE_SIZE = 8
+
+/* ----------------------------------------------------------------
+   Sorting helpers
+   ---------------------------------------------------------------- */
+
+type SortKey =
+  | "code"
+  | "name"
+  | "packageName"
+  | "router"
+  | "ipAddress"
+  | "status"
+  | "expiryDate"
+type SortDir = "asc" | "desc"
+
+/** "10 September 2026" -> timestamp (untuk sort Masa Aktif secara kronologis) */
+function expiryTimestamp(dateStr: string): number {
+  const parts = dateStr.trim().split(/\s+/)
+  if (parts.length !== 3) return 0
+  const day = Number(parts[0])
+  const month = MONTHS_ID.indexOf(parts[1])
+  const year = Number(parts[2])
+  if (!day || month < 0 || !year) return 0
+  return new Date(year, month, day).getTime()
+}
 
 /* ----------------------------------------------------------------
    Date helpers (format penyimpanan: "10 September 2026")
@@ -195,6 +224,8 @@ export function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [packageFilter, setPackageFilter] = useState("all")
   const [page, setPage] = useState(0)
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>("asc")
 
   // Sheet form (tambah / edit)
   const [formOpen, setFormOpen] = useState(false)
@@ -386,8 +417,65 @@ export function CustomersPage() {
       result = result.filter((c) => c.packageName === packageFilter)
     }
 
+    // Sorting (sebelum pagination)
+    if (sortKey) {
+      const dir = sortDir === "asc" ? 1 : -1
+      result = [...result].sort((a, b) => {
+        if (sortKey === "expiryDate") {
+          return (expiryTimestamp(a.expiryDate) - expiryTimestamp(b.expiryDate)) * dir
+        }
+        if (sortKey === "status") {
+          // Active dulu, lalu Isolated saat asc
+          const rank = (s: string) => (s === "Active" ? 0 : 1)
+          return (rank(a.status) - rank(b.status)) * dir
+        }
+        const av = a[sortKey].toLowerCase()
+        const bv = b[sortKey].toLowerCase()
+        return av.localeCompare(bv, "id", { numeric: true }) * dir
+      })
+    }
+
     return result
-  }, [customers, search, statusFilter, packageFilter])
+  }, [customers, search, statusFilter, packageFilter, sortKey, sortDir])
+
+  /* ---------- Sort handlers ---------- */
+  const toggleSort = (key: SortKey) => {
+    setPage(0)
+    if (sortKey !== key) {
+      setSortKey(key)
+      setSortDir("asc")
+    } else if (sortDir === "asc") {
+      setSortDir("desc")
+    } else {
+      setSortKey(null)
+      setSortDir("asc")
+    }
+  }
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowUpDown className="size-3 opacity-40" />
+    return sortDir === "asc" ? (
+      <ArrowUp className="size-3" />
+    ) : (
+      <ArrowDown className="size-3" />
+    )
+  }
+
+  const SortableHead = ({ label, k }: { label: string; k: SortKey }) => (
+    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+      <button
+        type="button"
+        onClick={() => toggleSort(k)}
+        className={cn(
+          "inline-flex items-center gap-1.5 transition-colors hover:text-foreground",
+          sortKey === k && "text-foreground",
+        )}
+      >
+        {label}
+        {sortIcon(k)}
+      </button>
+    </TableHead>
+  )
 
   /* ---------- Pagination ---------- */
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -465,6 +553,7 @@ export function CustomersPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Select
+              items={{ all: "Semua status", Active: "Aktif", Isolated: "Isolir" }}
               value={statusFilter}
               onValueChange={(val) => {
                 setStatusFilter(val ?? "all")
@@ -482,6 +571,10 @@ export function CustomersPage() {
             </Select>
 
             <Select
+              items={Object.fromEntries([
+                ["all", "Semua paket"],
+                ...packages.map((pkg) => [pkg.name, pkg.name]),
+              ])}
               value={packageFilter}
               onValueChange={(val) => {
                 setPackageFilter(val ?? "all")
@@ -621,27 +714,13 @@ export function CustomersPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                ID Pelanggan
-              </TableHead>
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Pelanggan
-              </TableHead>
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Paket Layanan
-              </TableHead>
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Router
-              </TableHead>
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                IP Address
-              </TableHead>
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Status
-              </TableHead>
-              <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Masa Aktif
-              </TableHead>
+              <SortableHead label="ID Pelanggan" k="code" />
+              <SortableHead label="Pelanggan" k="name" />
+              <SortableHead label="Paket Layanan" k="packageName" />
+              <SortableHead label="Router" k="router" />
+              <SortableHead label="IP Address" k="ipAddress" />
+              <SortableHead label="Status" k="status" />
+              <SortableHead label="Masa Aktif" k="expiryDate" />
               <TableHead className="w-15 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 <span className="sr-only">Aksi</span>
               </TableHead>

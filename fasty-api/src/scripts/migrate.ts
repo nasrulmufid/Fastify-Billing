@@ -64,6 +64,9 @@ async function main() {
     console.log("Menjalankan migration_add_username.sql ...")
     await runRawSqlFile(conn, "migration_add_username.sql")
 
+    console.log("Menjalankan migration_add_notification_seen.sql ...")
+    await runRawSqlFile(conn, "migration_add_notification_seen.sql")
+
     // Upsert user admin super_admin (bcrypt hash valid utk "admin")
     const hash = await bcrypt.hash("admin", 10)
     await conn.query(

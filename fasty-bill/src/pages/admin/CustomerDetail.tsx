@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react"
-import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom"
+import {
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom"
 import {
   ArrowLeft,
   CalendarPlus,
@@ -339,11 +345,11 @@ export function CustomerDetailPage() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink to="/admin">Dashboard</BreadcrumbLink>
+            <BreadcrumbLink render={<Link to="/admin" />}>Dashboard</BreadcrumbLink>
             <BreadcrumbSeparator />
           </BreadcrumbItem>
           <BreadcrumbItem>
-            <BreadcrumbLink to="/admin/customers">Pelanggan</BreadcrumbLink>
+            <BreadcrumbLink render={<Link to="/admin/customers" />}>Pelanggan</BreadcrumbLink>
             <BreadcrumbSeparator />
           </BreadcrumbItem>
           <BreadcrumbItem>

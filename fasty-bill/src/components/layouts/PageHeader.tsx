@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { Link } from "react-router-dom"
 
 import {
   Breadcrumb,
@@ -36,7 +37,11 @@ export function PageHeader({ breadcrumbs, title, description, actions }: PageHea
                   {isLast ? (
                     <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                   ) : (
-                    <BreadcrumbLink to={crumb.to ?? "/admin"}>{crumb.label}</BreadcrumbLink>
+                    <BreadcrumbLink
+                      render={<Link to={crumb.to ?? "/admin"} />}
+                    >
+                      {crumb.label}
+                    </BreadcrumbLink>
                   )}
                   {!isLast && <BreadcrumbSeparator />}
                 </BreadcrumbItem>

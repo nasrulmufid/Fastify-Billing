@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, User } from "lucide-react"
+import { ArrowRight, AlertCircle, Eye, EyeOff, Loader2, Lock, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,10 +17,12 @@ export function PortalLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [invalidCredentials, setInvalidCredentials] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError("")
+    setInvalidCredentials(false)
 
     if (!username.trim() || !password) {
       setError("Username dan password wajib diisi.")
@@ -35,6 +37,7 @@ export function PortalLoginPage() {
       toast.success("Login berhasil, selamat datang!")
       navigate("/portal")
     } else {
+      setInvalidCredentials(true)
       setError("Username atau password salah, atau akun tidak aktif.")
     }
   }
@@ -58,8 +61,12 @@ export function PortalLoginPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             {error && (
-              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-600">
-                {error}
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-600"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -74,6 +81,7 @@ export function PortalLoginPage() {
                   placeholder="Masukkan username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  aria-invalid={invalidCredentials || undefined}
                   className="h-10 pl-9"
                 />
               </div>
@@ -91,6 +99,7 @@ export function PortalLoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  aria-invalid={invalidCredentials || undefined}
                   className="h-10 pr-10 pl-9"
                 />
                 <button

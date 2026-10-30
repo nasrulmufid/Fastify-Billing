@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom"
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   Search,
   Bell,
@@ -111,12 +111,30 @@ function NavGroupSection({
   group,
   collapsed,
   onNavigate,
+  activeTo,
 }: {
   group: NavGroup
   collapsed: boolean
   onNavigate: () => void
+  activeTo: string | null
 }) {
   const [open, setOpen] = useState(true)
+
+  const linkClass = (isActive: boolean) =>
+    cn(
+      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+      isActive
+        ? "bg-primary/10 text-primary"
+        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+    )
+
+  const linkClassCollapsed = (isActive: boolean) =>
+    cn(
+      "flex items-center justify-center rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
+      isActive
+        ? "bg-primary/10 text-primary"
+        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+    )
 
   // Icon-only mode: render items flat, group headers hidden
   if (collapsed) {
@@ -126,17 +144,10 @@ function NavGroupSection({
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to !== "/admin"}
+            end
             onClick={onNavigate}
             title={item.label}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center justify-center rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )
-            }
+            className={() => linkClassCollapsed(activeTo === item.to)}
           >
             <item.icon className="h-4 w-4 shrink-0" />
           </NavLink>
@@ -163,16 +174,9 @@ function NavGroupSection({
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to !== "/admin"}
+              end
               onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )
-              }
+              className={() => linkClass(activeTo === item.to)}
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {item.label}
@@ -193,6 +197,7 @@ type NotificationItem = {
   desc: string
   time: string
   customerId?: string
+  seenAt?: string | null
   unread?: boolean
 }
 
@@ -213,6 +218,24 @@ export function AdminLayout() {
   const [searchQuery, setSearchQuery] = useState("")
   const customers = useCustomers()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Menu aktif GLOBAL = item nav dengan prefix path terpanjang yang cocok
+  // dengan URL saat ini. Dihitung sekali di sini (bukan per group) agar
+  // hanya satu menu yang aktif.
+  // Contoh: di /admin/pppoe/customers hanya "Pelanggan" yang aktif, bukan Dashboard.
+  const activeNavTo = useMemo(() => {
+    const path = location.pathname
+    let best: string | null = null
+    for (const group of navGroups) {
+      for (const item of group.items) {
+        if (path === item.to || path.startsWith(item.to + "/")) {
+          if (best === null || item.to.length > best.length) best = item.to
+        }
+      }
+    }
+    return best
+  }, [location.pathname])
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
 
@@ -229,6 +252,7 @@ export function AdminLayout() {
             const type = (r.type ?? "payment") as NotificationType
             const meta = notifMeta[type] ?? notifMeta.payment
             const customer = (r.customer ?? "") as string
+            const seenAt = (r.seenAt ?? null) as string | null
             return {
               id: String(r.id),
               type,
@@ -236,7 +260,8 @@ export function AdminLayout() {
               desc: customer ? `${customer} · ${String(r.code ?? "")}` : String(r.code ?? ""),
               time: (r.time ?? "") as string,
               customerId: r.customer_id != null ? String(r.customer_id) : undefined,
-              unread: (r.status ?? "Terkirim") === "Gagal",
+              seenAt,
+              unread: seenAt == null,
             }
           }),
         )
@@ -249,13 +274,33 @@ export function AdminLayout() {
     }
   }, [])
 
-  // Badge = jumlah notifikasi gagal (perlu perhatian)
+  // Badge = jumlah notifikasi belum dibaca (seen_at masih NULL)
   const unreadCount = notifications.filter((n) => n.unread).length
   const recentNotifications = notifications.slice(0, 10)
 
-  // "Read all" — hapus notifikasi dari navbar (badge & list)
+  // "Read all" — tandai semua sudah dibaca di backend, lalu perbarui state lokal
   const handleReadAll = () => {
-    setNotifications([])
+    api
+      .post("/notifications/read-all")
+      .then(() => {
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, unread: false, seenAt: new Date().toISOString() })),
+        )
+      })
+      .catch(() => {
+        // tetap update state lokal agar UX tidak menggantung bila API gagal
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, unread: false, seenAt: new Date().toISOString() })),
+        )
+      })
+  }
+
+  // Tandai satu notifikasi dibaca saat item diklik
+  const markAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, unread: false, seenAt: new Date().toISOString() } : n)),
+    )
+    api.post(`/notifications/${id}/read`).catch(() => {})
   }
 
   const searchResults = useMemo(() => {
@@ -326,6 +371,7 @@ export function AdminLayout() {
                 group={group}
                 collapsed={sidebarCollapsed}
                 onNavigate={() => setSidebarOpen(false)}
+                activeTo={activeNavTo}
               />
             ))}
           </nav>
@@ -528,6 +574,7 @@ export function AdminLayout() {
                         key={n.id}
                         className="flex cursor-pointer flex-col items-start gap-0.5 py-3"
                         onClick={() => {
+                          markAsRead(n.id)
                           if (n.customerId) navigate(`/admin/customers/${n.customerId}`)
                           else navigate("/admin/notifications")
                         }}

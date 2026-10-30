@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
+  AlertCircle,
   ArrowRight,
   Eye,
   EyeOff,
@@ -54,10 +55,12 @@ export function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [invalidCredentials, setInvalidCredentials] = useState(false)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError("")
+    setInvalidCredentials(false)
 
     const trimmed = username.trim()
     if (!trimmed || !password) {
@@ -78,10 +81,17 @@ export function LoginPage() {
       })
       .catch((err) => {
         setLoading(false)
-        const message =
-          err?.response?.data?.error?.message ??
-          "Tidak dapat terhubung ke server. Pastikan backend berjalan."
-        setError(message)
+        const status = err?.response?.status
+        if (status === 401 || status === 403) {
+          setInvalidCredentials(true)
+          setError("Username atau password salah. Silakan coba lagi.")
+        } else if (err?.code === "ECONNABORTED") {
+          setError("Koneksi ke server timeout. Periksa koneksi internet Anda.")
+        } else if (!err?.response) {
+          setError("Tidak dapat terhubung ke server. Pastikan backend berjalan.")
+        } else {
+          setError(err?.response?.data?.error?.message ?? "Terjadi kesalahan. Coba lagi nanti.")
+        }
       })
   }
 
@@ -173,6 +183,7 @@ export function LoginPage() {
                   placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  aria-invalid={invalidCredentials || undefined}
                   className="h-10 pl-9"
                 />
               </div>
@@ -198,6 +209,7 @@ export function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  aria-invalid={invalidCredentials || undefined}
                   className="h-10 pr-10 pl-9"
                 />
                 <button
@@ -226,11 +238,15 @@ export function LoginPage() {
               </Label>
             </div>
 
-            {/* Error */}
+            {/* Error — inline, tetap tampil sampai user submit lagi */}
             {error && (
-              <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
-                {error}
-              </p>
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-xs font-medium text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+                <span>{error}</span>
+              </div>
             )}
 
             <Button

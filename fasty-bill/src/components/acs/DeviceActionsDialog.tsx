@@ -5,7 +5,7 @@
  * Tabs: Reboot | WiFi Settings
  */
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -63,7 +63,8 @@ const wifiSchema = z.object({
   wlanIndex: z.coerce.number().int().min(1).default(1),
 })
 
-type WifiFormValues = z.infer<typeof wifiSchema>
+type WifiFormValues = z.input<typeof wifiSchema>
+type WifiFormOutput = z.output<typeof wifiSchema>
 
 // ---------------------------------------------------------------------------
 // Props
@@ -134,9 +135,8 @@ function WifiForm({ device, onSuccess }: { device: DeviceInfo; onSuccess: () => 
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
-  } = useForm<WifiFormValues>({
+  } = useForm<WifiFormValues, unknown, WifiFormOutput>({
     resolver: zodResolver(wifiSchema),
     defaultValues: {
       ssid: "",
@@ -145,7 +145,7 @@ function WifiForm({ device, onSuccess }: { device: DeviceInfo; onSuccess: () => 
     },
   })
 
-  const onSubmit = (values: WifiFormValues) => {
+  const onSubmit = (values: WifiFormOutput) => {
     mutation.mutate(
       { deviceId: device._id, ...values },
       { onSuccess },

@@ -10,12 +10,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { MoreHorizontal, RefreshCw, Search, Wifi, WifiOff } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageHeader } from "@/components/layouts/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -128,10 +126,12 @@ function DeviceRowActions({ device }: { device: GenieACSDevice }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" />
+          }
+        >
+          <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Aksi</DropdownMenuLabel>
@@ -262,6 +262,7 @@ export function AcsPage() {
 
           <div className="flex items-center gap-2">
             <Select
+              items={{ all: "Semua Status", Online: "Online", Offline: "Offline" }}
               value={filters.status}
               onValueChange={(v) => setStatus(v as AcsDeviceStatusFilter)}
             >
@@ -327,12 +328,14 @@ export function AcsPage() {
                     </TableCell>
                     <TableCell className="font-medium">
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="cursor-help">
-                            {device.DisplayName.length > 30
-                              ? device.DisplayName.slice(0, 30) + "…"
-                              : device.DisplayName}
-                          </span>
+                        <TooltipTrigger
+                          render={
+                            <span className="cursor-help" />
+                          }
+                        >
+                          {device.DisplayName.length > 30
+                            ? device.DisplayName.slice(0, 30) + "…"
+                            : device.DisplayName}
                         </TooltipTrigger>
                         <TooltipContent>{device.DisplayName}</TooltipContent>
                       </Tooltip>
