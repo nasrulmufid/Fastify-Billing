@@ -53,6 +53,10 @@ export const usePaymentStore = create<PaymentStore>((set, get) => ({
       await api.post(`/payments/${id}/approve`, { statusNote })
       await get().load()
       await useInvoiceStore.getState().load()
+      // Pembayaran mengubah status/expiry pelanggan (completePaymentFlow) —
+      // refresh customer store agar halaman pelanggan ikut segar tanpa reload.
+      const { refreshCustomers } = await import("@/lib/customerStore")
+      void refreshCustomers()
       return true
     } catch (err: unknown) {
       console.error("Gagal menyetujui pembayaran:", (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? err)

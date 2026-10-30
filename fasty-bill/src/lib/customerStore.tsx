@@ -127,6 +127,27 @@ function mapCustomerFromApi(c: any): Customer {
 let pkgIdCache: Record<string, number> = {}
 let routerIdCache: Record<string, number> = {}
 
+/**
+ * Dispatcher global (di-set oleh CustomerProvider) agar fungsi di luar komponen
+ * (mis. refreshCustomers) tetap bisa update store.
+ */
+let globalDispatch: Dispatch<Action> | null = null
+
+/**
+ * Fetch ulang daftar pelanggan dari server ke store.
+ * Dipanggil setelah aksi tulis (isolir, bayar, extend, dsb.) agar SEMUA halaman
+ * yang membaca store ikut memperbarui UI tanpa refresh browser.
+ */
+export async function refreshCustomers(): Promise<void> {
+  if (!globalDispatch) return
+  try {
+    const { data } = await api.get("/customers", { params: { limit: 100 } })
+    globalDispatch({ type: "SET_CUSTOMERS", payload: data.data.map(mapCustomerFromApi) })
+  } catch (err) {
+    console.warn("Gagal refresh pelanggan dari API:", (err as Error)?.message)
+  }
+}
+
 async function ensureMaps() {
   if (Object.keys(pkgIdCache).length && Object.keys(routerIdCache).length) return
   const [pkgs, routers] = await Promise.all([api.get("/packages"), api.get("/routers")])
@@ -141,6 +162,14 @@ const DispatchCtx = createContext<Dispatch<Action>>(() => {})
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, dispatch] = useReducer(customerReducer, seed)
   const token = useAuthStore((s) => s.token)
+
+  // Registrasikan dispatcher global utk refreshCustomers()
+  useEffect(() => {
+    globalDispatch = dispatch
+    return () => {
+      globalDispatch = null
+    }
+  }, [dispatch])
 
   // Hydrate dari backend Fastify (fasty-api) saat sudah login. Gagal -> tetap pakai seed.
   useEffect(() => {
@@ -255,10 +284,14 @@ export function useCustomerActions() {
   const setStatus = useCallback(
     async (id: string, status: Customer["status"]) => {
       try {
-        const { data } = await api.post(`/network/isolir/${id}`, { isolate: status === "Isolated" })
-        dispatch({ type: "UPSERT_CUSTOMER", payload: mapCustomerFromApi(data.data) })
+        await api.post(`/network/isolir/${id}`, { isolate: status === "Isolated" })
+        // Optimistic update agar UI langsung berubah (tombol isolir hijau/merah),
+        // lalu refresh dari server agar data (remote-address, dsb.) paling akurat.
+        dispatch({ type: "SET_STATUS", payload: { id, status } })
+        void refreshCustomers()
       } catch (err) {
         console.error("Gagal mengubah status:", err)
+        throw err // propagasikan agar pemanggil bisa menampilkan toast error
       }
     },
     [dispatch],
@@ -267,10 +300,11 @@ export function useCustomerActions() {
   const setExpiry = useCallback(
     async (id: string, expiryDate: string) => {
       try {
-        const { data } = await api.put(`/customers/${id}/expiry`, { expiryDate })
-        dispatch({ type: "UPSERT_CUSTOMER", payload: mapCustomerFromApi(data.data) })
+        await api.put(`/customers/${id}/expiry`, { expiryDate })
+        void refreshCustomers()
       } catch (err) {
         console.error("Gagal mengubah masa aktif:", err)
+        throw err
       }
     },
     [dispatch],
@@ -280,10 +314,11 @@ export function useCustomerActions() {
   const extendExpiry = useCallback(
     async (id: string, months: number) => {
       try {
-        const { data } = await api.post(`/customers/${id}/extend`, { months })
-        dispatch({ type: "UPSERT_CUSTOMER", payload: mapCustomerFromApi(data.data) })
+        await api.post(`/customers/${id}/extend`, { months })
+        void refreshCustomers()
       } catch (err) {
         console.error("Gagal memperpanjang masa aktif:", err)
+        throw err
       }
     },
     [dispatch],

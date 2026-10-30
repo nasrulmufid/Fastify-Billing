@@ -76,6 +76,10 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       await api.post(`/invoices/${id}/mark-paid`, { method })
       await get().load()
       await usePaymentStore.getState().load()
+      // Pembayaran mengubah status/expiry pelanggan (completePaymentFlow) —
+      // refresh customer store agar halaman pelanggan ikut segar tanpa reload.
+      const { refreshCustomers } = await import("@/lib/customerStore")
+      void refreshCustomers()
       return true
     } catch (err: unknown) {
       console.error("Gagal menandai invoice lunas:", (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? err)

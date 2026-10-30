@@ -66,7 +66,7 @@ import {
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog"
 import api from "@/lib/axios"
 import { useAuthStore } from "@/store/useAppStore"
-import { useCustomerActions } from "@/lib/customerStore"
+import { useCustomerActions, useCustomers, refreshCustomers } from "@/lib/customerStore"
 import { expiryToInputValue, inputToExpiry } from "@/lib/dateUtils"
 import { formatPrice } from "@/lib/paymentData"
 import { Banknote } from "lucide-react"
@@ -139,6 +139,10 @@ export function CustomerDetailPage() {
   const { token } = useAuthStore()
   const navigate = useNavigate()
   const { extendExpiry, setExpiry, setStatus } = useCustomerActions()
+  // Sumber data utama dari STORE — otomatis ter-update setelah aksi apa pun
+  // (isolir, extend, pembayaran) tanpa refresh browser.
+  const storeCustomers = useCustomers()
+  const storeCustomer = storeCustomers.find((c) => c.id === id)
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
@@ -160,7 +164,7 @@ export function CustomerDetailPage() {
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null)
   const [cashLoading, setCashLoading] = useState(false)
 
-  // Fetch customer data from backend API
+  // Fetch awal: customer dari API (fallback ke store) + invoices + tickets.
   useEffect(() => {
     if (!id || !token) return
 
@@ -184,6 +188,17 @@ export function CustomerDetailPage() {
         setLoading(false)
       })
   }, [id, token])
+
+  // Sinkronkan state lokal dengan store setiap store berubah (setelah isolir/extend/
+  // pembayaran dari halaman ini maupun halaman lain) — tombol isolir langsung
+  // berubah merah/hijau tanpa refresh browser.
+  useEffect(() => {
+    if (!storeCustomer) return
+    setCustomer((prev) => {
+      if (!prev) return prev
+      return { ...prev, ...storeCustomer, id: prev.id }
+    })
+  }, [storeCustomer])
 
   // Buka sheet edit otomatis saat akses /edit (deep-link)
   useEffect(() => {
@@ -279,7 +294,8 @@ export function CustomerDetailPage() {
       })
       setPayOpen(false)
       setPayInvoice(null)
-      // Refresh invoices
+      // Refresh data pelanggan (store) & daftar invoice lokal
+      void refreshCustomers()
       const invRes = await api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } })
       setInvoices(invRes.data.data || [])
     } catch (err: any) {
@@ -322,12 +338,9 @@ export function CustomerDetailPage() {
       })
       setCashOpen(false)
       setSelectedPackageId(null)
-      // Refresh data pelanggan & invoice
-      const [custRes, invRes] = await Promise.all([
-        api.get(`/customers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-        api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-      ])
-      setCustomer(custRes.data.data)
+      // Refresh data pelanggan (store) & daftar invoice lokal
+      void refreshCustomers()
+      const invRes = await api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } })
       setInvoices(invRes.data.data || [])
     } catch (err: any) {
       console.error("Gagal order paket tunai:", err)
