@@ -7,9 +7,11 @@ import {
   Banknote,
   CheckCircle2,
   Clock3,
-  Download,
   Eye,
+  FileDown,
+  FileSpreadsheet,
   FileText,
+  Loader2,
   MoreHorizontal,
   QrCode,
   Search,
@@ -62,6 +64,7 @@ import {
 import { MONTHS_ID } from "@/lib/dateUtils"
 import { usePaymentStore } from "@/store/paymentStore"
 import { useInvoiceStore } from "@/store/invoiceStore"
+import { exportReportXlsx, exportReportPdf, type ReportRow } from "@/lib/reportExport"
 
 const PAGE_SIZE = 10
 
@@ -182,6 +185,7 @@ export function PaymentsPage() {
   const [page, setPage] = useState(0)
   const [sortKey, setSortKey] = useState<SortKey | null>("date")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null)
 
   /* ---------- Rentang tanggal aktif (dari quick range / custom) ---------- */
   const dateRange = useMemo((): { from: Date | null; to: Date | null } => {
@@ -382,32 +386,56 @@ export function PaymentsPage() {
     }
   }
 
-  const handleExportCsv = () => {
-    if (sorted.length === 0) {
+  const reportRows: ReportRow[] = useMemo(
+    () =>
+      sorted.map((p) => ({
+        code: p.code,
+        customer: p.customer,
+        invoice: p.invoice,
+        method: p.method,
+        date: p.date,
+        amount: p.amount,
+        status: p.status,
+      })),
+    [sorted],
+  )
+
+  const exportMeta = {
+    title: "Laporan Pendapatan",
+    periodLabel: activeRangeLabel,
+    summary: [
+      { label: "Total Pendapatan", value: formatPrice(report.total) },
+      { label: "Transaksi Sukses", value: String(report.count) },
+      { label: "QRIS", value: formatPrice(report.qris) },
+      { label: "Tunai", value: formatPrice(report.tunai) },
+    ],
+    fileName: "laporan-pendapatan",
+  }
+
+  const handleExport = async (format: "xlsx" | "pdf") => {
+    if (reportRows.length === 0) {
       toast.error("Tidak ada data untuk diexport")
       return
     }
-    const header = ["Kode", "Pelanggan", "Invoice", "Metode", "Tanggal", "Jumlah", "Status"]
-    const rows = sorted.map((p) => [
-      p.code,
-      p.customer,
-      p.invoice,
-      p.method,
-      p.date,
-      formatPrice(p.amount),
-      p.status,
-    ])
-    const csv = "\uFEFF" + [header, ...rows].map((r) => r.join(",")).join("\n")
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `laporan-pendapatan-${activeRangeLabel.replace(/\s+/g, "-").toLowerCase()}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Export CSV berhasil", {
-      description: `${sorted.length} transaksi (periode: ${activeRangeLabel}) diexport.`,
-    })
+    setExporting(format)
+    try {
+      if (format === "xlsx") {
+        await exportReportXlsx(reportRows, exportMeta)
+        toast.success("Export Excel berhasil", {
+          description: `${reportRows.length} transaksi (periode: ${activeRangeLabel}) diexport ke XLSX.`,
+        })
+      } else {
+        exportReportPdf(reportRows, exportMeta)
+        toast.success("Export PDF berhasil", {
+          description: `${reportRows.length} transaksi (periode: ${activeRangeLabel}) diexport ke PDF.`,
+        })
+      }
+    } catch (err) {
+      console.error("Gagal export:", err)
+      toast.error("Gagal export", { description: (err as Error)?.message })
+    } finally {
+      setExporting(null)
+    }
   }
 
   return (
@@ -618,10 +646,46 @@ export function PaymentsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExportCsv}>
-              <Download className="mr-1.5 size-4" />
-              Export CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" disabled={exporting !== null || reportRows.length === 0} />
+                }
+              >
+                {exporting ? (
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                ) : (
+                  <FileDown className="mr-1.5 size-4" />
+                )}
+                {exporting === "xlsx"
+                  ? "Membuat Excel…"
+                  : exporting === "pdf"
+                    ? "Membuat PDF…"
+                    : "Export Laporan"}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Pilih format</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => void handleExport("xlsx")}>
+                  <FileSpreadsheet className="mr-2 size-4 text-emerald-600" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Excel (.xlsx)</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Dengan auto-filter & baris total
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleExport("pdf")}>
+                  <FileDown className="mr-2 size-4 text-rose-600" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">PDF (.pdf)</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Siap cetak dgn header & ringkasan
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {hasActiveFilter && (
               <Button variant="ghost" onClick={resetFilters} title="Hapus semua filter">
                 <X className="mr-1.5 size-4" />
