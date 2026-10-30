@@ -210,3 +210,49 @@ export async function getReminderTemplate(
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+/**
+ * Pesan default saat pelanggan bayar namun Mikrotik/server sedang offline
+ * (mis. karena PLN padam). Bisa dioverride admin lewat halaman WA Gateway.
+ */
+export const DEFAULT_OFFLINE_MESSAGE =
+  "Yth {nama}, pembayaran Anda sebesar {jumlah} melalui {metode} telah kami terima. Terima kasih.\n\n" +
+  "Saat ini Server sedang down biasanya karena PLN Off, anda jangan khawatir, pembayaran anda tetap kami terima " +
+  "dan internet akan kembali normal setelah Server Online."
+
+export interface OfflineMessageTemplate {
+  id: number
+  name: string
+  body: string
+}
+
+/**
+ * Ambil template pesan "server offline" (Mikrotik down saat transaksi).
+ * Prioritas:
+ *   1. Kolom offline_message di wa_api_config (custom admin dari halaman WA Gateway)
+ *   2. Template di DB dengan nama mengandung keyword "offline/server down"
+ *   3. Fallback pesan default (DEFAULT_OFFLINE_MESSAGE)
+ */
+export async function getOfflineMessage(app: FastifyInstance): Promise<OfflineMessageTemplate> {
+  // 1) Custom text khusus offline message dari wa_api_config
+  const [row] = (await app.db.query("SELECT offline_message FROM wa_api_config WHERE id = 1")) as Record<
+    string,
+    unknown
+  >[]
+  const custom = String(row?.offline_message ?? "").trim()
+  if (custom) return { id: 0, name: "Server Offline (custom)", body: custom }
+
+  // 2) Cari template bernama "offline" / "server down" di wa_templates
+  const rows = (await app.db.query("SELECT * FROM wa_templates ORDER BY id ASC")) as Record<string, unknown>[]
+  const keywords = ["offline", "server down", "server off", "pln"]
+  const byName = rows.find((r) => {
+    const n = String(r.name ?? "").toLowerCase()
+    return keywords.some((kw) => n.includes(kw))
+  })
+  if (byName) {
+    return { id: Number(byName.id), name: String(byName.name), body: String(byName.body) }
+  }
+
+  // 3) Fallback default
+  return { id: 0, name: "Server Offline (default)", body: DEFAULT_OFFLINE_MESSAGE }
+}

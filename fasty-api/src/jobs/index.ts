@@ -4,9 +4,8 @@ import type { FastifyInstance } from "fastify"
 import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { fillPlaceholders } from "../utils/template.js"
-import { recordRouterWarning, withRouter } from "../services/router.service.js"
+import { recordRouterWarning, withRouter, enqueueRouterSync, loadPendingSyncQueue, markSyncQueueEntry } from "../services/router.service.js"
 import { syncRouterAfterPayment } from "../services/payment.service.js"
-import { isRadiusRouter, syncCustomerById } from "../services/radius.service.js"
 import { getReminderTemplate, sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
 
 /**
@@ -122,19 +121,9 @@ export function registerJobs(app: FastifyInstance) {
           if (!isoResult.ok) {
             app.log.warn({ customerId: cust.customer_id, error: isoResult.error }, "Gagal kirim notif isolir WA")
           }
-          if (cust.router_id && cust.pppoe_username && (await isRadiusRouter(app, cust.router_id as number))) {
-            const res = await syncCustomerById(app, Number(cust.customer_id))
-            if (!res.ok) {
-              await recordRouterWarning(app, {
-                routerId: Number(cust.router_id),
-                customerId: Number(cust.customer_id),
-                action: "Isolir otomatis (RADIUS)",
-                warning: { code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" },
-              })
-            }
-            continue
-          }
-          // Sinkron ke Mikrotik: ubah profile ke ISOLIR dengan ip-pool isolir
+          // Sinkron ke Mikrotik (REST API): ubah profile ke ISOLIR dengan ip-pool isolir.
+          // Bila router offline, entri dimasukkan ke antrian sync agar diterapkan
+          // otomatis saat router online kembali.
           if (cust.router_id && cust.pppoe_username) {
             const res = await withRouter(app, cust.router_id as number, async (client) => {
               const [routerRow] = (await app.db.query(
@@ -155,6 +144,11 @@ export function registerJobs(app: FastifyInstance) {
                 customerId: Number(cust.customer_id),
                 action: "Isolir otomatis",
                 warning: res.warning,
+              })
+              await enqueueRouterSync(app, {
+                routerId: Number(cust.router_id),
+                customerId: Number(cust.customer_id),
+                reason: "Isolir otomatis",
               })
             }
           }
@@ -255,46 +249,52 @@ export function registerJobs(app: FastifyInstance) {
     await sendReminderBatch("h1", 1)
   })
 
-  // Setiap 5 menit — coba ulang sinkronisasi pembayaran yang gagal karena router offline
+  // Setiap 5 menit — proses antrian sinkronisasi (router_sync_queue).
+  // Antrian berisi pelanggan yang pembayaran/aktivasi/isolir-nya belum sempat
+  // diterapkan ke Mikrotik karena router offline saat itu. Begitu router online
+  // kembali, perubahan profile PPPoE (ISOLIR <-> profile paket) diterapkan otomatis.
   cron.schedule("*/5 * * * *", async () => {
     try {
-      const customers = (await app.db.query(
-        `SELECT DISTINCT c.*
-         FROM customers c
-         JOIN notification_logs n ON n.customer_id = c.id
-         WHERE n.type = 'router' AND n.status = 'Gagal'
-           AND n.error LIKE 'Gagal menghubungi%'
-           AND c.status = 'Active'
-           AND c.router_id IS NOT NULL
-           AND c.pppoe_username IS NOT NULL`,
-      )) as Record<string, unknown>[]
+      const queue = await loadPendingSyncQueue(app, 50)
+      if (queue.length === 0) return
 
-      for (const customer of customers) {
-        const synced = await syncRouterAfterPayment(app, customer, "Transaksi")
+      let done = 0
+      let failed = 0
+      for (const item of queue) {
+        const routerId = Number(item.router_id)
+        // Cek dulu apakah router online — bila masih offline, skip (tetap pending)
+        const ping = await withRouter(app, routerId, (client) => client.ping())
+        if (!ping.ok) continue
+
+        const customer = {
+          id: item.customer_id,
+          name: item.customer_name,
+          router_id: item.router_id,
+          package_id: item.package_id,
+          pppoe_username: item.pppoe_username,
+          pppoe_password: item.pppoe_password,
+          phone: item.phone,
+        }
+        const synced = await syncRouterAfterPayment(app, customer, "Transaksi", {
+          // Retry dari antrian: jangan kirim notifikasi "server offline" lagi —
+          // pesan itu hanya relevan saat transaksi awal terjadi.
+          notifyOffline: false,
+        })
         if (synced) {
+          await markSyncQueueEntry(app, Number(item.id), "done")
           await app.db.query(
-            "UPDATE notification_logs SET status = 'Terkirim', error = NULL WHERE type = 'router' AND status = 'Gagal' AND customer_id = ?",
-            [customer.id],
+            "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Sinkronisasi router berhasil (antrian)', ?)",
+            [String(item.customer_name ?? item.customer_id)],
           )
-          await app.db.query(
-            "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Sinkronisasi router berhasil', ?)",
-            [String(customer.name ?? customer.id)],
-          )
+          done++
+        } else {
+          await markSyncQueueEntry(app, Number(item.id), "failed", "Gagal sinkron saat router online")
+          failed++
         }
       }
-      if (customers.length > 0) app.log.info({ count: customers.length }, "Retry sinkronisasi router selesai")
+      app.log.info({ total: queue.length, done, failed }, "Antrian sync router diproses")
     } catch (err) {
-      app.log.error(err, "Gagal retry sinkronisasi router")
-    }
-  })
-
-  // Harian 03:00 — hapus riwayat accounting RADIUS > 90 hari
-  cron.schedule("0 3 * * *", async () => {
-    try {
-      await app.db.query("DELETE FROM radacct WHERE acctstoptime < DATE_SUB(NOW(), INTERVAL 90 DAY)")
-      app.log.info("Retensi radacct selesai")
-    } catch (err) {
-      app.log.error(err, "Gagal retensi radacct")
+      app.log.error(err, "Gagal memproses antrian sync router")
     }
   })
 }

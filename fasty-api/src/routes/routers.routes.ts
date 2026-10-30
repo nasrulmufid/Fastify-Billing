@@ -1,10 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
-import crypto from "node:crypto"
 import { z } from "zod"
 
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
 import { recordRouterWarning, testRouterConnection } from "../services/router.service.js"
-import { backfillRouter } from "../services/radius.service.js"
 
 /**
  * Validasi host — PERSIS regex frontend (RouterFormDialog HOST_RE):
@@ -50,10 +48,6 @@ const createRouterSchema = z.object({
     )
     .optional()
     .or(z.literal("")),
-  radiusEnabled: z.coerce.boolean().optional(),
-  nasSecret: z.string().optional(),
-  nasIdentifier: z.string().optional(),
-  coaPort: z.coerce.number().int().min(1).max(65535).optional(),
 })
 
 const updateRouterSchema = createRouterSchema.partial()
@@ -71,10 +65,6 @@ function mapRouter(row: Record<string, unknown>) {
     ipPool: row.ip_pool_pppoe ?? "",
     ipPoolPppoe: row.ip_pool_pppoe ?? "",
     ipPoolIsolir: row.ip_pool_isolir ?? "",
-    radiusEnabled: Number(row.radius_enabled ?? 0) === 1,
-    nasSecret: row.nas_secret ? maskSecret(decryptSecret(String(row.nas_secret))) : "",
-    nasIdentifier: row.nas_identifier ?? "",
-    coaPort: Number(row.coa_port ?? 3799),
     status: row.status,
     clientCount: row.client_count,
     uptime: row.uptime,
@@ -97,8 +87,8 @@ export async function routersRoutes(app: FastifyInstance) {
   app.post("/routers", techAuth, async (req, reply) => {
     const body = createRouterSchema.parse(req.body)
     const result = (await app.db.query(
-      `INSERT INTO routers (name, host, provider, api_port, api_use_https, api_user, api_password, ip_pool_pppoe, ip_pool_isolir, radius_enabled, nas_secret, nas_identifier, coa_port)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO routers (name, host, provider, api_port, api_use_https, api_user, api_password, ip_pool_pppoe, ip_pool_isolir)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         body.name.trim(),
         body.host.trim(),
@@ -109,10 +99,6 @@ export async function routersRoutes(app: FastifyInstance) {
         body.apiPassword ? encryptSecret(body.apiPassword) : null,
         body.ipPoolPppoe ? body.ipPoolPppoe.trim() : null,
         body.ipPoolIsolir ? body.ipPoolIsolir.trim() : null,
-        body.radiusEnabled ? 1 : 0,
-        body.nasSecret ? encryptSecret(body.nasSecret) : null,
-        body.nasIdentifier ?? null,
-        body.coaPort ?? 3799,
       ],
     )) as unknown as { insertId: number }
     const [row] = (await app.db.query("SELECT * FROM routers WHERE id = ?", [
@@ -131,9 +117,7 @@ export async function routersRoutes(app: FastifyInstance) {
         `UPDATE routers SET name = COALESCE(?, name), host = COALESCE(?, host),
            provider = COALESCE(?, provider), api_port = COALESCE(?, api_port),
            api_use_https = COALESCE(?, api_use_https), api_user = COALESCE(?, api_user),
-           api_password = ?, ip_pool_pppoe = COALESCE(?, ip_pool_pppoe), ip_pool_isolir = COALESCE(?, ip_pool_isolir),
-           radius_enabled = COALESCE(?, radius_enabled), nas_secret = COALESCE(?, nas_secret),
-           nas_identifier = COALESCE(?, nas_identifier), coa_port = COALESCE(?, coa_port)
+           api_password = ?, ip_pool_pppoe = COALESCE(?, ip_pool_pppoe), ip_pool_isolir = COALESCE(?, ip_pool_isolir)
          WHERE id = ?`,
         [
           body.name ? body.name.trim() : null,
@@ -145,10 +129,6 @@ export async function routersRoutes(app: FastifyInstance) {
           encryptSecret(body.apiPassword),
           body.ipPoolPppoe !== undefined ? (body.ipPoolPppoe ? body.ipPoolPppoe.trim() : null) : null,
           body.ipPoolIsolir !== undefined ? (body.ipPoolIsolir ? body.ipPoolIsolir.trim() : null) : null,
-          body.radiusEnabled !== undefined ? (body.radiusEnabled ? 1 : 0) : null,
-          body.nasSecret ? encryptSecret(body.nasSecret) : null,
-          body.nasIdentifier ?? null,
-          body.coaPort ?? null,
           id,
         ],
       )
@@ -157,9 +137,7 @@ export async function routersRoutes(app: FastifyInstance) {
         `UPDATE routers SET name = COALESCE(?, name), host = COALESCE(?, host),
            provider = COALESCE(?, provider), api_port = COALESCE(?, api_port),
            api_use_https = COALESCE(?, api_use_https), api_user = COALESCE(?, api_user),
-           ip_pool_pppoe = COALESCE(?, ip_pool_pppoe), ip_pool_isolir = COALESCE(?, ip_pool_isolir),
-           radius_enabled = COALESCE(?, radius_enabled), nas_secret = COALESCE(?, nas_secret),
-           nas_identifier = COALESCE(?, nas_identifier), coa_port = COALESCE(?, coa_port)
+           ip_pool_pppoe = COALESCE(?, ip_pool_pppoe), ip_pool_isolir = COALESCE(?, ip_pool_isolir)
          WHERE id = ?`,
         [
           body.name ? body.name.trim() : null,
@@ -170,10 +148,6 @@ export async function routersRoutes(app: FastifyInstance) {
           body.apiUser ?? null,
           body.ipPoolPppoe !== undefined ? (body.ipPoolPppoe ? body.ipPoolPppoe.trim() : null) : null,
           body.ipPoolIsolir !== undefined ? (body.ipPoolIsolir ? body.ipPoolIsolir.trim() : null) : null,
-          body.radiusEnabled !== undefined ? (body.radiusEnabled ? 1 : 0) : null,
-          body.nasSecret ? encryptSecret(body.nasSecret) : null,
-          body.nasIdentifier ?? null,
-          body.coaPort ?? null,
           id,
         ],
       )
@@ -287,46 +261,5 @@ export async function routersRoutes(app: FastifyInstance) {
     }
     await recordRouterWarning(app, { routerId: Number(id), action: "Sinkronisasi user", warning: res.warning })
     return reply.send({ data: { syncedCount: 0 }, warning: res.warning })
-  })
-
-  // POST /routers/:id/radius-enable — aktifkan RADIUS: buat secret NAS + backfill pelanggan
-  app.post("/routers/:id/radius-enable", techAuth, async (req, reply) => {
-    const { id } = req.params as { id: string }
-    const body = z.object({ nasSecret: z.string().min(4).optional() }).parse(req.body ?? {})
-    const [row] = (await app.db.query("SELECT * FROM routers WHERE id = ?", [id])) as Record<string, unknown>[]
-    if (!row) {
-      return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Router tidak ditemukan" } })
-    }
-    let secret = body.nasSecret
-    if (!secret) {
-      secret = crypto.randomBytes(12).toString("hex")
-      await app.db.query("UPDATE routers SET nas_secret = ? WHERE id = ?", [encryptSecret(secret), id])
-    } else {
-      await app.db.query("UPDATE routers SET nas_secret = ? WHERE id = ?", [encryptSecret(secret), id])
-    }
-    await app.db.query(
-      "INSERT INTO nas (nasname, shortname, type, secret, description) VALUES (?, ?, 'other', ?, ?) ON DUPLICATE KEY UPDATE secret = VALUES(secret), shortname = VALUES(shortname)",
-      [
-        String(row.host).split(":")[0],
-        String(row.name),
-        secret,
-        `NAS untuk ${row.name}`,
-      ],
-    )
-    await app.db.query("UPDATE routers SET radius_enabled = 1 WHERE id = ?", [id])
-    const backfill = await backfillRouter(app, Number(id))
-    return reply.send({ data: { nasSecret: secret, synced: backfill.synced } })
-  })
-
-  // POST /routers/:id/radius-disable — kembali ke autentikasi secret lokal Mikrotik
-  app.post("/routers/:id/radius-disable", techAuth, async (req, reply) => {
-    const { id } = req.params as { id: string }
-    const [row] = (await app.db.query("SELECT host FROM routers WHERE id = ?", [id])) as Record<string, unknown>[]
-    if (!row) {
-      return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Router tidak ditemukan" } })
-    }
-    await app.db.query("UPDATE routers SET radius_enabled = 0 WHERE id = ?", [id])
-    await app.db.query("DELETE FROM nas WHERE nasname = ?", [String(row.host).split(":")[0]])
-    return reply.send({ data: { message: "RADIUS dinonaktifkan" } })
   })
 }

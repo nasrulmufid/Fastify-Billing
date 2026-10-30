@@ -3,8 +3,9 @@ import type { FastifyInstance } from "fastify"
 
 import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
-import { recordRouterWarning, withRouter, type RouterWarning } from "./router.service.js"
-import { isRadiusRouter, syncCustomerById } from "./radius.service.js"
+import { enqueueRouterSync, recordRouterWarning, withRouter, type RouterWarning } from "./router.service.js"
+import { getOfflineMessage, sendWhatsAppMessage } from "./wa.service.js"
+import { fillPlaceholders } from "../utils/template.js"
 
 /**
  * Selesaikan pembayaran (flow bersama):
@@ -107,18 +108,8 @@ export async function syncRouterAfterPayment(
   app: FastifyInstance,
   customer: Record<string, unknown>,
   method: "QRIS" | "Tunai" | "Transaksi" = "Transaksi",
+  opts?: { notifyOffline?: boolean },
 ): Promise<boolean> {
-  if (await isRadiusRouter(app, customer.router_id as number)) {
-    const res = await syncCustomerById(app, Number(customer.id))
-    if (res.ok) return true
-    await recordRouterWarning(app, {
-      routerId: Number(customer.router_id),
-      customerId: Number(customer.id),
-      action: `RADIUS gagal — pembayaran ${method}`,
-      warning: { code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" },
-    })
-    return false
-  }
   const [pkg] = (await app.db.query(
     "SELECT name, download_speed, upload_speed FROM packages WHERE id = ?",
     [customer.package_id],
@@ -141,13 +132,72 @@ export async function syncRouterAfterPayment(
     })
   })
   if (!res.ok) {
+    // Router offline / koneksi terputus — pembayaran SUDAH tercatat di DB (source of truth),
+    // jadi transaksi tetap berjalan. Yang dilakukan:
+    //   1. Catat warning utk audit (notification_logs + activity_logs).
+    //   2. Masukkan ke antrian sync — job berkala akan menerapkan perubahan profile
+    //      (ISOLIR -> profile paket) otomatis begitu router online kembali.
+    //   3. Kabari pelanggan via WA: pembayaran diterima, server sedang down (mis. PLN off),
+    //      internet kembali normal setelah server online. Pesan bisa dicustom di WA Gateway.
     await recordRouterWarning(app, {
       routerId: Number(customer.router_id),
       customerId: Number(customer.id),
       action: `Router offline — pembayaran ${method}`,
       warning: res.warning,
     })
+    await enqueueRouterSync(app, {
+      routerId: Number(customer.router_id),
+      customerId: Number(customer.id),
+      reason: `Pembayaran ${method}`,
+    })
+    if (opts?.notifyOffline !== false) {
+      await sendOfflineNotice(app, customer, method)
+    }
     return false
   }
   return true
+}
+
+/**
+ * Kirim pesan "server offline" ke pelanggan via WA Gateway setelah pembayaran
+ * sukses tercatat namun Mikrotik sedang tidak bisa dihubungi.
+ * Template diambil dari konfigurasi WA Gateway (bisa dicustom admin);
+ * bila belum diisi, gunakan pesan default.
+ */
+export async function sendOfflineNotice(
+  app: FastifyInstance,
+  customer: Record<string, unknown>,
+  method: string,
+): Promise<void> {
+  try {
+    const [pkg] = (await app.db.query("SELECT name, price FROM packages WHERE id = ?", [
+      customer.package_id,
+    ])) as Record<string, unknown>[]
+    const template = await getOfflineMessage(app)
+    const vars: Record<string, string> = {
+      nama: String(customer.name ?? ""),
+      paket: String(pkg?.name ?? ""),
+      jumlah: pkg?.price != null ? String(pkg.price) : "",
+      tanggal: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+      metode: method,
+    }
+    const message = fillPlaceholders(template.body, vars)
+    const result = await sendWhatsAppMessage(app, {
+      phone: String(customer.phone ?? ""),
+      message,
+    })
+    const ntCode = await app.db.transaction(async (q) =>
+      nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 }),
+    )
+    await app.db.query(
+      "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'payment', ?, 'WhatsApp', ?, ?)",
+      [ntCode, customer.id ?? null, result.ok ? "Terkirim" : "Gagal", result.ok ? null : result.error],
+    )
+    await app.db.query(
+      "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Notifikasi server offline dikirim', ?)",
+      [String(customer.name ?? customer.id)],
+    )
+  } catch (err) {
+    app.log.error(err, "Gagal mengirim notifikasi offline")
+  }
 }

@@ -7,7 +7,6 @@ import {
   syncPackagesToRouter,
   type RouterWarning,
 } from "../services/router.service.js"
-import { syncAllPackageGroups } from "../services/radius.service.js"
 
 const PKG_TYPE_ENUM = z.enum(["PPPoE"])
 const PKG_STATUS_ENUM = z.enum(["Aktif", "Nonaktif"])
@@ -180,7 +179,6 @@ export async function packagesRoutes(app: FastifyInstance) {
       })
     }
     const { syncedCount, routerResults, warnings } = await syncPackagesToAllRouters(app, pkgRows)
-    await syncAllPackageGroups(app)
     const payload: Record<string, unknown> = { data: { syncedCount, routerResults } }
     if (warnings.length) payload.warning = warnings[0]
     return reply.send(payload)

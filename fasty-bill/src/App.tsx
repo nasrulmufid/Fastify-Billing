@@ -26,11 +26,6 @@ import { PaymentsPage } from "@/pages/admin/PaymentsPage"
 import { WAGatewayPage } from "@/pages/admin/WAGatewayPage"
 import { AcsPage } from "@/pages/admin/AcsPage"
 import { AcsConfigPage } from "@/pages/admin/AcsConfigPage"
-import { RadiusStatusPage } from "@/pages/admin/radius/StatusPage"
-import { RadiusSessionsPage } from "@/pages/admin/radius/SessionsPage"
-import { RadiusUsagePage } from "@/pages/admin/radius/UsagePage"
-import { RadiusNasPage } from "@/pages/admin/radius/NasPage"
-import { RadiusConfigPage } from "@/pages/admin/radius/ConfigPage"
 import { SettingsPage } from "@/pages/admin/SettingsPage"
 import { TicketDetailPage } from "@/pages/admin/TicketDetail"
 import { TicketsPage } from "@/pages/admin/TicketsPage"
@@ -103,11 +98,6 @@ export function App() {
               <Route path="wa-gateway" element={<WAGatewayPage />} />
               <Route path="acs" element={<AcsPage />} />
               <Route path="acs/config" element={<AcsConfigPage />} />
-              <Route path="radius/status" element={<RadiusStatusPage />} />
-              <Route path="radius/sessions" element={<RadiusSessionsPage />} />
-              <Route path="radius/usage" element={<RadiusUsagePage />} />
-              <Route path="radius/nas" element={<RadiusNasPage />} />
-              <Route path="radius/config" element={<RadiusConfigPage />} />
             </Route>
 
             {/* Catch-all */}

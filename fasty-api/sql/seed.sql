@@ -18,8 +18,7 @@ INSERT INTO packages (code, name, download_speed, upload_speed, price, type, sta
 -- ------------------------------------------------------------
 INSERT INTO routers (name, host, provider, status, client_count, uptime) VALUES
 ('Mikrotik-Core-01', '192.168.1.1:8728', 'Mikrotik', 'Connected', 18, '24 hari 7 jam'),
-('Mikrotik-Core-02', '192.168.1.2:8728', 'Mikrotik', 'Connected', 9, '24 hari 7 jam'),
-('Radius-ISP-01', '192.168.1.3:1812', 'FreeRADIUS', 'Standby', 3, '—');
+('Mikrotik-Core-02', '192.168.1.2:8728', 'Mikrotik', 'Connected', 9, '24 hari 7 jam');
 
 -- ------------------------------------------------------------
 -- customers (CUST-1001..1030) — selaras seed frontend

@@ -396,3 +396,93 @@ export async function recordRouterWarning(
     app.log.error(err, "Gagal mencatat warning router")
   }
 }
+
+/* ============================================================
+   Antrian sinkronisasi ulang saat Mikrotik offline
+   ============================================================
+   Saat pembayaran/aktivasi terjadi namun router sedang offline,
+   perubahan profile PPPoE tidak bisa diterapkan. Entri di tabel
+   router_sync_queue menandai pelanggan yang perlu di-sync ulang;
+   job berkala (jobs/index.ts) memproses antrian ini begitu router
+   kembali online. Tabel dibuat otomatis (idempoten) agar deployment
+   lama tanpa migrasi tetap berjalan.
+   ============================================================ */
+
+export interface QueueSyncItem {
+  routerId: number
+  customerId: number
+  reason?: string
+}
+
+/** Pastikan tabel antrian ada (idempoten — aman dipanggil berulang). */
+export async function ensureSyncQueueTable(app: FastifyInstance): Promise<void> {
+  await app.db.query(
+    `CREATE TABLE IF NOT EXISTS router_sync_queue (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      customer_id BIGINT UNSIGNED NOT NULL,
+      router_id BIGINT UNSIGNED NOT NULL,
+      reason VARCHAR(200) NULL,
+      status ENUM('pending','done','failed') NOT NULL DEFAULT 'pending',
+      attempts INT NOT NULL DEFAULT 0,
+      last_error TEXT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processed_at DATETIME NULL,
+      INDEX idx_sync_queue_status (status),
+      INDEX idx_sync_queue_router (router_id)
+    ) ENGINE=InnoDB`,
+  )
+}
+
+/** Masukkan pelanggan ke antrian sync (skip bila sudah pending utk customer tsb). */
+export async function enqueueRouterSync(
+  app: FastifyInstance,
+  item: QueueSyncItem,
+): Promise<void> {
+  try {
+    await ensureSyncQueueTable(app)
+    const [existing] = (await app.db.query(
+      "SELECT id FROM router_sync_queue WHERE customer_id = ? AND status = 'pending' LIMIT 1",
+      [item.customerId],
+    )) as Record<string, unknown>[]
+    if (existing) return // sudah antre — tidak duplikat
+    await app.db.query(
+      "INSERT INTO router_sync_queue (customer_id, router_id, reason) VALUES (?, ?, ?)",
+      [item.customerId, item.routerId, item.reason ?? null],
+    )
+  } catch (err) {
+    app.log.error(err, "Gagal memasukkan antrian sync router")
+  }
+}
+
+/** Ambil entri pending dari antrian sync (untuk job berkala). */
+export async function loadPendingSyncQueue(
+  app: FastifyInstance,
+  limit = 50,
+): Promise<Record<string, unknown>[]> {
+  await ensureSyncQueueTable(app)
+  return (await app.db.query(
+    `SELECT q.id, q.customer_id, q.router_id, q.reason, q.attempts, c.name AS customer_name,
+            c.pppoe_username, c.pppoe_password, c.status, c.package_id, c.phone
+     FROM router_sync_queue q
+     JOIN customers c ON c.id = q.customer_id
+     WHERE q.status = 'pending'
+     ORDER BY q.id ASC
+     LIMIT ?`,
+    [limit],
+  )) as Record<string, unknown>[]
+}
+
+/** Tandai entri antrian selesai/gagal. */
+export async function markSyncQueueEntry(
+  app: FastifyInstance,
+  id: number,
+  status: "done" | "failed",
+  error?: string,
+): Promise<void> {
+  await app.db.query(
+    `UPDATE router_sync_queue
+     SET status = ?, attempts = attempts + 1, last_error = ?, processed_at = NOW()
+     WHERE id = ?`,
+    [status, error ?? null, id],
+  )
+}

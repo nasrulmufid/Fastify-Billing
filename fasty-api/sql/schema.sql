@@ -183,8 +183,19 @@ CREATE TABLE IF NOT EXISTS wa_api_config (
   api_key VARCHAR(255) NULL, -- terenkripsi
   device_name VARCHAR(120) NULL,
   webhook_url VARCHAR(255) NULL,
-  auto_reconnect BOOLEAN NOT NULL DEFAULT TRUE
+  auto_reconnect BOOLEAN NOT NULL DEFAULT TRUE,
+  offline_message TEXT NULL COMMENT 'Pesan WA saat Mikrotik offline saat transaksi (custom WA Gateway)'
 ) ENGINE=InnoDB;
+
+-- Idempoten: tambah kolom offline_message bila DB lama belum punya
+SET @col_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wa_api_config' AND COLUMN_NAME = 'offline_message'
+);
+SET @sql = IF(@col_exists = 0,
+  "ALTER TABLE wa_api_config ADD COLUMN offline_message TEXT NULL AFTER auto_reconnect",
+  "SELECT 1");
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ------------------------------------------------------------
 -- notification_logs — log notifikasi otomatis

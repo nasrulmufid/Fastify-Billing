@@ -30,7 +30,6 @@ import {
 
 export const ROUTER_PROVIDER_OPTIONS = [
   "Mikrotik",
-  "FreeRADIUS",
   "Cisco",
   "Ubiquiti",
   "TP-Link",

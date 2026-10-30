@@ -252,7 +252,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
 
               <div className="space-y-2">
                 <Label htmlFor="p-profile">
-                  Profil RADIUS <span className="text-muted-foreground">(opsional)</span>
+                  Profil PPPoE Mikrotik <span className="text-muted-foreground">(opsional)</span>
                 </Label>
                 <Input
                   id="p-profile"
@@ -260,7 +260,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
                   {...register("profileName")}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Nama grup di FreeRADIUS (Mikrotik-Rate-Limit diambil dari kecepatan paket).
+                  Nama profile di Mikrotik (rate-limit diambil dari kecepatan paket).
                 </p>
               </div>
             </section>

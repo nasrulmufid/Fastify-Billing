@@ -5,7 +5,7 @@ import { nextCode } from "../utils/codegen.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
 import { fillPlaceholders } from "../utils/template.js"
-import { sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice } from "../services/wa.service.js"
+import { sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice, getOfflineMessage, DEFAULT_OFFLINE_MESSAGE } from "../services/wa.service.js"
 
 const templateSchema = z.object({
   name: z.string().min(1, "Nama template wajib diisi"),
@@ -18,6 +18,7 @@ const configSchema = z.object({
   deviceName: z.string().optional(),
   webhookUrl: z.string().optional(),
   autoReconnect: z.boolean().optional(),
+  offlineMessage: z.string().optional(),
 })
 
 const sendSchema = z.object({
@@ -148,6 +149,34 @@ export async function waGatewayRoutes(app: FastifyInstance) {
       ],
     )
     return reply.send({ data: { message: "Konfigurasi WA Gateway disimpan" } })
+  })
+
+  // GET /wa-gateway/offline-message — template pesan "server offline" (Mikrotik down saat transaksi)
+  app.get("/wa-gateway/offline-message", superOnly, async (_req, reply) => {
+    const tpl = await getOfflineMessage(app)
+    const [row] = (await app.db.query("SELECT offline_message FROM wa_api_config WHERE id = 1")) as Record<
+      string,
+      unknown
+    >[]
+    return reply.send({
+      data: {
+        body: tpl.body,
+        isCustom: Boolean(String(row?.offline_message ?? "").trim()),
+        defaultBody: DEFAULT_OFFLINE_MESSAGE,
+      },
+    })
+  })
+
+  // PUT /wa-gateway/offline-message — simpan custom pesan (kosongkan = kembali ke default)
+  app.put("/wa-gateway/offline-message", superOnly, async (req, reply) => {
+    const body = z.object({ body: z.string() }).parse(req.body ?? {})
+    const custom = body.body.trim()
+    await app.db.query(
+      `INSERT INTO wa_api_config (id, offline_message) VALUES (1, ?)
+       ON DUPLICATE KEY UPDATE offline_message = VALUES(offline_message)`,
+      [custom || null],
+    )
+    return reply.send({ data: { message: "Pesan server offline disimpan", body: custom || DEFAULT_OFFLINE_MESSAGE } })
   })
 
   // POST /wa-gateway/send — kirim pesan single/bulk + tulis notification_logs

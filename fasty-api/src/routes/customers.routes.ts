@@ -3,12 +3,7 @@ import { z } from "zod"
 
 import { nextCode, nextCustomerCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, toDbDateTime, MONTHS_ID } from "../utils/date.js"
-import { recordRouterWarning, withRouter, type RouterWarning } from "../services/router.service.js"
-import {
-  deleteUser,
-  isRadiusRouter,
-  syncCustomerById,
-} from "../services/radius.service.js"
+import { recordRouterWarning, withRouter, enqueueRouterSync, type RouterWarning } from "../services/router.service.js"
 import { completePaymentFlow } from "../services/payment.service.js"
 import {
   generateCustomerWorkbook,
@@ -265,24 +260,9 @@ export async function customersRoutes(app: FastifyInstance) {
       newCustomerId,
     ])) as Record<string, unknown>[]
 
-    if (body.routerId && body.pppoeUsername && (await isRadiusRouter(app, body.routerId))) {
-      const res = await syncCustomerById(app, newCustomerId)
-      if (!res.ok) {
-        await recordRouterWarning(app, {
-          routerId: body.routerId,
-          customerId: newCustomerId,
-          action: "Tambah pelanggan (RADIUS)",
-          warning: { code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" },
-        })
-        const payload: Record<string, unknown> = { data: mapCustomer(row) }
-        payload.warning = { code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" }
-        return reply.code(201).send(payload)
-      }
-      return reply.code(201).send({ data: mapCustomer(row) })
-    }
-
-    // Sinkron ke Mikrotik: buat secret PPPoE (disabled, karena status Isolated)
+    // Sinkron ke Mikrotik (REST API): buat secret PPPoE (disabled, karena status Isolated)
     // + pastikan profile (nama paket) ada. Kegagalan -> warning, bukan error.
+    // Router offline -> pelanggan masuk antrian sync agar diterapkan saat router online.
     const warnings: RouterWarning[] = []
     if (body.routerId && body.pppoeUsername) {
       const res = await withRouter(app, body.routerId, async (client) => {
@@ -301,6 +281,11 @@ export async function customersRoutes(app: FastifyInstance) {
           customerId: newCustomerId,
           action: "Tambah pelanggan (secret PPPoE)",
           warning: res.warning,
+        })
+        await enqueueRouterSync(app, {
+          routerId: Number(body.routerId),
+          customerId: newCustomerId,
+          reason: "Tambah pelanggan baru",
         })
       }
     }
@@ -429,21 +414,10 @@ export async function customersRoutes(app: FastifyInstance) {
     // Auto-reassign profile PPPoE bila pelanggan PINDAH PAKET (kecepatan berubah).
     // Customer Isolated tetap enabled dan memakai profile ISOLIR.
     // Kegagalan -> warning, bukan error (DB tetap source of truth).
+    // Router offline -> pelanggan masuk antrian sync (diterapkan saat router online).
     const warnings: RouterWarning[] = []
     const newPackageId = body.packageId ? Number(body.packageId) : null
-    const radiusRouter = !!row.router_id && (await isRadiusRouter(app, Number(row.router_id)))
-    if (radiusRouter && row.pppoe_username && (newPackageId !== prevPackageId || String(prevIp) !== String(row.ip_address))) {
-      const res = await syncCustomerById(app, Number(row.id))
-      if (!res.ok) {
-        warnings.push({ code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" })
-        await recordRouterWarning(app, {
-          routerId: Number(row.router_id),
-          customerId: Number(row.id),
-          action: "Perbarui pelanggan (RADIUS)",
-          warning: warnings[0],
-        })
-      }
-    } else if (row.router_id && row.pppoe_username && newPackageId && newPackageId !== prevPackageId) {
+    if (row.router_id && row.pppoe_username && newPackageId && newPackageId !== prevPackageId) {
       const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
         newPackageId,
       ])) as Record<string, unknown>[]
@@ -473,13 +447,18 @@ export async function customersRoutes(app: FastifyInstance) {
             action: "Ubah paket pelanggan",
             warning: res.warning,
           })
+          await enqueueRouterSync(app, {
+            routerId: Number(row.router_id),
+            customerId: Number(row.id),
+            reason: "Ubah paket pelanggan",
+          })
         }
       }
     }
 
     // Jika IP berubah (mis. sebelumnya statis lalu dihapus), pastikan secret PPP di router
     // memakai `local-address` yang baru. Lakukan ini juga bila paket tidak berubah.
-    if (!radiusRouter && row.router_id && row.pppoe_username && String(prevIp) !== String(row.ip_address)) {
+    if (row.router_id && row.pppoe_username && String(prevIp) !== String(row.ip_address)) {
       const [pkg] = (await app.db.query("SELECT name, download_speed, upload_speed FROM packages WHERE id = ?", [
         row.package_id,
       ])) as Record<string, unknown>[]
@@ -507,6 +486,11 @@ export async function customersRoutes(app: FastifyInstance) {
           action: "Perbarui local-address pelanggan",
           warning: res.warning,
         })
+        await enqueueRouterSync(app, {
+          routerId: Number(row.router_id),
+          customerId: Number(row.id),
+          reason: "Perbarui local-address pelanggan",
+        })
       }
     }
 
@@ -518,14 +502,7 @@ export async function customersRoutes(app: FastifyInstance) {
   // DELETE /customers/:id
   app.delete("/customers/:id", adminAuth, async (req, reply) => {
     const { id } = req.params as { id: string }
-    const [cust] = (await app.db.query("SELECT pppoe_username FROM customers WHERE id = ?", [id])) as Record<
-      string,
-      unknown
-    >[]
     await app.db.query("DELETE FROM customers WHERE id = ?", [id])
-    if (cust?.pppoe_username) {
-      await app.db.transaction((q) => deleteUser(q.query, String(cust.pppoe_username)))
-    }
     return reply.send({ data: { message: "Pelanggan dihapus" } })
   })
 
@@ -634,18 +611,7 @@ export async function customersRoutes(app: FastifyInstance) {
     }
 
     const warnings: RouterWarning[] = []
-    if (row.router_id && row.pppoe_username && (await isRadiusRouter(app, Number(row.router_id)))) {
-      const res = await syncCustomerById(app, Number(row.id))
-      if (!res.ok) {
-        warnings.push({ code: "MIKROTIK_OFFLINE", message: res.error ?? "Sinkron RADIUS gagal" })
-        await recordRouterWarning(app, {
-          routerId: Number(row.router_id),
-          customerId: Number(row.id),
-          action: body.isolate ? "Isolir pelanggan (RADIUS)" : "Aktifkan koneksi (RADIUS)",
-          warning: warnings[0],
-        })
-      }
-    } else if (row.router_id && row.pppoe_username) {
+    if (row.router_id && row.pppoe_username) {
       const res = await withRouter(app, Number(row.router_id), async (client) => {
         const [routerRow] = (await app.db.query(
           "SELECT ip_pool_isolir FROM routers WHERE id = ?",
@@ -683,6 +649,13 @@ export async function customersRoutes(app: FastifyInstance) {
           customerId: Number(row.id),
           action: body.isolate ? "Isolir pelanggan" : "Aktifkan koneksi",
           warning: res.warning,
+        })
+        // Router offline: perubahan status tetap tersimpan di DB; masukkan ke
+        // antrian agar profile PPPoE disesuaikan otomatis saat router online kembali.
+        await enqueueRouterSync(app, {
+          routerId: Number(row.router_id),
+          customerId: Number(row.id),
+          reason: body.isolate ? "Isolir pelanggan (manual)" : "Aktifkan koneksi (manual)",
         })
       }
     }

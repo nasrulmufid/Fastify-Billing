@@ -20,6 +20,7 @@ import {
   Search,
   ListChecks,
   Filter,
+  AlertTriangle,
 } from "lucide-react"
 
 import { PageHeader } from "@/components/layouts/PageHeader"
@@ -1085,6 +1086,149 @@ function TemplatePesanTab() {
 }
 
 /* ================================================================
+   Tab: Pesan Offline (server down saat transaksi)
+   ================================================================ */
+
+function PesanOfflineTab() {
+  const [body, setBody] = useState("")
+  const [defaultBody, setDefaultBody] = useState("")
+  const [isCustom, setIsCustom] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data } = await api.get("/wa-gateway/offline-message")
+        setBody(String(data?.data?.body ?? ""))
+        setDefaultBody(String(data?.data?.defaultBody ?? ""))
+        setIsCustom(Boolean(data?.data?.isCustom))
+      } catch {
+        toast.error("Gagal memuat pesan offline")
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const handleSave = async () => {
+    if (!body.trim()) {
+      toast.error("Isi pesan tidak boleh kosong")
+      return
+    }
+    setSaving(true)
+    try {
+      await api.put("/wa-gateway/offline-message", { body: body.trim() })
+      setIsCustom(true)
+      toast.success("Pesan server offline disimpan", {
+        description: "Pesan ini dikirim otomatis saat pembayaran sukses namun Mikrotik sedang offline.",
+      })
+    } catch {
+      toast.error("Gagal menyimpan pesan offline")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReset = () => {
+    setBody(defaultBody)
+    toast.info("Menggunakan teks default. Klik Simpan untuk menerapkan.")
+  }
+
+  const dirty = body.trim() !== defaultBody.trim()
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-3">
+      <Card className="border-border lg:col-span-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle className="size-4 text-muted-foreground" />
+            Pesan "Server Offline"
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Pesan ini dikirim otomatis ke pelanggan saat pembayaran <strong>berhasil dicatat</strong> namun
+            Mikrotik sedang offline/terputus (mis. karena PLN padam). Sistem tetap menerima pembayaran dan
+            akan menyinkronkan profile PPPoE otomatis begitu server online kembali.
+          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="offlineMessage">
+              Isi Pesan
+              <span className="ml-2 text-xs text-muted-foreground">({body.length} karakter)</span>
+              {isCustom && (
+                <Badge className="ml-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  Custom
+                </Badge>
+              )}
+            </Label>
+            <Textarea
+              id="offlineMessage"
+              rows={6}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              disabled={loading}
+              placeholder="Tulis pesan untuk pelanggan saat server offline…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Variabel: {"{nama}"}, {"{paket}"}, {"{jumlah}"}, {"{tanggal}"}, {"{metode}"}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Pratinjau</Label>
+            <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed">
+              {body.trim()
+                ? renderWhatsApp(body)
+                : <span className="text-xs text-muted-foreground">Pesan akan tampil di sini…</span>}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving || loading}>
+              {saving ? "Menyimpan…" : "Simpan Pesan"}
+            </Button>
+            <Button variant="outline" onClick={handleReset} disabled={saving || loading || !dirty}>
+              Kembalikan ke Default
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Braces className="size-4 text-muted-foreground" />
+            Variabel Pesan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Gunakan variabel berikut di isi pesan. Nilainya diisi otomatis dari data pelanggan dan pembayaran.
+          </p>
+          <div className="grid gap-2 text-xs">
+            {[
+              ["{nama}", "Nama pelanggan"],
+              ["{paket}", "Nama paket layanan"],
+              ["{jumlah}", "Jumlah pembayaran"],
+              ["{tanggal}", "Tanggal transaksi"],
+              ["{metode}", "Metode pembayaran (QRIS/Tunai)"],
+            ].map(([variable, description]) => (
+              <div key={variable} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+                <code className="font-medium text-primary">{variable}</code>
+                <span className="text-right text-muted-foreground">{description}</span>
+              </div>
+            ))}
+          </div>
+          <Separator className="my-1" />
+          <p className="text-xs text-muted-foreground">
+            Jika field dikosongkan (disimpan tanpa teks), sistem memakai pesan default.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/* ================================================================
    WA Gateway Page
    ================================================================ */
 
@@ -1107,6 +1251,10 @@ export function WAGatewayPage() {
             <MessageSquareText className="mr-1.5 size-3.5" />
             Template Pesan
           </TabsTrigger>
+          <TabsTrigger value="pesan-offline">
+            <AlertTriangle className="mr-1.5 size-3.5" />
+            Pesan Offline
+          </TabsTrigger>
           <TabsTrigger value="pengaturan-api">
             <Settings2 className="mr-1.5 size-3.5" />
             Pengaturan API
@@ -1119,6 +1267,10 @@ export function WAGatewayPage() {
 
         <TabsContent value="template-pesan" className="mt-4">
           <TemplatePesanTab />
+        </TabsContent>
+
+        <TabsContent value="pesan-offline" className="mt-4">
+          <PesanOfflineTab />
         </TabsContent>
 
         <TabsContent value="pengaturan-api" className="mt-4">

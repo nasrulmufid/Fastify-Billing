@@ -22,9 +22,6 @@ import {
   AlertTriangle,
   Wallet,
   Cpu,
-  ShieldCheck,
-  BarChart3,
-  Server,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ComponentType } from "react"
 
@@ -93,16 +90,6 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/admin/acs", label: "Devices", icon: Cpu },
       { to: "/admin/acs/config", label: "Config", icon: Settings },
-    ],
-  },
-  {
-    title: "RADIUS",
-    items: [
-      { to: "/admin/radius/status", label: "Status", icon: ShieldCheck },
-      { to: "/admin/radius/sessions", label: "Sesi Online", icon: Wifi },
-      { to: "/admin/radius/usage", label: "Pemakaian", icon: BarChart3 },
-      { to: "/admin/radius/nas", label: "NAS Client", icon: Server },
-      { to: "/admin/radius/config", label: "Pengaturan", icon: Settings },
     ],
   },
 ]
