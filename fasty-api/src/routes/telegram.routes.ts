@@ -15,6 +15,7 @@ const templatesSchema = z.object({
   paymentFailed: z.string().optional(),
   paymentExpired: z.string().optional(),
   routerOffline: z.string().optional(),
+  routerOnline: z.string().optional(),
 })
 
 const configSchema = z.object({
@@ -25,12 +26,19 @@ const configSchema = z.object({
   notifyPaymentFailed: z.coerce.boolean().optional(),
   notifyPaymentExpired: z.coerce.boolean().optional(),
   notifyRouterOffline: z.coerce.boolean().optional(),
+  notifyRouterOnline: z.coerce.boolean().optional(),
   routerCheckIntervalMinutes: z.coerce.number().int().min(1).max(1440).optional(),
   templates: templatesSchema.optional(),
 })
 
 /** Daftar tipe notifikasi yang valid untuk body test. */
-const NOTIFY_TYPES = ["paymentSuccess", "paymentFailed", "paymentExpired", "routerOffline"] as const
+const NOTIFY_TYPES = [
+  "paymentSuccess",
+  "paymentFailed",
+  "paymentExpired",
+  "routerOffline",
+  "routerOnline",
+] as const
 type NotifyType = (typeof NOTIFY_TYPES)[number]
 
 export async function telegramRoutes(app: FastifyInstance): Promise<void> {
@@ -51,6 +59,7 @@ export async function telegramRoutes(app: FastifyInstance): Promise<void> {
         notifyPaymentFailed: cfg.notifyPaymentFailed,
         notifyPaymentExpired: cfg.notifyPaymentExpired,
         notifyRouterOffline: cfg.notifyRouterOffline,
+        notifyRouterOnline: cfg.notifyRouterOnline,
         routerCheckIntervalMinutes: cfg.routerCheckIntervalMinutes,
         templates: cfg.templates,
         defaults: {
@@ -75,6 +84,7 @@ export async function telegramRoutes(app: FastifyInstance): Promise<void> {
       notifyPaymentFailed: body.notifyPaymentFailed ?? current.notifyPaymentFailed,
       notifyPaymentExpired: body.notifyPaymentExpired ?? current.notifyPaymentExpired,
       notifyRouterOffline: body.notifyRouterOffline ?? current.notifyRouterOffline,
+      notifyRouterOnline: body.notifyRouterOnline ?? current.notifyRouterOnline,
       routerCheckIntervalMinutes:
         body.routerCheckIntervalMinutes ?? current.routerCheckIntervalMinutes,
       templates: { ...current.templates, ...(body.templates ?? {}) },

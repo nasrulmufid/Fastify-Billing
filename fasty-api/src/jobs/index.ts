@@ -346,6 +346,18 @@ export function registerJobs(app: FastifyInstance) {
           )
         }
         if (isOnline && prevStatus === "Disconnected" && cfg.enabled) {
+          // Router pulih -> notif Telegram "online kembali" + proses antrian sync
+          const res = await notifyTelegram(app, {
+            type: "routerOnline",
+            vars: {
+              router: String(r.name ?? routerId),
+              host: String(r.host ?? ""),
+              tanggal: new Date().toLocaleString("id-ID"),
+            },
+          })
+          if (!res.ok) {
+            app.log.warn({ routerId, error: res.error }, "Gagal kirim notif Telegram router online")
+          }
           await app.db.query(
             "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Mikrotik online kembali', ?)",
             [String(r.name ?? routerId)],

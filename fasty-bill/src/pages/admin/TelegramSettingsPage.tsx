@@ -28,7 +28,7 @@ import api from "@/lib/axios"
    Types
    ================================================================ */
 
-type TemplateKey = "paymentSuccess" | "paymentFailed" | "paymentExpired" | "routerOffline"
+type TemplateKey = "paymentSuccess" | "paymentFailed" | "paymentExpired" | "routerOffline" | "routerOnline"
 
 type TelegramConfigData = {
   botToken: string
@@ -38,6 +38,7 @@ type TelegramConfigData = {
   notifyPaymentFailed: boolean
   notifyPaymentExpired: boolean
   notifyRouterOffline: boolean
+  notifyRouterOnline: boolean
   routerCheckIntervalMinutes: number
   templates: Record<TemplateKey, string>
   defaults: {
@@ -54,6 +55,7 @@ const notifyTypeMeta: Record<NotifyType, { label: string; description: string }>
   paymentFailed: { label: "Transaksi Gagal", description: "Dikirim saat webhook payment.failed diterima dari payment gateway." },
   paymentExpired: { label: "Transaksi Kadaluarsa", description: "Dikirim saat webhook payment.expired diterima (QRIS tidak dibayar sebelum batas waktu)." },
   routerOffline: { label: "Mikrotik Offline", description: "Dikirim saat monitor berkala mendeteksi router tidak merespons." },
+  routerOnline: { label: "Mikrotik Online Kembali", description: "Dikirim saat router pulih dari offline — antrian sinkronisasi PPPoE otomatis dilanjutkan." },
 }
 
 /* ================================================================
@@ -75,6 +77,7 @@ export function TelegramSettingsPage() {
     paymentFailed: true,
     paymentExpired: true,
     routerOffline: true,
+    routerOnline: true,
   })
   const [intervalMin, setIntervalMin] = useState(5)
   const [templates, setTemplates] = useState<Record<TemplateKey, string>>({
@@ -82,6 +85,7 @@ export function TelegramSettingsPage() {
     paymentFailed: "",
     paymentExpired: "",
     routerOffline: "",
+    routerOnline: "",
   })
 
   useEffect(() => {
@@ -98,6 +102,7 @@ export function TelegramSettingsPage() {
           paymentFailed: cfg.notifyPaymentFailed,
           paymentExpired: cfg.notifyPaymentExpired,
           routerOffline: cfg.notifyRouterOffline,
+          routerOnline: cfg.notifyRouterOnline ?? true,
         })
         setIntervalMin(cfg.routerCheckIntervalMinutes)
         setTemplates({ ...cfg.templates })
@@ -124,6 +129,7 @@ export function TelegramSettingsPage() {
         notifyPaymentFailed: notify.paymentFailed,
         notifyPaymentExpired: notify.paymentExpired,
         notifyRouterOffline: notify.routerOffline,
+        notifyRouterOnline: notify.routerOnline,
         routerCheckIntervalMinutes: intervalMin,
         templates,
       })
@@ -289,6 +295,7 @@ export function TelegramSettingsPage() {
                   ["paymentFailed", "Transaksi Gagal"],
                   ["paymentExpired", "Transaksi Kadaluarsa"],
                   ["routerOffline", "Mikrotik Offline"],
+                  ["routerOnline", "Mikrotik Online Kembali"],
                 ] as const
               ).map(([key, label]) => (
                 <div key={key} className="flex items-center justify-between gap-3">

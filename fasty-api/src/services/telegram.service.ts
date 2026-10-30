@@ -28,6 +28,7 @@ export interface TelegramTemplates {
   paymentFailed: string
   paymentExpired: string
   routerOffline: string
+  routerOnline: string
 }
 
 export interface TelegramConfig {
@@ -38,6 +39,7 @@ export interface TelegramConfig {
   notifyPaymentFailed: boolean
   notifyPaymentExpired: boolean
   notifyRouterOffline: boolean
+  notifyRouterOnline: boolean
   routerCheckIntervalMinutes: number
   templates: TelegramTemplates
 }
@@ -63,6 +65,11 @@ export const DEFAULT_TELEGRAM_TEMPLATES: TelegramTemplates = {
     "Router : {router}\nHost   : {host}\nWaktu  : {tanggal}\n\n" +
     "Router tidak merespons. Sinkronisasi PPPoE ditahan di antrian dan akan " +
     "diterapkan otomatis saat router online kembali.",
+  routerOnline:
+    "✅ MIKROTIK ONLINE\n\n" +
+    "Router : {router}\nHost   : {host}\nWaktu  : {tanggal}\n\n" +
+    "Router kembali merespons. Sinkronisasi PPPoE tertunda sedang diproses " +
+    "sesuai antrian.",
 }
 
 export const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
@@ -73,6 +80,7 @@ export const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
   notifyPaymentFailed: true,
   notifyPaymentExpired: true,
   notifyRouterOffline: true,
+  notifyRouterOnline: true,
   routerCheckIntervalMinutes: 5,
   templates: { ...DEFAULT_TELEGRAM_TEMPLATES },
 }
@@ -143,7 +151,7 @@ export async function sendTelegramMessage(
 }
 
 interface NotifyInput {
-  type: "paymentSuccess" | "paymentFailed" | "paymentExpired" | "routerOffline"
+  type: "paymentSuccess" | "paymentFailed" | "paymentExpired" | "routerOffline" | "routerOnline"
   vars: Record<string, string>
 }
 
@@ -165,6 +173,7 @@ export async function notifyTelegram(app: FastifyInstance, input: NotifyInput): 
       paymentFailed: cfg.notifyPaymentFailed,
       paymentExpired: cfg.notifyPaymentExpired,
       routerOffline: cfg.notifyRouterOffline,
+      routerOnline: cfg.notifyRouterOnline,
     }
     if (!typeEnabled[input.type]) return { ok: false, error: "Tipe notifikasi dinonaktifkan" }
 
@@ -180,7 +189,7 @@ export async function notifyTelegram(app: FastifyInstance, input: NotifyInput): 
       "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, ?, ?, 'Telegram', ?, ?)",
       [
         ntCode,
-        input.type === "routerOffline" ? "router" : "payment",
+        input.type === "routerOffline" || input.type === "routerOnline" ? "router" : "payment",
         input.vars.customerId ?? null,
         result.ok ? "Terkirim" : "Gagal",
         result.ok ? null : result.error,
