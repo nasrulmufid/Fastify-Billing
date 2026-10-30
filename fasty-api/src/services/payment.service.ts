@@ -5,6 +5,7 @@ import { nextCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { enqueueRouterSync, recordRouterWarning, withRouter, type RouterWarning } from "./router.service.js"
 import { getOfflineMessage, sendWhatsAppMessage } from "./wa.service.js"
+import { notifyTelegram } from "./telegram.service.js"
 import { fillPlaceholders } from "../utils/template.js"
 
 /**
@@ -101,6 +102,31 @@ export async function completePaymentFlow(
     })
   }
 
+  // Notifikasi Telegram: transaksi sukses — untuk SEMUA metode (QRIS & Tunai).
+  // Single source of truth agar tidak dobel: webhook payment.completed TIDAK
+  // mengirim Telegram sendiri (juga lewat sini). Fire-and-forget, tidak blokir.
+  if (app) {
+    setImmediate(() => {
+      void (async () => {
+        const [pkg] = (await app.db.query("SELECT name FROM packages WHERE id = ?", [
+          customer?.package_id ?? null,
+        ])) as Record<string, unknown>[]
+        await notifyTelegram(app, {
+          type: "paymentSuccess",
+          vars: {
+            customerId: String(payment.customer_id ?? ""),
+            nama: String(customer?.name ?? ""),
+            paket: String(pkg?.name ?? ""),
+            kode: String(payment.code ?? ""),
+            jumlah: String(payment.amount ?? ""),
+            metode: method,
+            tanggal: new Date().toLocaleString("id-ID"),
+          },
+        })
+      })().catch(() => {})
+    })
+  }
+
   return { payment: { ...payment, status: "Sukses" }, invoice }
 }
 
@@ -153,9 +179,39 @@ export async function syncRouterAfterPayment(
     if (opts?.notifyOffline !== false) {
       await sendOfflineNotice(app, customer, method)
     }
+    // Notifikasi Telegram ke admin: sinkronisasi Mikrotik gagal karena router
+    // offline — perubahan profile PPPoE pelanggan ini ditahan di antrian.
+    const routerInfo = await getRouterInfo(app, Number(customer.router_id))
+    await notifyTelegram(app, {
+      type: "routerOffline",
+      vars: {
+        customerId: String(customer.id ?? ""),
+        nama: String(customer.name ?? ""),
+        paket: String(pkg?.name ?? ""),
+        kode: `Pembayaran ${method}`,
+        jumlah: String(paymentAmountOf(customer) ?? ""),
+        metode: method,
+        tanggal: new Date().toLocaleString("id-ID"),
+        router: String(routerInfo.name ?? customer.router_id ?? ""),
+        host: String(routerInfo.host ?? ""),
+      },
+    })
     return false
   }
   return true
+}
+
+/** Ambil nama & host router (untuk variabel notifikasi). */
+async function getRouterInfo(app: FastifyInstance, routerId: number): Promise<{ name?: string; host?: string }> {
+  const [row] = (await app.db.query("SELECT name, host FROM routers WHERE id = ?", [routerId])) as Record<
+    string,
+    unknown
+  >[]
+  return { name: row?.name ? String(row.name) : undefined, host: row?.host ? String(row.host) : undefined }
+}
+
+function paymentAmountOf(customer: Record<string, unknown>): string {
+  return customer.amount != null ? String(customer.amount) : ""
 }
 
 /**

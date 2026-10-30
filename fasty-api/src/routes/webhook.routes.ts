@@ -101,24 +101,8 @@ export async function webhookRoutes(app: FastifyInstance) {
         const result = await app.db.transaction(async (q) =>
           completePaymentFlow(q, String(payment.id), "QRIS", "Sistem", app),
         )
-        // Notifikasi Telegram: transaksi sukses (fire-and-forget, tidak blokir webhook)
-        setImmediate(() => {
-          void (async () => {
-            const ctx = await loadNotifyContext(payment.customer_id)
-            await notifyTelegram(app, {
-              type: "paymentSuccess",
-              vars: {
-                customerId: String(payment.customer_id ?? ""),
-                nama: String(ctx.customer_name ?? ""),
-                paket: String(ctx.package_name ?? ""),
-                kode: String(result.payment.code ?? ""),
-                jumlah: String(payment.amount ?? ""),
-                metode: "QRIS",
-                tanggal: new Date().toLocaleString("id-ID"),
-              },
-            })
-          })().catch(() => {})
-        })
+        // Notifikasi Telegram "Transaksi Sukses" dikirim dari completePaymentFlow
+        // (single source of truth utk semua metode: QRIS & Tunai) — tidak di sini.
         return reply.send({ data: { ok: true, matched: true, payment: result.payment.code } })
       }
       case "payment.failed":

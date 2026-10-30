@@ -127,11 +127,19 @@ export function TelegramSettingsPage() {
         routerCheckIntervalMinutes: intervalMin,
         templates,
       })
-      toast.success("Konfigurasi Telegram disimpan", {
-        description: enabled
-          ? "Notifikasi aktif dan akan dikirim ke chat tujuan."
-          : "Tersimpan, namun notifikasi global masih nonaktif.",
-      })
+      if (enabled) {
+        toast.success("Konfigurasi Telegram disimpan", {
+          description: "Notifikasi aktif dan akan dikirim ke chat tujuan.",
+        })
+      } else {
+        // Peringatan eksplisit — master switch off = SEMUA notif tidak terkirim
+        // (test bot tetap bisa jalan, ini yang sering bikin terkecoh).
+        toast.warning("Tersimpan, tapi notifikasi NONAKTIF", {
+          description:
+            "Saklar 'Notifikasi Aktif' masih OFF — tidak ada notif yang dikirim. Nyalakan saklar lalu simpan lagi.",
+          duration: 10000,
+        })
+      }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
@@ -340,17 +348,17 @@ export function TelegramSettingsPage() {
               <div className="flex items-center gap-2">
                 {enabled ? (
                   <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    Aktif
+                    Notifikasi Aktif
                   </Badge>
                 ) : (
-                  <Badge variant="outline">Nonaktif</Badge>
+                  <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
+                    Notifikasi Nonaktif — tidak ada kiriman
+                  </Badge>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Trigger transaksi berasal dari webhook payment gateway (SumoPod):
-                <span className="font-mono"> payment.completed</span>,
-                <span className="font-mono"> payment.failed</span>,
-                <span className="font-mono"> payment.expired</span>.
+                Notif sukses dikirim untuk SEMUA transaksi (QRIS & Tunai dari admin, webhook gateway).
+                Notif gagal/kadaluarsa dari webhook payment gateway (SumoPod).
               </p>
               <Button variant="outline" className="w-full" onClick={() => handleTest("paymentSuccess")} disabled={testing !== null}>
                 {testing === "paymentSuccess" ? (
