@@ -3,11 +3,11 @@ import { z } from "zod"
 
 import {
   getTelegramConfig,
-  saveTelegramConfig,
   sendTelegramMessage,
   testTelegramBot,
   DEFAULT_TELEGRAM_CONFIG,
   DEFAULT_TELEGRAM_TEMPLATES,
+  TELEGRAM_CONFIG_KEY,
 } from "../services/telegram.service.js"
 
 const templatesSchema = z.object({
@@ -79,7 +79,12 @@ export async function telegramRoutes(app: FastifyInstance): Promise<void> {
         body.routerCheckIntervalMinutes ?? current.routerCheckIntervalMinutes,
       templates: { ...current.templates, ...(body.templates ?? {}) },
     }
-    await saveTelegramConfig(app, next)
+    // Simpan ke system_config (satu baris per key — tidak menimpa config lain).
+    await app.db.query(
+      `INSERT INTO system_config (config_key, config_value) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)`,
+      [TELEGRAM_CONFIG_KEY, JSON.stringify(next)],
+    )
     return reply.send({ data: { message: "Konfigurasi Telegram disimpan" } })
   })
 

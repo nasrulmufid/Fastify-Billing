@@ -228,14 +228,24 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
--- app_settings — pengaturan umum (single-row) + key-value config
--- setting_key dipakai untuk: acs_config, radius_config (legacy),
--- telegram_config (token bot, chat id, template notifikasi).
+-- app_settings — pengaturan umum (single-row)
+-- Konfigurasi key-value (telegram_config, genieacs_config, dll)
+-- kini disimpan di tabel system_config (lihat migration_system_config.sql)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_settings (
   id TINYINT UNSIGNED NOT NULL DEFAULT 1 PRIMARY KEY,
   grace_period_days INT NOT NULL DEFAULT 7,
   billing_cycle VARCHAR(30) NOT NULL DEFAULT 'Setiap 1 bulan',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- system_config — penyimpanan konfigurasi key-value (satu baris per key)
+-- Dipakai: telegram_config, genieacs_config, dan konfigurasi modul lain
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS system_config (
+  config_key VARCHAR(64) NOT NULL PRIMARY KEY,
+  config_value TEXT NOT NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

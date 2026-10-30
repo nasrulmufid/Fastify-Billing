@@ -70,6 +70,9 @@ async function main() {
     console.log("Menjalankan migration_no_freeradius.sql ...")
     await runRawSqlFile(conn, "migration_no_freeradius.sql")
 
+    console.log("Menjalankan migration_system_config.sql ...")
+    await runRawSqlFile(conn, "migration_system_config.sql")
+
     // Upsert user admin super_admin (bcrypt hash valid utk "admin")
     const hash = await bcrypt.hash("admin", 10)
     await conn.query(

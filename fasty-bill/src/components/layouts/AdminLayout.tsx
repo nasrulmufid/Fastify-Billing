@@ -62,10 +62,10 @@ const navGroups: NavGroup[] = [
     items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    title: "PPPoE",
+    title: "Pelanggan",
     items: [
-      { to: "/admin/pppoe/customers", label: "Pelanggan", icon: Users },
-      { to: "/admin/pppoe/packages", label: "Paket PPPoE", icon: Package },
+      { to: "/admin/pppoe/customers", label: "Pelanggan PPPoE", icon: Users },
+      { to: "/admin/pppoe/packages", label: "Paket Layanan", icon: Package },
     ],
   },
   {
@@ -76,22 +76,27 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Lainnya",
+    title: "Jaringan",
     items: [
-      { to: "/admin/network", label: "Jaringan", icon: Wifi },
-      { to: "/admin/notifications", label: "Notifikasi", icon: BellRing },
-      { to: "/admin/telegram", label: "Telegram", icon: Send },
-      { to: "/admin/tickets", label: "Tiket", icon: Ticket },
-      { to: "/admin/activity-log", label: "Log Aktivitas", icon: Activity },
-      { to: "/admin/settings", label: "Pengaturan", icon: Settings },
-      { to: "/admin/wa-gateway", label: "WA Gateway", icon: MessageCircle },
+      { to: "/admin/network", label: "Router", icon: Wifi },
+      { to: "/admin/acs", label: "Perangkat ACS", icon: Cpu },
+      { to: "/admin/acs/config", label: "Konfigurasi ACS", icon: Settings },
     ],
   },
   {
-    title: "ACS",
+    title: "Komunikasi",
     items: [
-      { to: "/admin/acs", label: "Devices", icon: Cpu },
-      { to: "/admin/acs/config", label: "Config", icon: Settings },
+      { to: "/admin/wa-gateway", label: "WA Gateway", icon: MessageCircle },
+      { to: "/admin/telegram", label: "Telegram Bot", icon: Send },
+      { to: "/admin/notifications", label: "Notifikasi", icon: BellRing },
+      { to: "/admin/tickets", label: "Tiket", icon: Ticket },
+    ],
+  },
+  {
+    title: "Sistem",
+    items: [
+      { to: "/admin/activity-log", label: "Log Aktivitas", icon: Activity },
+      { to: "/admin/settings", label: "Pengaturan", icon: Settings },
     ],
   },
 ]

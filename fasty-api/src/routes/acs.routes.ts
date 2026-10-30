@@ -51,9 +51,9 @@ export async function acsRoutes(app: FastifyInstance): Promise<void> {
   // GET /acs/config
   app.get("/acs/config", auth, async (_req: FastifyRequest, reply: FastifyReply) => {
     const [row] = (await app.db.query(
-      "SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1",
+      "SELECT config_value FROM system_config WHERE config_key = ? LIMIT 1",
       [CONFIG_SETTING_KEY],
-    )) as { setting_value: string }[]
+    )) as { config_value: string }[]
 
     let configData: GenieACSConfig = {
       baseUrl: "http://localhost:7557",
@@ -62,9 +62,9 @@ export async function acsRoutes(app: FastifyInstance): Promise<void> {
       autoSyncOnAccess: true,
     }
 
-    if (row?.setting_value) {
+    if (row?.config_value) {
       try {
-        const parsed = JSON.parse(row.setting_value)
+        const parsed = JSON.parse(row.config_value)
         configData = {
           baseUrl: parsed.baseUrl ?? configData.baseUrl,
           apiKey: parsed.apiKey ?? "",
@@ -91,9 +91,11 @@ export async function acsRoutes(app: FastifyInstance): Promise<void> {
   app.put("/acs/config", auth, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = acsConfigSchema.parse(req.body)
 
+    // Simpan ke system_config (satu baris per key — tidak menimpa config lain
+    // seperti telegram_config; app_settings hanya utk pengaturan umum single-row).
     await app.db.query(
-      `INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      `INSERT INTO system_config (config_key, config_value) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)`,
       [CONFIG_SETTING_KEY, JSON.stringify(body)],
     )
 
@@ -268,11 +270,11 @@ export async function acsRoutes(app: FastifyInstance): Promise<void> {
 
 async function getAcsConfig(app: FastifyInstance): Promise<GenieACSConfig> {
   const [row] = (await app.db.query(
-    "SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1",
+    "SELECT config_value FROM system_config WHERE config_key = ? LIMIT 1",
     [CONFIG_SETTING_KEY],
-  )) as { setting_value: string }[]
+  )) as { config_value: string }[]
 
-  if (!row?.setting_value) {
+  if (!row?.config_value) {
     // Return defaults — caller should warn user to configure first
     return {
       baseUrl: "http://localhost:7557",
@@ -283,7 +285,7 @@ async function getAcsConfig(app: FastifyInstance): Promise<GenieACSConfig> {
   }
 
   try {
-    const parsed = JSON.parse(row.setting_value)
+    const parsed = JSON.parse(row.config_value)
     return {
       baseUrl: parsed.baseUrl ?? "http://localhost:7557",
       apiKey: parsed.apiKey ?? "",

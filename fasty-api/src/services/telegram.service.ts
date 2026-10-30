@@ -20,6 +20,9 @@ import { fillPlaceholders } from "../utils/template.js"
 
 const CONFIG_KEY = "telegram_config"
 
+/** Key konfigurasi di app_settings (dipakai juga oleh routes). */
+export const TELEGRAM_CONFIG_KEY = CONFIG_KEY
+
 export interface TelegramTemplates {
   paymentSuccess: string
   paymentFailed: string
@@ -74,15 +77,15 @@ export const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
   templates: { ...DEFAULT_TELEGRAM_TEMPLATES },
 }
 
-/** Baca konfigurasi Telegram dari app_settings (merge dengan default). */
+/** Baca konfigurasi Telegram dari system_config (merge dengan default). */
 export async function getTelegramConfig(app: FastifyInstance): Promise<TelegramConfig> {
   const [row] = (await app.db.query(
-    "SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1",
+    "SELECT config_value FROM system_config WHERE config_key = ? LIMIT 1",
     [CONFIG_KEY],
-  )) as { setting_value: string | null }[]
-  if (!row?.setting_value) return { ...DEFAULT_TELEGRAM_CONFIG }
+  )) as { config_value: string | null }[]
+  if (!row?.config_value) return { ...DEFAULT_TELEGRAM_CONFIG }
   try {
-    const parsed = JSON.parse(row.setting_value) as Partial<TelegramConfig>
+    const parsed = JSON.parse(row.config_value) as Partial<TelegramConfig>
     return {
       ...DEFAULT_TELEGRAM_CONFIG,
       ...parsed,
@@ -93,11 +96,11 @@ export async function getTelegramConfig(app: FastifyInstance): Promise<TelegramC
   }
 }
 
-/** Simpan konfigurasi Telegram ke app_settings. */
+/** Simpan konfigurasi Telegram ke system_config (satu baris per key — aman dari penimpaan config lain). */
 export async function saveTelegramConfig(app: FastifyInstance, cfg: TelegramConfig): Promise<void> {
   await app.db.query(
-    `INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)
-     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    `INSERT INTO system_config (config_key, config_value) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)`,
     [CONFIG_KEY, JSON.stringify(cfg)],
   )
 }
