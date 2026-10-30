@@ -69,7 +69,7 @@ import { useAuthStore } from "@/store/useAppStore"
 import { useCustomerActions, useCustomers, refreshCustomers } from "@/lib/customerStore"
 import { expiryToInputValue, inputToExpiry } from "@/lib/dateUtils"
 import { formatPrice } from "@/lib/paymentData"
-import { Banknote } from "lucide-react"
+import { Banknote, CheckCircle2 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 
@@ -160,6 +160,7 @@ export function CustomerDetailPage() {
   const [payOpen, setPayOpen] = useState(false)
   const [payInvoice, setPayInvoice] = useState<any | null>(null)
   const [cashOpen, setCashOpen] = useState(false)
+  const [cashReceipt, setCashReceipt] = useState<{ invoiceCode: string; paymentCode: string; amount: number; packageName: string } | null>(null)
   const [packages, setPackages] = useState<any[]>([])
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null)
   const [cashLoading, setCashLoading] = useState(false)
@@ -327,15 +328,21 @@ export function CustomerDetailPage() {
     if (!customer || !selectedPackageId) return
     setCashLoading(true)
     try {
-      await api.post(
+      const res = await api.post(
         `/customers/${customer.id}/purchase-cash`,
         { packageId: selectedPackageId },
         { headers: { Authorization: `Bearer ${token}` } },
       )
       const pkg = packages.find((p) => p.id === selectedPackageId)
+      // Ambil no invoice & kode payment BARU dari response backend
+      const invoiceCode = String(res?.data?.data?.invoice?.code ?? "-")
+      const paymentCode = String(res?.data?.data?.payment?.code ?? "-")
+      const amount = Number(res?.data?.data?.invoice?.amount ?? 0)
       toast.success("Order paket tunai dicatat", {
         description: `${customer.name} dipindah ke paket ${pkg?.name ?? ""} — lunas tunai, masa aktif +1 bulan & profile Mikrotik disinkron.`,
       })
+      // Tampilkan struk: no invoice baru + kode payment
+      setCashReceipt({ invoiceCode, paymentCode, amount, packageName: pkg?.name ?? "" })
       setCashOpen(false)
       setSelectedPackageId(null)
       // Refresh data pelanggan (store) & daftar invoice lokal
@@ -823,7 +830,7 @@ export function CustomerDetailPage() {
           <DialogHeader>
             <DialogTitle className="text-lg">Terima Cash — Order Paket Baru</DialogTitle>
             <DialogDescription className="text-sm">
-              Pilih paket untuk {customer.name}. Sistem akan mencatat order, melunasi tunai, memperpanjang masa aktif 1 bulan, dan menyinkron profile Mikrotik.
+              Pilih paket untuk {customer.name}. Sistem akan membuat <strong>no invoice baru</strong>, mencatat order, melunasi tunai, memperpanjang masa aktif 1 bulan, dan menyinkron profile Mikrotik.
             </DialogDescription>
           </DialogHeader>
 
@@ -873,6 +880,57 @@ export function CustomerDetailPage() {
                 <Banknote className="mr-1.5 size-4" />
               )}
               Konfirmasi &amp; Catat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Dialog Struk Terima Cash (no invoice & kode payment baru) ---------- */}
+      <Dialog open={!!cashReceipt} onOpenChange={(open) => !open && setCashReceipt(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <span className="flex size-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <CheckCircle2 className="size-5" />
+              </span>
+              Pembayaran Diterima
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Struk pembayaran tunai — invoice baru telah dibuat &amp; masa aktif diperpanjang.
+            </DialogDescription>
+          </DialogHeader>
+
+          {cashReceipt && (
+            <div className="space-y-3">
+              <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">No. Invoice (baru)</span>
+                  <span className="font-mono font-bold text-primary">{cashReceipt.invoiceCode}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Kode Pembayaran</span>
+                  <span className="font-mono font-bold text-primary">{cashReceipt.paymentCode}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Paket</span>
+                  <span className="font-medium">{cashReceipt.packageName}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-dashed border-border pt-2 text-sm">
+                  <span className="font-medium">Jumlah Diterima</span>
+                  <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    {formatPrice(cashReceipt.amount)}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Catat no. invoice di atas pada buku kas manual bila diperlukan.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setCashReceipt(null)} className="w-full">
+              Selesai
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,7 +1,7 @@
 import cron from "node-cron"
 import type { FastifyInstance } from "fastify"
 
-import { nextCode } from "../utils/codegen.js"
+import { nextCode, nextDailyCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { fillPlaceholders } from "../utils/template.js"
 import { recordRouterWarning, withRouter, enqueueRouterSync, loadPendingSyncQueue, markSyncQueueEntry, firstIpFromCidr } from "../services/router.service.js"
@@ -67,7 +67,7 @@ export function registerJobs(app: FastifyInstance) {
         if (!dueISO) continue
 
         const period = expiryStr.split(" ").slice(1).join(" ") // "September 2026"
-        const code = await app.db.transaction(async (q) => nextCode(q.query, "invoices", "INV-"))
+        const code = await app.db.transaction(async (q) => nextDailyCode(q.query, "invoices", "INV-"))
         await app.db.query(
           "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, ?)",
           [code, c.id, pkg.price, period, dueISO],

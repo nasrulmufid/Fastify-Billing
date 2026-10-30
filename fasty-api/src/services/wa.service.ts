@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify"
 
 import { decryptSecret } from "../utils/crypto.js"
-import { nextCode } from "../utils/codegen.js"
+import { nextCode, nextDailyCode } from "../utils/codegen.js"
 import { normalizePhone } from "../utils/phone.js"
 import { createSumopodPayment } from "../utils/sumopod.js"
 
@@ -115,7 +115,7 @@ export async function buildPaymentLinkForInvoice(
   )) as Record<string, unknown>[]
   let payment = existing
   if (!payment) {
-    const code = await app.db.transaction(async (q) => nextCode(q.query, "payments", "PY-"))
+    const code = await app.db.transaction(async (q) => nextDailyCode(q.query, "payments", "IQ-"))
     const result = (await app.db.query(
       "INSERT INTO payments (code, customer_id, invoice_id, method, amount, status) VALUES (?, ?, ?, 'QRIS', ?, 'Pending')",
       [code, invoice.customer_id, invoice.invoice_id, Number(invoice.amount)],

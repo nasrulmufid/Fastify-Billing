@@ -107,8 +107,8 @@ export async function paymentsRoutes(app: FastifyInstance) {
       .parse(req.body)
 
     const result = await app.db.transaction(async (q) => {
-      const { nextCode } = await import("../utils/codegen.js")
-      const pyCode = await nextCode(q.query, "payments", "PY-")
+      const { nextDailyCode } = await import("../utils/codegen.js")
+      const pyCode = await nextDailyCode(q.query, "payments", "IQ-")
       const { toDbDateTime } = await import("../utils/date.js")
       const pRes = (await q.query(
         "INSERT INTO payments (code, customer_id, invoice_id, method, amount, paid_at, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')",

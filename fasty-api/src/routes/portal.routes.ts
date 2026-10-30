@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
-import { nextCode } from "../utils/codegen.js"
+import { nextDailyCode } from "../utils/codegen.js"
 import { decryptSecret } from "../utils/crypto.js"
 import { fromISODate } from "../utils/date.js"
 import { createSumopodPayment } from "../utils/sumopod.js"
@@ -271,7 +271,7 @@ export async function portalRoutes(app: FastifyInstance) {
     if (existing) {
       payment = existing
     } else {
-      const code = await app.db.transaction(async (q) => nextCode(q.query, "payments", "PY-"))
+      const code = await app.db.transaction(async (q) => nextDailyCode(q.query, "payments", "IQ-"))
       const res = (await app.db.query(
         "INSERT INTO payments (code, customer_id, invoice_id, method, amount, status) VALUES (?, ?, ?, 'QRIS', ?, 'Pending')",
         [code, cust, body.invoiceId, Number(invoice.amount)],

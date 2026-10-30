@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
 import { completePaymentFlow } from "../services/payment.service.js"
-import { nextCode } from "../utils/codegen.js"
+import { nextCode, nextDailyCode } from "../utils/codegen.js"
 import { fromISODate, toISODate, toDbDateTime } from "../utils/date.js"
 
 const INVOICE_STATUS_ENUM = z.enum(["Paid", "Unpaid", "Overdue"])
@@ -89,7 +89,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
   app.post("/invoices", auth, async (req, reply) => {
     const body = createInvoiceSchema.parse(req.body)
     const code = await app.db.transaction(async (q) => {
-      return nextCode(q.query, "invoices", "INV-")
+      return nextDailyCode(q.query, "invoices", "INV-")
     })
     const result = await app.db.query(
       "INSERT INTO invoices (code, customer_id, amount, status, period) VALUES (?, ?, ?, 'Unpaid', ?)",
@@ -122,7 +122,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
       }
 
       // Buat payment lalu selesaikan dalam transaksi yang sama.
-      const pyCode = await nextCode(q.query, "payments", "PY-")
+      const pyCode = await nextDailyCode(q.query, "payments", "IQ-")
       const pRes = (await q.query(
         "INSERT INTO payments (code, customer_id, invoice_id, method, amount, paid_at, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')",
         [pyCode, invoice.customer_id, invoice.id, body.method, invoice.amount, toDbDateTime(new Date())],

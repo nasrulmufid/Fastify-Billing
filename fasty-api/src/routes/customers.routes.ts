@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
-import { nextCode, nextCustomerCode } from "../utils/codegen.js"
+import { nextCode, nextCustomerCode, nextDailyCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, toDbDateTime, MONTHS_ID } from "../utils/date.js"
 import { recordRouterWarning, withRouter, enqueueRouterSync, firstIpFromCidr, type RouterWarning } from "../services/router.service.js"
 import { completePaymentFlow } from "../services/payment.service.js"
@@ -249,7 +249,7 @@ export async function customersRoutes(app: FastifyInstance) {
       const price = Number(pkg?.price ?? 0)
       const now = new Date()
       const period = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`
-      const invCode = await app.db.transaction(async (q) => nextCode(q.query, "invoices", "INV-"))
+      const invCode = await app.db.transaction(async (q) => nextDailyCode(q.query, "invoices", "INV-"))
       await app.db.query(
         "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(NOW(), INTERVAL 1 MONTH))",
         [invCode, newCustomerId, price, period],
@@ -571,14 +571,14 @@ export async function customersRoutes(app: FastifyInstance) {
       // 2) Buat invoice baru (Unpaid) untuk periode berjalan
       const now = new Date()
       const period = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`
-      const invCode = await nextCode(q.query, "invoices", "INV-")
+      const invCode = await nextDailyCode(q.query, "invoices", "INV-")
       const invRes = (await q.query(
         "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(NOW(), INTERVAL 1 MONTH))",
         [invCode, id, Number(pkg.price), period],
       )) as unknown as { insertId: number }
 
       // 3) Buat payment lalu selesaikan (lunas tunai) dalam transaksi yang sama
-      const pyCode = await nextCode(q.query, "payments", "PY-")
+      const pyCode = await nextDailyCode(q.query, "payments", "IQ-")
       const pRes = (await q.query(
         "INSERT INTO payments (code, customer_id, invoice_id, method, amount, paid_at, status) VALUES (?, ?, ?, 'Tunai', ?, ?, 'Pending')",
         [pyCode, id, invRes.insertId, Number(pkg.price), toDbDateTime(now)],

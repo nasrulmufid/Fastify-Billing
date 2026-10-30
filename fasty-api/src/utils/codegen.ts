@@ -47,3 +47,38 @@ export async function nextCode(
   }
   return `${prefix}${next}`
 }
+
+/**
+ * Kode transaksi harian: PREFIX-{yymmdd}{4 digit acak}.
+ * Contoh: IQ-2510304821 (payment), INV-2510307350 (invoice).
+ *
+ * Format yymmdd+random (bukan sequential) agar kode tidak membocorkan
+ * volume transaksi & tetap unik per hari. Cek unik di DB dengan retry —
+ * bila bentrok (± 1:10000 per hari), ulangi dgn angka acak baru (maks 5x).
+ *
+ * @param runQuery peminjam koneksi transaksi
+ * @param table nama tabel ("payments" / "invoices")
+ * @param prefix prefix kode ("IQ-" utk payment, "INV-" utk invoice)
+ */
+export async function nextDailyCode(
+  runQuery: (sql: string, params?: unknown[]) => Promise<unknown>,
+  table: string,
+  prefix: string,
+): Promise<string> {
+  const now = new Date()
+  const yy = String(now.getFullYear()).slice(2)
+  const mm = String(now.getMonth() + 1).padStart(2, "0")
+  const dd = String(now.getDate()).padStart(2, "0")
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const rand = String(Math.floor(1000 + Math.random() * 9000)) // 1000-9999
+    const code = `${prefix}${yy}${mm}${dd}${rand}`
+    const [dup] = (await runQuery(`SELECT code FROM ${table} WHERE code = ? LIMIT 1`, [code])) as Record<
+      string,
+      unknown
+    >[]
+    if (!dup) return code
+  }
+  // Fallback: 4 digit acak + timestamp ms agar hampir mustahil bentrok
+  return `${prefix}${yy}${mm}${dd}${Math.floor(Math.random() * 9000) + 1000}${Date.now() % 100}`
+}
