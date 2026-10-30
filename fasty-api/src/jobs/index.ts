@@ -275,16 +275,23 @@ function registerSyncQueueJob(app: FastifyInstance) {
 
       let done = 0
       let failed = 0
+      let skipped = 0
       for (const item of queue) {
-        const routerId = Number(item.router_id)
+        // Gunakan router TERKINI pelanggan (bukan router_id saat enqueue) —
+        // mencegah antrian macet selamanya di router lama yang offline
+        // sedangkan pelanggan sudah pindah/dipindah ke router yang online.
+        const routerId = Number(item.current_router_id ?? item.enqueued_router_id)
         // Cek dulu apakah router online — bila masih offline, skip (tetap pending)
         const ping = await withRouter(app, routerId, (client) => client.ping())
-        if (!ping.ok) continue
+        if (!ping.ok) {
+          skipped++
+          continue
+        }
 
         const customer = {
           id: item.customer_id,
           name: item.customer_name,
-          router_id: item.router_id,
+          router_id: routerId,
           package_id: item.package_id,
           pppoe_username: item.pppoe_username,
           pppoe_password: item.pppoe_password,
@@ -307,7 +314,7 @@ function registerSyncQueueJob(app: FastifyInstance) {
           failed++
         }
       }
-      app.log.info({ total: queue.length, done, failed }, "Antrian sync router diproses")
+      app.log.info({ total: queue.length, done, failed, skipped }, "Antrian sync router diproses")
     } catch (err) {
       app.log.error(err, "Gagal memproses antrian sync router")
     }

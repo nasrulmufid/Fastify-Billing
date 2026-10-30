@@ -3,7 +3,7 @@ import { z } from "zod"
 
 import { nextCode, nextCustomerCode, nextDailyCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, toDbDateTime, MONTHS_ID } from "../utils/date.js"
-import { recordRouterWarning, withRouter, enqueueRouterSync, firstIpFromCidr, type RouterWarning } from "../services/router.service.js"
+import { recordRouterWarning, withRouter, enqueueRouterSync, firstIpFromCidr, updateQueueRouterForCustomer, type RouterWarning } from "../services/router.service.js"
 import { completePaymentFlow } from "../services/payment.service.js"
 import {
   generateCustomerWorkbook,
@@ -343,12 +343,14 @@ export async function customersRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string }
     const body = updateCustomerSchema.parse(req.body)
 
-    // Catat paket & IP lama utk deteksi "pindah paket" atau perubahan IP
-    const [prevRow] = (await app.db.query("SELECT package_id, ip_address FROM customers WHERE id = ?", [
+    // Catat paket, IP & router lama utk deteksi "pindah paket", perubahan IP,
+    // dan pindah router (mempengaruhi antrian sync pending).
+    const [prevRow] = (await app.db.query("SELECT package_id, ip_address, router_id FROM customers WHERE id = ?", [
       id,
     ])) as Record<string, unknown>[]
     const prevPackageId = prevRow ? Number(prevRow.package_id ?? 0) : null
     const prevIp = prevRow ? String(prevRow.ip_address ?? "") : ""
+    const prevRouterId = prevRow?.router_id ? Number(prevRow.router_id) : null
 
     await app.db.query(
       `UPDATE customers SET
@@ -388,6 +390,14 @@ export async function customersRoutes(app: FastifyInstance) {
     ])) as Record<string, unknown>[]
     if (!row) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Pelanggan tidak ditemukan" } })
+    }
+
+    // Bila pelanggan PINDAH ROUTER dan punya antrian sync pending, perbarui
+    // router_id antriannya ke router baru — tanpa ini antrian bisa macet
+    // selamanya di router lama yang offline sedangkan router baru online.
+    const newRouterId = body.routerId ? Number(body.routerId) : null
+    if (newRouterId && prevRouterId && newRouterId !== prevRouterId) {
+      await updateQueueRouterForCustomer(app, Number(id), newRouterId)
     }
 
     // Jika pengguna mengosongkan IP pada update (""), alokasikan dari pool router

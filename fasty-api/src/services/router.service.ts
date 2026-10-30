@@ -455,7 +455,10 @@ export async function ensureSyncQueueTable(app: FastifyInstance): Promise<void> 
   )
 }
 
-/** Masukkan pelanggan ke antrian sync (skip bila sudah pending utk customer tsb). */
+/** Masukkan pelanggan ke antrian sync.
+ *  Bila sudah ada entri pending utk customer tsb: perbarui router_id ke nilai
+ *  TERKINI (pelanggan bisa saja dipindah router saat entri masih pending —
+ *  penyebab antrian macet di router lama yang mati selamanya). */
 export async function enqueueRouterSync(
   app: FastifyInstance,
   item: QueueSyncItem,
@@ -466,7 +469,14 @@ export async function enqueueRouterSync(
       "SELECT id FROM router_sync_queue WHERE customer_id = ? AND status = 'pending' LIMIT 1",
       [item.customerId],
     )) as Record<string, unknown>[]
-    if (existing) return // sudah antre — tidak duplikat
+    if (existing) {
+      // Perbarui router_id entri pending agar job memproses di router yang benar
+      await app.db.query(
+        "UPDATE router_sync_queue SET router_id = ?, reason = COALESCE(?, reason) WHERE id = ?",
+        [item.routerId, item.reason ?? null, Number(existing.id)],
+      )
+      return
+    }
     await app.db.query(
       "INSERT INTO router_sync_queue (customer_id, router_id, reason) VALUES (?, ?, ?)",
       [item.customerId, item.routerId, item.reason ?? null],
@@ -476,14 +486,42 @@ export async function enqueueRouterSync(
   }
 }
 
-/** Ambil entri pending dari antrian sync (untuk job berkala). */
+/**
+ * Sinkronkan router_id entri pending milik pelanggan bila pelanggan dipindah
+ * ke router lain. Dipanggil saat admin mengubah router assignment customer.
+ */
+export async function updateQueueRouterForCustomer(
+  app: FastifyInstance,
+  customerId: number,
+  newRouterId: number,
+): Promise<void> {
+  try {
+    await ensureSyncQueueTable(app)
+    await app.db.query(
+      "UPDATE router_sync_queue SET router_id = ? WHERE customer_id = ? AND status = 'pending'",
+      [newRouterId, customerId],
+    )
+  } catch (err) {
+    app.log.error(err, "Gagal memperbarui router antrian sync")
+  }
+}
+
+/**
+ * Ambil entri pending dari antrian sync (untuk job berkala).
+ * PENTING: router_id yang dipakai job adalah router TERKINI pelanggan
+ * (c.router_id AS current_router_id) — bukan router_id yang dibekukan saat
+ * enqueue. Mencegah antrian macet selamanya di router lama yang offline
+ * sedangkan pelanggan sudah pindah/dipindah ke router yang online.
+ */
 export async function loadPendingSyncQueue(
   app: FastifyInstance,
   limit = 50,
 ): Promise<Record<string, unknown>[]> {
   await ensureSyncQueueTable(app)
   return (await app.db.query(
-    `SELECT q.id, q.customer_id, q.router_id, q.reason, q.attempts, c.name AS customer_name,
+    `SELECT q.id, q.customer_id, q.router_id AS enqueued_router_id,
+            COALESCE(c.router_id, q.router_id) AS current_router_id,
+            q.reason, q.attempts, c.name AS customer_name,
             c.pppoe_username, c.pppoe_password, c.status, c.package_id, c.phone
      FROM router_sync_queue q
      JOIN customers c ON c.id = q.customer_id
