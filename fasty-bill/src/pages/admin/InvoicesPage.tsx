@@ -186,9 +186,26 @@ export function InvoicesPage() {
     setPayTarget(null)
   }
 
-  const handleDelete = (invoice: Invoice) => {
-    removeInvoice(invoice.id)
-    toast.success("Invoice dihapus", { description: `${invoice.code} telah dihapus dari daftar.` })
+  const handleDelete = async (invoice: Invoice) => {
+    try {
+      const result = await removeInvoice(invoice.id)
+      if (invoice.status === "Paid") {
+        // Invoice lunas dihapus = pendapatan dibatalkan (payment terkait ikut dihapus)
+        toast.warning("Invoice lunas dihapus — pendapatan dibatalkan", {
+          description: `${invoice.code} beserta ${result?.deletedPayments ?? 0} payment terkait dihapus. Total pendapatan di Laporan Pendapatan otomatis menurun.`,
+          duration: 8000,
+        })
+      } else {
+        toast.success("Invoice dihapus", {
+          description: `${invoice.code} telah dihapus dari daftar.`,
+        })
+      }
+    } catch (err: any) {
+      toast.error("Gagal menghapus invoice", {
+        description:
+          err?.response?.data?.error?.message || "Terjadi kesalahan saat menghapus invoice.",
+      })
+    }
   }
 
   return (

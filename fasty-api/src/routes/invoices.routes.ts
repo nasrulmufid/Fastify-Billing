@@ -135,9 +135,48 @@ export async function invoicesRoutes(app: FastifyInstance) {
   })
 
   // DELETE /invoices/:id
-  app.delete("/invoices/:id", auth, async (req, reply) => {
+  // Logic penting: invoice Paid yang dihapus berarti pendapatan DIBATALKAN —
+  // payment Sukses terkait ikut dihapus agar Laporan Pendapatan tidak lagi
+  // menghitungnya (DB FK payments.invoice_id ON DELETE SET NULL hanya
+  // melepas relasi, payment-nya tetap ada & tetap terhitung sebagai pendapatan).
+  // Invoice Unpaid/Overdue hanya punya payment Pending (QRIS menunggu) atau
+  // belum ada payment — payment itu juga ikut dihapus (tidak bernilai).
+  // Masa aktif pelanggan TIDAK di-roll-back (kebijakan bisnis: masa aktif
+  // yang sudah berjalan tidak dipotong meski invoice dihapus).
+  app.delete("/invoices/:id", auth, async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string }
+    const [invoice] = (await app.db.query("SELECT id, code, status FROM invoices WHERE id = ?", [
+      id,
+    ])) as Record<string, unknown>[]
+    if (!invoice) {
+      return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Invoice tidak ditemukan" } })
+    }
+
+    const deletedPayments = (await app.db.transaction(async (q) => {
+      // Hapus semua payment yang merujuk invoice ini (Sukses/Pending/Ditolak)
+      const res = (await q.query("DELETE FROM payments WHERE invoice_id = ?", [id])) as unknown as {
+        affectedRows: number
+      }
+      // Bersihkan payment_code pada invoice ini sebelum barisnya dihapus (tidak wajib,
+      // tapi menjaga konsistensi bila ada trigger/audit)
+      await q.query("UPDATE invoices SET payment_code = NULL, payment_method = NULL WHERE id = ?", [id])
+      return res.affectedRows ?? 0
+    })) as number
+
     await app.db.query("DELETE FROM invoices WHERE id = ?", [id])
-    return reply.send({ data: { message: "Invoice dihapus" } })
+
+    await app.db.query("INSERT INTO activity_logs (actor, action, target) VALUES (?, ?, ?)", [
+      (req.user as { role?: string })?.role ?? "Admin",
+      invoice.status === "Paid" ? "Invoice lunas dihapus (pendapatan dibatalkan)" : "Invoice dihapus",
+      `${String(invoice.code)} — ${deletedPayments} payment terkait dihapus`,
+    ])
+
+    return reply.send({
+      data: {
+        message: "Invoice dihapus",
+        deletedPayments,
+        revenueAffected: invoice.status === "Paid",
+      },
+    })
   })
 }

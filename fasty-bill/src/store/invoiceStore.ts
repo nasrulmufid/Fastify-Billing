@@ -56,7 +56,9 @@ type InvoiceStore = {
    * menandai invoice Paid, dan memperpanjang masa aktif pelanggan 1 bulan (transaksi).
    */
   markPaid: (id: string, method: PaymentMethod) => Promise<boolean>
-  removeInvoice: (id: string) => Promise<void>
+  removeInvoice: (
+    id: string,
+  ) => Promise<{ deletedPayments?: number; revenueAffected?: boolean } | undefined>
 }
 
 export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
@@ -89,10 +91,21 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
 
   removeInvoice: async (id) => {
     try {
-      await api.delete(`/invoices/${id}`)
+      // Backend menghapus payment terkait invoice ini (Sukses/Pending/Ditolak) —
+      // pendapatan pada Laporan Pendapatan otomatis menurun.
+      const res = await api.delete<{ data?: { deletedPayments?: number; revenueAffected?: boolean } }>(
+        `/invoices/${id}`,
+      )
       set((state) => ({ invoices: state.invoices.filter((inv) => inv.id !== id) }))
+      // Payment & customer ikut berubah (payment dihapus, invoice hilang) —
+      // refresh kedua store agar Laporan Pendapatan & halaman lain sinkron.
+      await usePaymentStore.getState().load()
+      const { refreshCustomers } = await import("@/lib/customerStore")
+      void refreshCustomers()
+      return res.data
     } catch (err) {
       console.error("Gagal menghapus invoice:", err)
+      throw err
     }
   },
 }))
