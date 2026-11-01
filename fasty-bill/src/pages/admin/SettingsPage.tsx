@@ -478,7 +478,7 @@ function TabAkun() {
     }, 800)
   }
 
-  function handleChangePassword() {
+  async function handleChangePassword() {
     if (!curPass) {
       toast.error("Password saat ini wajib diisi")
       return
@@ -492,13 +492,20 @@ function TabAkun() {
       return
     }
     setSavingPass(true)
-    setTimeout(() => {
-      setSavingPass(false)
+    try {
+      await api.put("/auth/me/password", {
+        currentPassword: curPass,
+        newPassword: newPass,
+      })
       setCurPass("")
       setNewPass("")
       setConfirmPass("")
       toast.success("Password berhasil diubah", { description: "Gunakan password baru saat login berikutnya." })
-    }, 900)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Gagal mengubah password")
+    } finally {
+      setSavingPass(false)
+    }
   }
 
   if (!user) return null
