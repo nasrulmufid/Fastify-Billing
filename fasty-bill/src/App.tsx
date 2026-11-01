@@ -1,11 +1,34 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom"
 import { Toaster } from "sonner"
+import { useAuthStore } from "@/store/useAppStore"
 
 // Redirect component that reads :id from source route params
 function CustomerRedirect() {
   const { id } = useParams<{ id: string }>()
   if (!id) return <Navigate to="/admin/pppoe/customers" replace />
   return <Navigate to={`/admin/pppoe/customers/${id}`} replace />
+}
+
+// Protected route wrapper - block access jika role tidak sesuai
+function ProtectedRoute({ 
+  children, 
+  allowedRoles 
+}: { 
+  children: React.ReactNode
+  allowedRoles?: ("super_admin" | "admin" | "finance" | "teknisi")[]
+}) {
+  const user = useAuthStore((s) => s.user)
+  
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Redirect ke dashboard jika tidak punya akses
+    return <Navigate to="/admin" replace />
+  }
+  
+  return <>{children}</>
 }
 
 import { AdminLayout } from "@/components/layouts/AdminLayout"
@@ -75,31 +98,34 @@ export function App() {
             {/* Admin routes */}
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
-                {/* PPPoE routes */}
-                <Route path="pppoe/customers" element={<PppoeCustomersPage />} />
-                <Route path="pppoe/customers/:id/*" element={<CustomerLayout />} />
-                <Route path="pppoe/packages" element={<PppoePackagesPage />} />
+                {/* PPPoE routes — super_admin & admin only */}
+                <Route path="pppoe/customers" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><PppoeCustomersPage /></ProtectedRoute>} />
+                <Route path="pppoe/customers/:id/*" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><CustomerLayout /></ProtectedRoute>} />
+                <Route path="pppoe/packages" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><PppoePackagesPage /></ProtectedRoute>} />
                 {/* Legacy routes (redirect) */}
                 <Route path="customers" element={<Navigate to="/admin/pppoe/customers" replace />} />
                 <Route path="customers/:id/*" element={<CustomerRedirect />} />
                 <Route path="packages" element={<Navigate to="/admin/pppoe/packages" replace />} />
-                {/* Other routes */}
-              <Route path="invoices" element={<InvoicesPage />} />
-              <Route path="invoices/new" element={<InvoiceCreatePage />} />
-              <Route path="invoices/:id" element={<InvoiceDetailPage />} />
-              <Route path="payments" element={<PaymentsPage />} />
-              <Route path="payments/approval" element={<PaymentApprovalPage />} />
-              <Route path="payments/:id" element={<PaymentDetailPage />} />
-              <Route path="network" element={<NetworkPage />} />
+                {/* Transaction routes — super_admin, admin, finance */}
+              <Route path="invoices" element={<ProtectedRoute allowedRoles={["super_admin", "admin", "finance"]}><InvoicesPage /></ProtectedRoute>} />
+              <Route path="invoices/new" element={<ProtectedRoute allowedRoles={["super_admin", "admin", "finance"]}><InvoiceCreatePage /></ProtectedRoute>} />
+              <Route path="invoices/:id" element={<ProtectedRoute allowedRoles={["super_admin", "admin", "finance"]}><InvoiceDetailPage /></ProtectedRoute>} />
+              <Route path="payments" element={<ProtectedRoute allowedRoles={["super_admin", "admin", "finance"]}><PaymentsPage /></ProtectedRoute>} />
+              <Route path="payments/approval" element={<ProtectedRoute allowedRoles={["super_admin", "admin", "finance"]}><PaymentApprovalPage /></ProtectedRoute>} />
+              <Route path="payments/:id" element={<ProtectedRoute allowedRoles={["super_admin", "admin", "finance"]}><PaymentDetailPage /></ProtectedRoute>} />
+              {/* Network routes — super_admin & admin only */}
+              <Route path="network" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><NetworkPage /></ProtectedRoute>} />
+              <Route path="acs" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><AcsPage /></ProtectedRoute>} />
+              <Route path="acs/config" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><AcsConfigPage /></ProtectedRoute>} />
+              {/* Communication routes */}
+              <Route path="wa-gateway" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><WAGatewayPage /></ProtectedRoute>} />
+              <Route path="telegram" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><TelegramSettingsPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="telegram" element={<TelegramSettingsPage />} />
               <Route path="tickets" element={<TicketsPage />} />
               <Route path="tickets/:id" element={<TicketDetailPage />} />
-              <Route path="activity-log" element={<ActivityLogPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="wa-gateway" element={<WAGatewayPage />} />
-              <Route path="acs" element={<AcsPage />} />
-              <Route path="acs/config" element={<AcsConfigPage />} />
+              {/* System routes */}
+              <Route path="activity-log" element={<ProtectedRoute allowedRoles={["super_admin", "admin"]}><ActivityLogPage /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute allowedRoles={["super_admin"]}><SettingsPage /></ProtectedRoute>} />
             </Route>
 
             {/* Catch-all */}

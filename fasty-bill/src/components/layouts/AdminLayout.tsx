@@ -48,6 +48,7 @@ type NavItem = {
   to: string
   label: string
   icon: ComponentType<{ className?: string }>
+  roles?: ("super_admin" | "admin" | "finance" | "teknisi")[]
 }
 
 type NavGroup = {
@@ -63,30 +64,30 @@ const navGroups: NavGroup[] = [
   {
     title: "Pelanggan",
     items: [
-      { to: "/admin/pppoe/customers", label: "Pelanggan PPPoE", icon: Users },
-      { to: "/admin/pppoe/packages", label: "Paket Layanan", icon: Package },
+      { to: "/admin/pppoe/customers", label: "Pelanggan PPPoE", icon: Users, roles: ["super_admin", "admin"] },
+      { to: "/admin/pppoe/packages", label: "Paket Layanan", icon: Package, roles: ["super_admin", "admin"] },
     ],
   },
   {
     title: "Transaksi",
     items: [
-      { to: "/admin/invoices", label: "Invoice", icon: FileText },
-      { to: "/admin/payments", label: "Laporan Pendapatan", icon: Wallet },
+      { to: "/admin/invoices", label: "Invoice", icon: FileText, roles: ["super_admin", "admin", "finance"] },
+      { to: "/admin/payments", label: "Laporan Pendapatan", icon: Wallet, roles: ["super_admin", "admin", "finance"] },
     ],
   },
   {
     title: "Jaringan",
     items: [
-      { to: "/admin/network", label: "Router", icon: Wifi },
-      { to: "/admin/acs", label: "Perangkat ACS", icon: Cpu },
-      { to: "/admin/acs/config", label: "Konfigurasi ACS", icon: Settings },
+      { to: "/admin/network", label: "Router", icon: Wifi, roles: ["super_admin", "admin"] },
+      { to: "/admin/acs", label: "Perangkat ACS", icon: Cpu, roles: ["super_admin", "admin"] },
+      { to: "/admin/acs/config", label: "Konfigurasi ACS", icon: Settings, roles: ["super_admin", "admin"] },
     ],
   },
   {
     title: "Komunikasi",
     items: [
-      { to: "/admin/wa-gateway", label: "WA Gateway", icon: MessageCircle },
-      { to: "/admin/telegram", label: "Telegram Bot", icon: Send },
+      { to: "/admin/wa-gateway", label: "WA Gateway", icon: MessageCircle, roles: ["super_admin", "admin"] },
+      { to: "/admin/telegram", label: "Telegram Bot", icon: Send, roles: ["super_admin", "admin"] },
       { to: "/admin/notifications", label: "Notifikasi", icon: BellRing },
       { to: "/admin/tickets", label: "Tiket", icon: Ticket },
     ],
@@ -94,8 +95,8 @@ const navGroups: NavGroup[] = [
   {
     title: "Sistem",
     items: [
-      { to: "/admin/activity-log", label: "Log Aktivitas", icon: Activity },
-      { to: "/admin/settings", label: "Pengaturan", icon: Settings },
+      { to: "/admin/activity-log", label: "Log Aktivitas", icon: Activity, roles: ["super_admin", "admin"] },
+      { to: "/admin/settings", label: "Pengaturan", icon: Settings, roles: ["super_admin"] },
     ],
   },
 ]
@@ -213,6 +214,23 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // Filter menu berdasarkan role user
+  const filteredNavGroups = useMemo(() => {
+    const userRole = user?.role
+    if (!userRole) return []
+    
+    return navGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => {
+          // Jika tidak ada roles restriction, tampilkan ke semua
+          if (!item.roles) return true
+          return item.roles.includes(userRole)
+        }),
+      }))
+      .filter((group) => group.items.length > 0) // Hapus group kosong
+  }, [user?.role])
+
   // Menu aktif GLOBAL = item nav dengan prefix path terpanjang yang cocok
   // dengan URL saat ini. Dihitung sekali di sini (bukan per group) agar
   // hanya satu menu yang aktif.
@@ -220,7 +238,7 @@ export function AdminLayout() {
   const activeNavTo = useMemo(() => {
     const path = location.pathname
     let best: string | null = null
-    for (const group of navGroups) {
+    for (const group of filteredNavGroups) {
       for (const item of group.items) {
         if (path === item.to || path.startsWith(item.to + "/")) {
           if (best === null || item.to.length > best.length) best = item.to
@@ -228,7 +246,7 @@ export function AdminLayout() {
       }
     }
     return best
-  }, [location.pathname])
+  }, [location.pathname, filteredNavGroups])
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
 
@@ -358,7 +376,7 @@ export function AdminLayout() {
         {/* Navigation */}
         <ScrollArea className={cn("min-h-0 flex-1 py-4", sidebarCollapsed ? "px-2" : "px-3")}>
           <nav className={cn("space-y-4", sidebarCollapsed && "space-y-1")}>
-            {navGroups.map((group) => (
+            {filteredNavGroups.map((group) => (
               <NavGroupSection
                 key={group.title}
                 group={group}

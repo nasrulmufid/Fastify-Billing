@@ -770,6 +770,14 @@ function TabUser() {
 
   const isCurrentUser = (u: SettingsUser) => u.id === currentUser?.id
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
