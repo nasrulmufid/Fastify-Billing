@@ -191,15 +191,7 @@ export function LoginPage() {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="login-password">Password</Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  Lupa password?
-                </Link>
-              </div>
+              <Label htmlFor="login-password">Password</Label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
