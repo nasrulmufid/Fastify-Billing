@@ -660,6 +660,7 @@ function TabAkun() {
 function TabUser() {
   const currentUser = useAuthStore((s) => s.user)
   const [users, setUsers] = useState<SettingsUser[]>(seedUsers)
+  const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SettingsUser | undefined>(undefined)
   const [resetTarget, setResetTarget] = useState<SettingsUser | null>(null)
@@ -667,53 +668,104 @@ function TabUser() {
 
   const activeCount = users.filter((u) => u.status === "Aktif").length
 
-  function handleSave(input: { name: string; username: string; email: string; role: UserRole; password?: string; status: UserStatus }) {
-    if (editing) {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === editing.id ? { ...u, name: input.name, username: input.username, email: input.email, role: input.role, status: input.status } : u,
-        ),
-      )
-      toast.success("User diperbarui", { description: `${input.name} — role ${roleMeta[input.role].label}.` })
-    } else {
-      const newUser: SettingsUser = {
-        id: `u-${Date.now()}`,
-        name: input.name,
-        username: input.username,
-        email: input.email,
-        role: input.role,
-        status: input.status,
-        lastLogin: "Belum pernah",
+  // Load users dari API saat mount
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        setLoading(true)
+        const res = await api.get("/users")
+        if (mounted && res.data?.data) {
+          setUsers(res.data.data)
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error?.message || "Gagal memuat data user")
+      } finally {
+        if (mounted) setLoading(false)
       }
-      setUsers((prev) => [...prev, newUser])
-      toast.success("User ditambahkan", {
-        description: `${input.name} (${roleMeta[input.role].label}) dapat login dengan password awal.`,
-      })
     }
-    setFormOpen(false)
-    setEditing(undefined)
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function handleSave(input: { name: string; username: string; email: string; role: UserRole; password?: string; status: UserStatus }) {
+    try {
+      if (editing) {
+        // Edit user
+        await api.put(`/users/${editing.id}`, {
+          name: input.name,
+          username: input.username,
+          email: input.email,
+          role: input.role,
+          status: input.status,
+        })
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === editing.id ? { ...u, name: input.name, username: input.username, email: input.email, role: input.role, status: input.status } : u,
+          ),
+        )
+        toast.success("User diperbarui", { description: `${input.name} — role ${roleMeta[input.role].label}.` })
+      } else {
+        // Tambah user
+        const res = await api.post("/users", {
+          name: input.name,
+          username: input.username,
+          email: input.email,
+          role: input.role,
+          password: input.password,
+          status: input.status,
+        })
+        if (res.data?.data) {
+          setUsers((prev) => [...prev, res.data.data])
+        }
+        toast.success("User ditambahkan", {
+          description: `${input.name} (${roleMeta[input.role].label}) dapat login dengan password awal.`,
+        })
+      }
+      setFormOpen(false)
+      setEditing(undefined)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Gagal menyimpan user")
+    }
   }
 
-  function handleResetPassword(id: string, _password: string) {
-    toast.success("Password direset", {
-      description: `Password baru untuk ${users.find((u) => u.id === id)?.name} telah disimpan.`,
-    })
-    setResetTarget(null)
+  async function handleResetPassword(id: string, password: string) {
+    try {
+      await api.put(`/users/${id}/reset-password`, { password })
+      toast.success("Password direset", {
+        description: `Password baru untuk ${users.find((u) => u.id === id)?.name} telah disimpan.`,
+      })
+      setResetTarget(null)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Gagal mereset password")
+    }
   }
 
-  function handleToggleStatus(user: SettingsUser) {
-    const next: UserStatus = user.status === "Aktif" ? "Nonaktif" : "Aktif"
-    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, status: next } : u)))
-    toast.success(`User ${next === "Aktif" ? "diaktifkan" : "dinonaktifkan"}`, {
-      description: `${user.name} — akses login ${next === "Aktif" ? "dibuka kembali" : "ditangguhkan"}.`,
-    })
+  async function handleToggleStatus(user: SettingsUser) {
+    try {
+      const next: UserStatus = user.status === "Aktif" ? "Nonaktif" : "Aktif"
+      await api.put(`/users/${user.id}/status`, { status: next })
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, status: next } : u)))
+      toast.success(`User ${next === "Aktif" ? "diaktifkan" : "dinonaktifkan"}`, {
+        description: `${user.name} — akses login ${next === "Aktif" ? "dibuka kembali" : "ditangguhkan"}.`,
+      })
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Gagal mengubah status user")
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteTarget) return
-    setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id))
-    toast.success("User dihapus", { description: `${deleteTarget.name} dihapus dari sistem.` })
-    setDeleteTarget(null)
+    try {
+      await api.delete(`/users/${deleteTarget.id}`)
+      setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id))
+      toast.success("User dihapus", { description: `${deleteTarget.name} dihapus dari sistem.` })
+      setDeleteTarget(null)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Gagal menghapus user")
+    }
   }
 
   const isCurrentUser = (u: SettingsUser) => u.id === currentUser?.id

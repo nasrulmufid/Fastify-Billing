@@ -10,11 +10,11 @@ export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
 
   db: {
-    host: process.env.DB_HOST ?? "127.0.0.1",
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: process.env.DB_USER ?? "root",
-    password: process.env.DB_PASS ?? "",
-    database: process.env.DB_NAME ?? "fasty_bill",
+    host: "localhost",
+    port:  3306,
+    user:  "fasty",
+    password:  "fasty123#",
+    database:  "fasty_bill",
   },
 
   jwt: {
@@ -31,13 +31,6 @@ export const config = {
   },
 
   encryptionKey: process.env.ENCRYPTION_KEY ?? "dev-encryption-key-placeholder!!",
-
-  genieacs: {
-    baseUrl: process.env.GENIEACS_URL ?? "http://localhost:7557",
-    apiKey: process.env.GENIEACS_API_KEY ?? "",
-    syncIntervalMinutes: Number(process.env.GENIEACS_SYNC_INTERVAL ?? 30),
-    autoSyncOnAccess: process.env.GENIEACS_AUTO_SYNC !== "false",
-  },
 }
 
 export const isProd = config.nodeEnv === "production"
