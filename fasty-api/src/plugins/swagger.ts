@@ -1,7 +1,15 @@
 import fp from "fastify-plugin"
 import type { FastifyInstance } from "fastify"
 
+import { isProd } from "../config.js"
+
 export const swaggerPlugin = fp(async (app: FastifyInstance) => {
+  // Skip Swagger in production for security
+  if (isProd) {
+    app.log.info("Swagger UI disabled in production")
+    return
+  }
+
   await app.register(import("@fastify/swagger"), {
     openapi: {
       info: {

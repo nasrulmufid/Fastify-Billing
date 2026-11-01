@@ -14,12 +14,7 @@ const customerLoginSchema = z.object({
   password: z.string().min(1, "Password wajib diisi"),
 })
 
-const forgotSchema = z.object({ username: z.string().min(1, "Username wajib diisi") })
-
-const resetSchema = z.object({
-  token: z.string().min(1, "Token wajib diisi"),
-  newPassword: z.string().min(6, "Password baru minimal 6 karakter"),
-})
+// Reset password endpoints removed for security - use admin reset instead
 
 const updateProfileSchema = z.object({
   name: z.string().min(3, "Nama minimal 3 karakter").optional(),
@@ -119,7 +114,9 @@ export async function authRoutes(app: FastifyInstance) {
         })
       }
 
-      if (body.password !== String(row.login_password)) {
+      const passwordHash = String(row.login_password_hash ?? "")
+      const passwordMatches = passwordHash && await bcrypt.compare(body.password, passwordHash)
+      if (!passwordMatches) {
         return reply.code(401).send({
           error: { code: "INVALID_CREDENTIALS", message: "Username atau password salah" },
         })
@@ -130,35 +127,6 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.send({ data: { token, customer: publicCustomer(row) } })
     },
   )
-
-  // POST /auth/forgot-password
-  app.post("/auth/forgot-password", async (req, reply) => {
-    const body = forgotSchema.parse(req.body)
-    // Simulasi: kirim instruksi reset via email (belum ada mailer)
-    await app.db.query(
-      "INSERT INTO activity_logs (actor, action, target) VALUES ('Sistem', 'Permintaan reset password', ?)",
-      [body.username],
-    )
-    return reply.send({ data: { message: "Instruksi reset password terkirim ke email Anda." } })
-  })
-
-  // POST /auth/reset-password
-  app.post("/auth/reset-password", async (req, reply) => {
-    const body = resetSchema.parse(req.body)
-    // Token dinormalisasi menjadi username (simulasi sederhana — produksi pakai token aman)
-    const username = body.token.replace(/^reset:/, "").toLowerCase()
-    const hash = await bcrypt.hash(body.newPassword, 10)
-    const result = (await app.db.query(
-      "UPDATE users SET password_hash = ? WHERE username = ?",
-      [hash, username],
-    )) as unknown as { affectedRows: number }
-    if (!result.affectedRows) {
-      return reply.code(400).send({
-        error: { code: "INVALID_TOKEN", message: "Token reset tidak valid" },
-      })
-    }
-    return reply.send({ data: { message: "Password berhasil direset. Silakan login." } })
-  })
 
   // GET /auth/me
   app.get(

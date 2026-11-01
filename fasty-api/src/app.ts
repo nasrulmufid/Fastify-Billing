@@ -6,6 +6,7 @@ import { corsPlugin } from "./plugins/cors.js"
 import { dbPlugin } from "./plugins/db.js"
 import { errorHandlerPlugin } from "./plugins/error-handler.js"
 import { jwtPlugin } from "./plugins/jwt.js"
+import { helmetPlugin } from "./plugins/helmet.js"
 import { swaggerPlugin } from "./plugins/swagger.js"
 
 import { authRoutes } from "./routes/auth.routes.js"
@@ -51,6 +52,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(corsPlugin)
   await app.register(dbPlugin)
   await app.register(jwtPlugin)
+  await app.register(helmetPlugin)
   await app.register(errorHandlerPlugin)
   await app.register(swaggerPlugin)
 

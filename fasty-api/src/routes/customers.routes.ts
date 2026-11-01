@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
+import bcrypt from "bcryptjs"
 
 import { nextCode, nextCustomerCode, nextDailyCode } from "../utils/codegen.js"
 import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate, toDbDateTime, MONTHS_ID } from "../utils/date.js"

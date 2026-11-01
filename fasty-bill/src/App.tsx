@@ -55,7 +55,6 @@ import { TicketDetailPage } from "@/pages/admin/TicketDetail"
 import { TicketsPage } from "@/pages/admin/TicketsPage"
 import { PppoeCustomersPage } from "@/pages/admin/pppoe/CustomersPage"
 import { PppoePackagesPage } from "@/pages/admin/pppoe/PackagesPage"
-import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage"
 import { LoginPage } from "@/pages/auth/LoginPage"
 import { PortalLoginPage } from "@/pages/auth/PortalLoginPage"
 import { NotFoundPage } from "@/pages/NotFound"
@@ -92,7 +91,6 @@ export function App() {
             {/* Auth routes */}
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             </Route>
 
             {/* Admin routes */}
