@@ -49,6 +49,8 @@ services:
       SUMODOP_WEBHOOK_TOKEN: ${SUMODOP_WEBHOOK_TOKEN:-}
       GENIEACS_BASE_URL: ${GENIEACS_BASE_URL:-}
       GENIEACS_API_KEY: ${GENIEACS_API_KEY:-}
+    volumes:
+      - baileys_auth:/.baileys
     expose: ["3000"]
     ports:
       - "3000:3000"
@@ -58,9 +60,6 @@ services:
       timeout: 5s
       retries: 5
     networks: [fasty-net]
-    # Uncomment untuk debugging langsung ke API:
-    # ports:
-    #   - "3000:3000"
   fasty-bill:
     build:
       context: ./fasty-bill
@@ -93,8 +92,11 @@ services:
     ports:
       - "5000:5000"
     networks: [fasty-net]
+    # NOTE: Baileys QR login sudah terintegrasi di fasty-api service
+    # Container ini deprecated — bisa dihapus untuk production Baileys-only
 volumes:
   mysql_data:
+  baileys_auth:
   whatsapp_storages:
   whatsapp_statics:
 networks:
