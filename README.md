@@ -59,9 +59,16 @@ Fastify Billing/
 - Git
 - Browser for frontend access
 
-## Quick Start
+## Quick Start (Development)
 
-Install dependencies for the root runner and both applications:
+### Requirements
+
+- Node.js 20 or newer and npm
+- MySQL 8 / MariaDB 10.6+ running locally or reachable from this machine
+
+### Install and configure
+
+Run from repository root:
 
 ```bash
 npm install
@@ -69,75 +76,37 @@ npm install --prefix fasty-api
 npm install --prefix fasty-bill
 ```
 
-Configure `fasty-api/.env` and `fasty-bill/.env` using the respective
-`.env.example` files, then run both applications from this directory:
+Copy `fasty-api/.env.example` to `fasty-api/.env`, then set DB credentials and secrets. PowerShell:
 
-```bash
-npm run dev
+```powershell
+Copy-Item fasty-api/.env.example fasty-api/.env
 ```
 
-For a production-style run, build both applications and start them together:
-
-```bash
-npm run start
-```
-
-The API is available at `http://localhost:3000` and the Vite development server
-at `http://localhost:5173`. The production-style frontend preview is available
-at `http://localhost:4173`.
-
-## Backend Setup
-
-1. Copy the environment file:
+macOS/Linux:
 
 ```bash
 cp fasty-api/.env.example fasty-api/.env
 ```
 
-2. Update the values in `fasty-api/.env` according to your local database and
-   credentials.
+Frontend has no `.env.example`; its API URL defaults to `/api`. Create `fasty-bill/.env` only when overriding `VITE_API_URL`, for example `VITE_API_URL=http://localhost:3000/api`.
 
-3. Run database migration and seed:
+The MySQL database must already exist, and `DB_HOST` in `fasty-api/.env` must reach it. Apply schema and seed once:
 
 ```bash
 npm run db:migrate --prefix fasty-api
 ```
 
-3. Start both servers from the project root with `npm run dev`.
-
-The backend can still be started independently from `fasty-api` when needed:
+Start both services from repository root:
 
 ```bash
-npm run dev --prefix fasty-api
+npm run dev
 ```
 
-The API will run at:
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/docs`
 
-- http://localhost:3000
-- Swagger docs: http://localhost:3000/docs
-
-## Frontend Setup
-
-1. Copy the environment file:
-
-```bash
-cp fasty-bill/.env.example fasty-bill/.env
-```
-
-2. The frontend starts automatically with the backend when running `npm run dev`
-   from the project root.
-
-The frontend can still be started independently from the project root when
-needed:
-
-```bash
-npm run dev --prefix fasty-bill
-```
-
-The frontend will run at:
-
-- http://localhost:5173
-
+Start one service independently with `npm run dev --prefix fasty-api` or `npm run dev --prefix fasty-bill`.
 ## Environment Variables
 
 ### Backend .env example

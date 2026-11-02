@@ -12,7 +12,7 @@ set -e
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-3306}"
 DB_USER="${DB_USER:-fasty}"
-DB_PASS="${DB_PASS:-changeme_db}"
+DB_PASSWORD="${DB_PASSWORD:-${DB_PASS:-changeme_db}}"
 DB_NAME="${DB_NAME:-fasty_bill}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-changeme_root}"
 
@@ -39,7 +39,7 @@ fi
 echo "[INFO] Menjalankan migrasi database..."
 if [ -f "/app/sql/migration_production.sql" ]; then
   DB_HOST="$DB_HOST" DB_PORT="$DB_PORT" DB_USER="root" \
-    DB_PASS="$MYSQL_ROOT_PASSWORD" node /app/dist/scripts/migrate_production.js
+    DB_PASSWORD="$MYSQL_ROOT_PASSWORD" node /app/dist/scripts/migrate_production.js
   echo "[OK] Migrasi database selesai!"
 else
   echo "[WARN] File migration_production.sql tidak ditemukan di /app/sql/"
