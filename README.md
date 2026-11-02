@@ -189,7 +189,7 @@ nginx), WhatsApp gateway.
    | `fasty-bill` (nginx) | 80            | Frontend + API proxy      |
    | `fasty-api`          | internal 3000 | Backend (via nginx saja)  |
    | `mysql`              | internal 3306 | Database (tidak diexpose) |
-   | `whatsapp`           | 5000          | WA gateway dashboard      |
+       | `whatsapp` (Baileys) | 5000          | WA gateway dashboard (QR login, test) |
 
    Migration runs automatically on first start (creates schema + default admin).
 
@@ -231,6 +231,19 @@ mysql:
     - '127.0.0.1:3306:3306' # Local MySQL client
 ```
 
+## WhatsApp Gateway (Baileys)
+
+Dashboard login via QR code scan:
+1. Access WhatsApp dashboard: `http://<server-ip>:5000`
+2. Scan QR code dengan device WhatsApp
+3. Status koneksi & tes koneksi tersedia di dashboard
+4. Session auto-persist di volume `whatsapp_storages`
+
+Setup:
+- Edit `.env`: `WA_WEBHOOK` untuk incoming message webhooks (opsional)
+- Container `whatsapp` auto-start via docker-compose
+- Reset session: hapus volume atau redeploy
+
 ## Main Features
 
 - Admin dashboard
@@ -243,6 +256,7 @@ mysql:
 - Notification system
 - Activity log tracking
 - Customer self-service portal
+- WhatsApp gateway (Baileys)
 
 ## Default Admin Login
 
