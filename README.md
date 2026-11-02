@@ -173,7 +173,6 @@ nginx), WhatsApp gateway.
    | `DB_USER` / `DB_PASSWORD` | Kredensial aplikasi ke database                                |
    | `JWT_SECRET`              | JWT signing key (run: `openssl rand -base64 32`)               |
    | `ENCRYPTION_KEY`          | Data encryption key (32 chars, run: `openssl rand -base64 32`) |
-   | `WA_BASIC_AUTH`           | WhatsApp gateway auth `user:password`                          |
    | `CORS_ORIGIN`             | Frontend URL (mis. `https://billing.yourdomain.com`)           |
 
 2. **Start services**
