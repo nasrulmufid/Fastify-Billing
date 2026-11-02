@@ -29,30 +29,30 @@ function renderPlain(text: string, keyBase: string): ReactNode[] {
 
 function renderStyled(style: Style, inner: string, key: string): ReactNode {
   if (!inner.trim()) return null
-  const children = renderWhatsApp(inner, `${key}-c`)
+  // Don't recurse — just render inner as plain text (no nested formatting)
   switch (style) {
     case "bold":
       return (
         <strong key={key} className="font-semibold">
-          {children}
+          {inner}
         </strong>
       )
     case "italic":
       return (
         <em key={key} className="italic">
-          {children}
+          {inner}
         </em>
       )
     case "strike":
       return (
         <span key={key} className="line-through">
-          {children}
+          {inner}
         </span>
       )
     case "mono":
       return (
         <code key={key} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">
-          {children}
+          {inner}
         </code>
       )
   }
