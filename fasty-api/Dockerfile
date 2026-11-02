@@ -20,8 +20,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# Install netcat untuk menunggu koneksi MySQL; migrasi dijalankan melalui mysql2.
-RUN apk add --no-cache netcat-openbsd
+# Install netcat untuk menunggu koneksi MySQL; su-exec untuk drop privileges.
+RUN apk add --no-cache netcat-openbsd su-exec
 
 # Copy SQL migration file & entrypoint script (sebagai root dulu)
 COPY sql ./sql

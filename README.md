@@ -142,89 +142,81 @@ VITE_API_URL=http://localhost:3000/api
 
 ## Deployment (Docker Compose)
 
-Setup produksi siap pakai menggunakan Docker Compose: MySQL, backend
-(`fasty-api`), frontend (`fasty-bill` via nginx), dan gateway WhatsApp
-([go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice)).
+Production setup: MySQL, backend (`fasty-api`), frontend (`fasty-bill` via nginx), WhatsApp gateway.
 
-### Struktur file deploy
+### Prerequisites
 
-```bash
-Fastify-Billing/
-├── docker-compose.yml          # orkestrasi 4 service
-├── .env.example                # contoh variabel environment
-├── fasty-api/
-│   ├── Dockerfile              # multi-stage Node 20 Alpine
-│   └── sql/migration_production.sql  # skema + admin default (data kosong)
-└── fasty-bill/
-    ├── Dockerfile              # Vite build + nginx
-    └── nginx.conf              # reverse proxy /api -> backend
-```
+- Docker & Docker Compose installed
+- Domain (recommended untuk HTTPS)
 
-### Langkah deploy
+### Quick Start
 
-1. **Siapkan environment variables**
+1. **Configure environment**
 
    ```bash
    cp .env.example .env
    ```
 
-   Edit `.env` dan ubah minimal nilai berikut (jangan pakai default):
+   Edit `.env` — ubah nilai berikut (jangan gunakan default):
 
-   | Variabel              | Keterangan                                          |
-   | --------------------- | --------------------------------------------------- |
-   | `MYSQL_ROOT_PASSWORD` | Password root MySQL                                 |
-   | `DB_USER` / `DB_PASS` | Kredensial aplikasi ke DB                           |
-   | `JWT_SECRET`          | Secret JWT (acak, panjang)                          |
-   | `ENCRYPTION_KEY`      | Kunci enkripsi (32 karakter)                        |
-   | `WA_BASIC_AUTH`       | `user:password` dashboard & API gateway WA          |
-   | `CORS_ORIGIN`         | Origin frontend (mis. `https://billing.domain.com`) |
+   | Variabel | Deskripsi |
+   |----------|-----------|
+   | `MYSQL_ROOT_PASSWORD` | MySQL root password (32+ chars, random) |
+   | `DB_USER` / `DB_PASSWORD` | Kredensial aplikasi ke database |
+   | `JWT_SECRET` | JWT signing key (run: `openssl rand -base64 32`) |
+   | `ENCRYPTION_KEY` | Data encryption key (32 chars, run: `openssl rand -base64 32`) |
+   | `WA_BASIC_AUTH` | WhatsApp gateway auth `user:password` |
+   | `CORS_ORIGIN` | Frontend URL (mis. `https://billing.yourdomain.com`) |
 
-2. **Build & jalankan semua service**
+2. **Start services**
 
    ```bash
    docker compose up -d --build
    ```
 
-   Service yang berjalan:
+   Services & ports:
 
-   | Service              | Port             | Keterangan                                                       |
-   | -------------------- | ---------------- | ---------------------------------------------------------------- |
-   | `fasty-bill` (nginx) | `80`             | Frontend + proxy `/api` ke backend                               |
-   | `fasty-api`          | internal `3000`  | Backend API (tidak diexpose publik)                              |
-   | `mysql`              | `127.0.0.1:3306` | DB (hanya localhost)                                             |
-   | `whatsapp`           | `3000`           | Dashboard gateway WA (ubah ke `127.0.0.1` jika tak perlu publik) |
+   | Service | Port | Akses |
+   |---------|------|-------|
+   | `fasty-bill` (nginx) | 80 | Frontend + API proxy |
+   | `fasty-api` | internal 3000 | Backend (via nginx saja) |
+   | `mysql` | internal 3306 | Database (tidak diexpose) |
+   | `whatsapp` | 5000 | WA gateway dashboard |
 
-3. **Migrasi database** (buat skema + user admin default)
+   Migration runs automatically on first start (creates schema + default admin).
 
-   ```bash
-   # Opsi A — via script npm (jalankan schema + seed + upsert admin)
-   docker compose exec fasty-api npm run db:migrate
+3. **Verify**
+   - Frontend: `http://<server-ip>/`
+   - API docs: `http://<server-ip>/api/docs`
+   - Health: `http://<server-ip>/health`
+   - WhatsApp: `http://<server-ip>:5000` (login: `WA_BASIC_AUTH`)
 
-   # Opsi B — import file migrasi produksi langsung ke MySQL
-   docker compose exec -T mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" fasty_bill \
-     < fasty-api/sql/migration_production.sql
-   ```
+   Default admin: `admin` / `admin` — **change immediately**.
 
-   Login admin default: `admin` / `admin` (segera ganti password).
+### Production notes
 
-4. **Verifikasi**
-   - Frontend: buka `http://<server-ip>/` (atau domain Anda)
-   - Swagger API: `http://<server-ip>/docs`
-   - Health backend: `http://<server-ip>/health`
-   - WhatsApp gateway: `http://<server-ip>:3000` (login pakai `WA_BASIC_AUTH`)
+- **HTTPS**: Place Caddy/Nginx/Traefik in front port 80 with Let's Encrypt. Update `CORS_ORIGIN` to HTTPS domain.
+- **Firewall**: Only expose ports 80 (frontend) and 443 (HTTPS). Keep 5000 (WhatsApp) internal or restrict to admin IPs.
+- **WhatsApp session**: Volume `whatsapp_storages` persists QR session — don't delete unless resetting. Set `WA_WEBHOOK` in `.env` for incoming message webhooks.
+- **Backups**: Schedule `mysql_data` volume backups: `docker exec fasty-mysql mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" fasty_bill > backup.sql`
+- **Updates**:
+  ```bash
+  git pull
+  docker compose up -d --build
+  ```
 
-### Catatan produksi
+### Development mode (local debugging)
 
-- **HTTPS**: compose ini belum menyertakan TLS. Pasang reverse proxy
-  (Caddy/Nginx/Traefik) di depan `fasty-bill:80` dengan sertifikat Let's
-  Encrypt, atau set `CORS_ORIGIN` ke domain HTTPS Anda.
-- **WhatsApp session**: volume `whatsapp_storages` menyimpan session QR — jangan
-  hapus agar tidak perlu scan ulang. Untuk webhook pesan masuk, isi `WA_WEBHOOK`
-  di `.env` dengan endpoint backend Anda.
-- **Keamanan**: ganti semua password/default, jangan expose port MySQL &
-  `fasty-api` ke publik (sudah dibatasi `127.0.0.1` di compose).
-- **Update image WA**:
-  `docker compose pull whatsapp && docker compose up -d whatsapp`.
+Uncomment in `docker-compose.yml` to expose ports directly:
+
+```yaml
+fasty-api:
+  ports:
+    - "3000:3000"  # Direct API access (debugging)
+mysql:
+  ports:
+    - "127.0.0.1:3306:3306"  # Local MySQL client
+```
 
 ## Main Features
 

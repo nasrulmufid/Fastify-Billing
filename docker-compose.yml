@@ -57,6 +57,9 @@ services:
       timeout: 5s
       retries: 5
     networks: [fasty-net]
+    # Uncomment untuk debugging langsung ke API:
+    # ports:
+    #   - "3000:3000"
   fasty-bill:
     build:
       context: ./fasty-bill
@@ -70,13 +73,13 @@ services:
       fasty-api:
         condition: service_healthy
     ports:
-      - "9980:80"
+      - "80:80"
     networks: [fasty-net]
   whatsapp:
     image: aldinokemal2104/go-whatsapp-web-multidevice:latest
     container_name: fasty-whatsapp
     restart: always
-    command: ["rest", "--basic-auth=${WA_BASIC_AUTH:-admin:admin}", "--port=3000", "--os=FastifyBilling", "--account-validation=false"]
+    command: ["rest", "--basic-auth=${WA_BASIC_AUTH:-admin:admin}", "--port=5000", "--os=FastifyBilling", "--account-validation=false"]
     environment:
       APP_PORT: 5000
       APP_DEBUG: "false"

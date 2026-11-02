@@ -45,6 +45,6 @@ else
   echo "[WARN] File migration_production.sql tidak ditemukan di /app/sql/"
 fi
 
-# Switch ke app user & start aplikasi
+# Drop privileges ke app user & start aplikasi
 echo "[INFO] Memulai aplikasi..."
-exec node /app/dist/server.js
+exec su-exec app node /app/dist/server.js
