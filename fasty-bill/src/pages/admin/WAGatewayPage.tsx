@@ -895,7 +895,7 @@ function TemplatePesanTab() {
   }
 
   return (
-    <div className="space-y-5">
+    <Card className="border-border"><CardContent className="pt-6 space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {loading ? "Memuat template…" : `${templates.length} template tersimpan`}
@@ -1047,7 +1047,8 @@ function TemplatePesanTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 
