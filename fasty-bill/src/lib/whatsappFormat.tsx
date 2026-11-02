@@ -28,6 +28,7 @@ function renderPlain(text: string, keyBase: string): ReactNode[] {
 }
 
 function renderStyled(style: Style, inner: string, key: string): ReactNode {
+  if (!inner.trim()) return null
   const children = renderWhatsApp(inner, `${key}-c`)
   switch (style) {
     case "bold":
@@ -63,29 +64,39 @@ export function renderWhatsApp(text: string, keyPrefix = "wa"): ReactNode[] {
   let lastIndex = 0
   let key = 0
   let match: RegExpExecArray | null
+
   FORMAT_RE.lastIndex = 0
   while ((match = FORMAT_RE.exec(text)) !== null) {
+    // Add plain text before match
     if (match.index > lastIndex) {
       nodes.push(...renderPlain(text.slice(lastIndex, match.index), `${keyPrefix}-${key++}`))
     }
-    const full = match[0]
-    const bold = match[2]
-    const italic = match[4]
-    const strike = match[6]
-    const mono = match[8]
-    const inner = bold ?? italic ?? strike ?? mono ?? ""
-    if (!inner) {
-      nodes.push(full)
-      lastIndex = match.index + full.length
-      continue
+
+    const full = match[0] // Full match: *text*, _text_, etc
+    const boldText = match[2] // Group 2: text inside *...*
+    const italicText = match[4] // Group 4: text inside _..._
+    const strikeText = match[6] // Group 6: text inside ~...~
+    const monoText = match[8] // Group 8: text inside `...`
+
+    const inner = boldText || italicText || strikeText || monoText
+    
+  if (inner && inner.trim()) {
+      const style: Style = boldText ? "bold" : italicText ? "italic" : strikeText ? "strike" : "mono"
+      const styled = renderStyled(style, inner, `${keyPrefix}-${key++}`)
+      if (styled) nodes.push(styled)
+    } else {
+      // No valid inner text, render as-is (wrapped in span for consistent key)
+      nodes.push(<span key={`${keyPrefix}-${key++}`}>{full}</span>)
     }
-    const style: Style = bold ? "bold" : italic ? "italic" : strike ? "strike" : "mono"
-    nodes.push(renderStyled(style, inner, `${keyPrefix}-${key++}`))
+
     lastIndex = match.index + full.length
   }
+
+  // Add remaining plain text
   if (lastIndex < text.length) {
     nodes.push(...renderPlain(text.slice(lastIndex), `${keyPrefix}-${key++}`))
   }
+
   return nodes
 }
 
