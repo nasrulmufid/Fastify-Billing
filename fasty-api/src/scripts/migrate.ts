@@ -4,6 +4,7 @@
  *
  * Penggunaan: npm run db:migrate
  */
+import "dotenv/config.js"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -33,23 +34,51 @@ async function runSqlFile(conn: mysql.Connection, file: string) {
 }
 
 async function main() {
-  const conn = await mysql.createConnection({
-    host: config.db.host,
-    port: config.db.port,
-    user: config.db.user,
-    password: config.db.password,
-    multipleStatements: true,
-  })
+  // Try connect sebagai root dulu untuk CREATE DB
+  let conn: mysql.Connection
+  let isRoot = false
+  
+  try {
+    conn = await mysql.createConnection({
+      host: config.db.host,
+      port: config.db.port,
+      user: "root",
+      password: process.env.MYSQL_ROOT_PASSWORD || "",
+      multipleStatements: true,
+    })
+    isRoot = true
+    console.log("✔ Connected as root")
+  } catch (err) {
+    console.warn("Cannot connect as root, trying with DB user...")
+    conn = await mysql.createConnection({
+      host: config.db.host,
+      port: config.db.port,
+      user: config.db.user,
+      password: config.db.password,
+      multipleStatements: true,
+    })
+  }
 
   try {
-    const dbName = config.db.database; 
-
-    // 1. Membersihkan dan membuat ulang database
-    console.log(`Menghapus database lama jika ada (${dbName})...`)
-    await conn.query(`DROP DATABASE IF EXISTS \`${dbName}\`;`)
+    const dbName = config.db.database
+    const dbUser = config.db.user
+    const dbPass = config.db.password
     
-    console.log(`Membuat database baru (${dbName})...`)
-    await conn.query(`CREATE DATABASE \`${dbName}\`;`)
+    console.log(`Config DB:`, config.db)
+    
+    // 1. CREATE DATABASE (root only)
+    if (isRoot) {
+      console.log(`Creating database (${dbName}) as root...`)
+      await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`)
+      await conn.query(`GRANT ALL PRIVILEGES ON \`${dbName}\`.* TO '${dbUser}'@'localhost' IDENTIFIED BY '${dbPass}';`)
+      await conn.query(`FLUSH PRIVILEGES;`)
+      console.log(`✔ Database ${dbName} created + privileges granted`)
+    } else {
+      console.log(`Using existing database (${dbName})...`)
+    }
+    
+    // 2. SELECT database
+    console.log(`Selecting database (${dbName})...`)
     await conn.query(`USE \`${dbName}\`;`)
 
     // 2. Membuat struktur tabel

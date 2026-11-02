@@ -6,7 +6,6 @@ import { config } from "../config.js"
 export const jwtPlugin = fp(async (app: FastifyInstance) => {
   await app.register(import("@fastify/jwt"), {
     secret: config.jwt.secret,
-    sign: { expiresIn: config.jwt.expiresIn },
   })
 
   // Dekorasi helper autentikasi + RBAC

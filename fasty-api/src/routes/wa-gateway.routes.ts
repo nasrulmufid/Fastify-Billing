@@ -6,7 +6,21 @@ import { config } from "../config.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
 import { fillPlaceholders } from "../utils/template.js"
-import { sendWhatsAppMessage, sleep, buildPaymentLinkForInvoice, getOfflineMessage, DEFAULT_OFFLINE_MESSAGE } from "../services/wa.service.js"
+import {
+  sendWhatsAppMessage,
+  sleep,
+  buildPaymentLinkForInvoice,
+  getOfflineMessage,
+  DEFAULT_OFFLINE_MESSAGE,
+} from "../services/wa.service.js"
+import {
+  initBaileysSock,
+  getBaileyStatus,
+  disconnectBaileys,
+  storeDeviceCredentials,
+  getDeviceName,
+  connectionState,
+} from "../services/baileys.service.js"
 
 const templateSchema = z.object({
   name: z.string().min(1, "Nama template wajib diisi"),
@@ -14,11 +28,7 @@ const templateSchema = z.object({
 })
 
 const configSchema = z.object({
-  serverUrl: z.string().optional(),
-  apiKey: z.string().optional(),
   deviceName: z.string().optional(),
-  webhookUrl: z.string().optional(),
-  autoReconnect: z.boolean().optional(),
   offlineMessage: z.string().optional(),
 })
 
@@ -46,24 +56,68 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     preHandler: [app.requireRoles(["super_admin"])],
   }
 
-  // GET /wa-gateway/status
-  app.get("/wa-gateway/status", superOnly, async (req, reply) => {
-    const [row] = (await app.db.query("SELECT * FROM wa_api_config WHERE id = 1")) as Record<
-      string,
-      unknown
-    >[]
-    const hasKey = !!decryptSecret(String(row?.api_key ?? ""))
-    return reply.send({ data: { connected: hasKey } })
+  // Lazy init Baileys — run saat first request, bukan saat app startup
+  let baileysInitialized = false
+  const ensureBaileysInit = async () => {
+    if (!baileysInitialized) {
+      baileysInitialized = true
+      try {
+        await initBaileysSock(app)
+      } catch (err) {
+        app.log.warn(err, "Baileys init failed (will retry on next request)")
+        baileysInitialized = false
+      }
+    }
+  }
+
+  // ---- Status & QR ----
+  app.get("/wa-gateway/status", superOnly, async (_req, reply) => {
+    await ensureBaileysInit()
+    const status = getBaileyStatus()
+    return reply.send({
+      data: {
+        connected: status.connected,
+        state: status.state,
+        qr: status.qr,
+      },
+    })
   })
 
-  // POST /wa-gateway/test
+  app.post("/wa-gateway/qr", superOnly, async (_req, reply) => {
+    await ensureBaileysInit()
+    const status = getBaileyStatus()
+    return reply.send({ data: status })
+  })
+
+  app.post("/wa-gateway/disconnect", superOnly, async (_req, reply) => {
+    await disconnectBaileys()
+    return reply.send({ data: { message: "WhatsApp disconnected" } })
+  })
+
   app.post("/wa-gateway/test", superOnly, async (req, reply) => {
-    const [row] = (await app.db.query("SELECT * FROM wa_api_config WHERE id = 1")) as Record<
-      string,
-      unknown
-    >[]
-    const hasKey = !!decryptSecret(String(row?.api_key ?? "")) && !!row?.server_url
-    return reply.send({ data: { connected: hasKey } })
+    const status = getBaileyStatus()
+    if (!status.connected) {
+      return reply.code(400).send({
+        error: {
+          code: "NOT_CONNECTED",
+          message: "WhatsApp bot belum terhubung",
+        },
+      })
+    }
+
+    try {
+      // Just verify connection; don't send actual test message
+      return reply.send({
+        data: { message: "WhatsApp bot terhubung dan siap mengirim pesan" },
+      })
+    } catch (err) {
+      return reply.code(500).send({
+        error: {
+          code: "TEST_FAILED",
+          message: "Gagal menguji koneksi",
+        },
+      })
+    }
   })
 
   // ---- Templates (TPL-00X) ----
@@ -76,8 +130,8 @@ export async function waGatewayRoutes(app: FastifyInstance) {
       data: rows.map((r) => ({
         id: r.id,
         code: r.code,
-        name: r.name,
-        body: r.body,
+        name: String(r.name ?? "").slice(0, 120),
+        body: String(r.body ?? "").slice(0, 4096),
         createdAt: String(r.created_at ?? ""),
         updatedAt: String(r.updated_at ?? ""),
       })),
@@ -85,74 +139,133 @@ export async function waGatewayRoutes(app: FastifyInstance) {
   })
 
   app.post("/wa-gateway/templates", superOnly, async (req, reply) => {
-    const body = templateSchema.parse(req.body)
-    const code = await app.db.transaction(async (q) => {
-      return nextCode(q.query, "wa_templates", "TPL-", { minStart: 1, pad: 3 })
-    })
-    const result = (await app.db.query(
-      "INSERT INTO wa_templates (code, name, body) VALUES (?, ?, ?)",
-      [code, body.name, body.body],
-    )) as unknown as { insertId: number }
-    return reply.code(201).send({ data: { id: result.insertId, code, ...body } })
+    try {
+      const body = templateSchema.parse(req.body)
+      
+      // Validate lengths
+      if (body.name.length > 120) {
+        return reply.code(400).send({
+          error: { code: "VALIDATION_ERROR", message: "Nama template terlalu panjang (maks 120 karakter)" },
+        })
+      }
+      if (body.body.length > 4096) {
+        return reply.code(400).send({
+          error: { code: "VALIDATION_ERROR", message: "Isi pesan terlalu panjang (maks 4096 karakter)" },
+        })
+      }
+
+      const code = await app.db.transaction(async (q) => {
+        return nextCode(q.query, "wa_templates", "TPL-", { minStart: 1, pad: 3 })
+      })
+      const result = (await app.db.query(
+        "INSERT INTO wa_templates (code, name, body) VALUES (?, ?, ?)",
+        [code, body.name.trim(), body.body.trim()],
+      )) as unknown as { insertId: number }
+      return reply.code(201).send({ data: { id: result.insertId, code, ...body } })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Validasi gagal"
+      app.log.warn({ error: msg }, "Template creation validation failed")
+      return reply.code(400).send({
+        error: { code: "VALIDATION_ERROR", message: msg },
+      })
+    }
   })
 
   app.put("/wa-gateway/templates/:id", superOnly, async (req: FastifyRequest, reply: FastifyReply) => {
-    const { id } = req.params as { id: string }
-    const body = templateSchema.partial().parse(req.body)
-    await app.db.query("UPDATE wa_templates SET name = COALESCE(?, name), body = COALESCE(?, body) WHERE id = ?", [
-      body.name ?? null,
-      body.body ?? null,
-      id,
-    ])
-    return reply.send({ data: { message: "Template diperbarui" } })
+    try {
+      const { id } = req.params as { id: string }
+      const templateId = parseInt(id, 10)
+      if (!Number.isInteger(templateId) || templateId <= 0) {
+        return reply.code(400).send({
+          error: { code: "INVALID_ID", message: "ID template tidak valid" },
+        })
+      }
+
+      const body = templateSchema.partial().parse(req.body)
+      if (body.name && body.name.length > 120) {
+        return reply.code(400).send({
+          error: { code: "VALIDATION_ERROR", message: "Nama template terlalu panjang" },
+        })
+      }
+      if (body.body && body.body.length > 4096) {
+        return reply.code(400).send({
+          error: { code: "VALIDATION_ERROR", message: "Isi pesan terlalu panjang" },
+        })
+      }
+
+      await app.db.query(
+        "UPDATE wa_templates SET name = COALESCE(?, name), body = COALESCE(?, body) WHERE id = ?",
+        [body.name?.trim() ?? null, body.body?.trim() ?? null, templateId],
+      )
+      return reply.send({ data: { message: "Template diperbarui" } })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Update gagal"
+      app.log.warn({ error: msg }, "Template update failed")
+      return reply.code(400).send({
+        error: { code: "UPDATE_ERROR", message: msg },
+      })
+    }
   })
 
   app.delete("/wa-gateway/templates/:id", superOnly, async (req, reply) => {
-    const { id } = req.params as { id: string }
-    await app.db.query("DELETE FROM wa_templates WHERE id = ?", [id])
-    return reply.send({ data: { message: "Template dihapus" } })
+    try {
+      const { id } = req.params as { id: string }
+      const templateId = parseInt(id, 10)
+      if (!Number.isInteger(templateId) || templateId <= 0) {
+        return reply.code(400).send({
+          error: { code: "INVALID_ID", message: "ID template tidak valid" },
+        })
+      }
+
+      const result = await app.db.query("DELETE FROM wa_templates WHERE id = ?", [templateId])
+      if ((result as unknown as { affectedRows: number }).affectedRows === 0) {
+        return reply.code(404).send({
+          error: { code: "NOT_FOUND", message: "Template tidak ditemukan" },
+        })
+      }
+      return reply.send({ data: { message: "Template dihapus" } })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Delete gagal"
+      app.log.warn({ error: msg }, "Template delete failed")
+      return reply.code(400).send({
+        error: { code: "DELETE_ERROR", message: msg },
+      })
+    }
   })
 
   // ---- Config ----
   app.get("/wa-gateway/config", superOnly, async (req, reply) => {
-    const [row] = (await app.db.query("SELECT * FROM wa_api_config WHERE id = 1")) as Record<
-      string,
-      unknown
-    >[]
-    const apiKey = decryptSecret(String(row?.api_key ?? ""))
+    const deviceName = await getDeviceName(app)
+    const status = getBaileyStatus()
     return reply.send({
       data: {
-        serverUrl: row?.server_url ?? "",
-        apiKey: maskSecret(apiKey),
-        deviceName: row?.device_name ?? "",
-        webhookUrl: row?.webhook_url ?? "",
-        autoReconnect: !!row?.auto_reconnect,
+        deviceName: deviceName || "Fasty Bot",
+        connected: status.connected,
+        state: status.state,
       },
     })
   })
 
   app.put("/wa-gateway/config", superOnly, async (req, reply) => {
-    const body = configSchema.parse(req.body)
-    const [row] = (await app.db.query("SELECT * FROM wa_api_config WHERE id = 1")) as Record<
-      string,
-      unknown
-    >[]
-    const currentKey = decryptSecret(String(row?.api_key ?? ""))
-    const nextKey = body.apiKey ? encryptSecret(body.apiKey) : encryptSecret(currentKey)
-    await app.db.query(
-      `INSERT INTO wa_api_config (id, server_url, api_key, device_name, webhook_url, auto_reconnect)
-       VALUES (1, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE server_url = COALESCE(?, server_url), api_key = ?, device_name = COALESCE(?, device_name),
-       webhook_url = COALESCE(?, webhook_url), auto_reconnect = COALESCE(?, auto_reconnect)`,
-      [
-        body.serverUrl ?? "", nextKey, body.deviceName ?? "", body.webhookUrl ?? "", body.autoReconnect ?? true,
-        body.serverUrl ?? null, nextKey, body.deviceName ?? null, body.webhookUrl ?? null, body.autoReconnect ?? null,
-      ],
-    )
-    return reply.send({ data: { message: "Konfigurasi WA Gateway disimpan" } })
+    try {
+      const body = configSchema.parse(req.body)
+      if (body.deviceName) {
+        await storeDeviceCredentials(app, body.deviceName)
+      }
+      return reply.send({ data: { message: "Konfigurasi WA Gateway disimpan" } })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Validasi gagal"
+      app.log.warn({ error: msg }, "Config update validation failed")
+      return reply.code(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: msg,
+        },
+      })
+    }
   })
 
-  // GET /wa-gateway/offline-message — template pesan "server offline" (Mikrotik down saat transaksi)
+  // GET /wa-gateway/offline-message
   app.get("/wa-gateway/offline-message", superOnly, async (_req, reply) => {
     const tpl = await getOfflineMessage(app)
     const [row] = (await app.db.query("SELECT offline_message FROM wa_api_config WHERE id = 1")) as Record<
@@ -168,98 +281,167 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     })
   })
 
-  // PUT /wa-gateway/offline-message — simpan custom pesan (kosongkan = kembali ke default)
+  // PUT /wa-gateway/offline-message
   app.put("/wa-gateway/offline-message", superOnly, async (req, reply) => {
-    const body = z.object({ body: z.string() }).parse(req.body ?? {})
-    const custom = body.body.trim()
-    await app.db.query(
-      `INSERT INTO wa_api_config (id, offline_message) VALUES (1, ?)
-       ON DUPLICATE KEY UPDATE offline_message = VALUES(offline_message)`,
-      [custom || null],
-    )
-    return reply.send({ data: { message: "Pesan server offline disimpan", body: custom || DEFAULT_OFFLINE_MESSAGE } })
-  })
+    try {
+      const body = z.object({ body: z.string().max(4096) }).parse(req.body ?? {})
+      const custom = body.body.trim()
 
-  // POST /wa-gateway/send — kirim pesan single/bulk + tulis notification_logs
-  app.post("/wa-gateway/send", superOnly, async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = sendSchema.parse(req.body)
-    const needsPaymentLink = body.template.body.includes("{payment_link}")
-    let paymentGatewayApiKey = ""
-    if (needsPaymentLink) {
-      paymentGatewayApiKey = config.sumopod.apiKey.trim()
-      if (!paymentGatewayApiKey) {
+      if (custom && custom.length < 10) {
         return reply.code(400).send({
           error: {
-            code: "NOT_CONFIGURED",
-            message: "Payment gateway QRIS belum dikonfigurasi oleh admin",
+            code: "VALIDATION_ERROR",
+            message: "Pesan minimal 10 karakter",
           },
         })
       }
-    }
-    const varsByPhone = new Map<string, Record<string, string>>()
-    for (const v of body.vars ?? []) {
-      varsByPhone.set(normalizePhone(v.phone), {
-        nama: v.nama ?? "",
-        jumlah: v.jumlah ?? "",
-        tanggal: v.tanggal ?? "",
-        no_invoice: v.no_invoice ?? "",
-        paket: v.paket ?? "",
-        payment_link: v.payment_link ?? "",
-      })
-    }
 
-    let sent = 0
-    let failed = 0
-    for (const rawPhone of body.to) {
-      const phone = normalizePhone(rawPhone)
-      const vars = { ...(varsByPhone.get(phone) ?? {}) }
-      const [invoiceData] = (await app.db.query(
-        `SELECT c.name, p.name AS package_name, i.id AS invoice_id, i.code AS invoice_code,
-                i.amount, i.due_at
-         FROM customers c
-         LEFT JOIN packages p ON p.id = c.package_id
-         LEFT JOIN invoices i ON i.customer_id = c.id AND i.status IN ('Unpaid', 'Overdue')
-         WHERE c.phone LIKE ?
-         ORDER BY i.id DESC LIMIT 1`,
-        [`%${phone.replace(/^62/, "0")}%`],
-      )) as Record<string, unknown>[]
-      vars.nama ||= String(invoiceData?.name ?? "")
-      vars.jumlah ||= invoiceData?.amount == null ? "" : String(invoiceData.amount)
-      vars.tanggal ||= String(invoiceData?.due_at ?? "")
-      vars.no_invoice ||= String(invoiceData?.invoice_code ?? "")
-      vars.paket ||= String(invoiceData?.package_name ?? "")
-      if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
-        vars.payment_link = (await buildPaymentLinkForInvoice(app, {
-          invoice_id: Number(invoiceData.invoice_id),
-          customer_id: Number(invoiceData.customer_id ?? 0),
-          amount: Number(invoiceData.amount ?? 0),
-        })) ?? ""
-      }
-      const message = fillPlaceholders(body.template.body, vars)
-      const result = await sendWhatsAppMessage(app, { phone: rawPhone, message })
-      const ntCode = await app.db.transaction(async (q) => {
-        return nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 })
-      })
-      const [cust] = (await app.db.query("SELECT id FROM customers WHERE phone LIKE ? LIMIT 1", [
-        `%${phone.replace(/^62/, "0")}%`,
-      ])) as Record<string, unknown>[]
-      if (result.ok) {
-        sent++
-      } else {
-        failed++
-        app.log.warn({ phone, error: result.error }, "Gagal kirim WA (manual)")
-      }
       await app.db.query(
-        "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'reminder', ?, 'WhatsApp', ?, ?)",
-        [ntCode, cust?.id ?? null, result.ok ? "Terkirim" : "Gagal", result.ok ? null : result.error],
+        `INSERT INTO wa_api_config (id, offline_message) VALUES (1, ?)
+         ON DUPLICATE KEY UPDATE offline_message = VALUES(offline_message)`,
+        [custom || null],
       )
-
-      // Jeda antar-batch: setiap 5 pesan dikirim, beri jeda agar tidak membanjiri gateway pihak ketiga
-      if (sent + failed > 0 && (sent + failed) % 5 === 0) {
-        await sleep(1000)
-      }
+      return reply.send({
+        data: { message: "Pesan server offline disimpan", body: custom || DEFAULT_OFFLINE_MESSAGE },
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Validasi gagal"
+      app.log.warn({ error: msg }, "Offline message validation failed")
+      return reply.code(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: msg,
+        },
+      })
     }
-    return reply.send({ data: { sent, failed } })
+  })
+
+  // POST /wa-gateway/send
+  app.post("/wa-gateway/send", superOnly, async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const body = sendSchema.parse(req.body)
+
+      // Validate recipients count (prevent abuse)
+      if (body.to.length > 1000) {
+        return reply.code(400).send({
+          error: {
+            code: "TOO_MANY_RECIPIENTS",
+            message: "Maksimal 1000 penerima per request",
+          },
+        })
+      }
+
+      // Validate message
+      const msgLength = body.template.body.length
+      if (msgLength > 4096) {
+        return reply.code(400).send({
+          error: {
+            code: "MESSAGE_TOO_LONG",
+            message: "Pesan terlalu panjang (maks 4096 karakter)",
+          },
+        })
+      }
+
+      const needsPaymentLink = body.template.body.includes("{payment_link}")
+      let paymentGatewayApiKey = ""
+      if (needsPaymentLink) {
+        paymentGatewayApiKey = config.sumopod.apiKey.trim()
+        if (!paymentGatewayApiKey) {
+          return reply.code(400).send({
+            error: {
+              code: "NOT_CONFIGURED",
+              message: "Payment gateway QRIS belum dikonfigurasi oleh admin",
+            },
+          })
+        }
+      }
+
+      const varsByPhone = new Map<string, Record<string, string>>()
+      for (const v of body.vars ?? []) {
+        const phone = normalizePhone(v.phone)
+        if (!phone) continue
+        varsByPhone.set(phone, {
+          nama: (v.nama ?? "").slice(0, 200),
+          jumlah: (v.jumlah ?? "").slice(0, 100),
+          tanggal: (v.tanggal ?? "").slice(0, 100),
+          no_invoice: (v.no_invoice ?? "").slice(0, 100),
+          paket: (v.paket ?? "").slice(0, 100),
+          payment_link: (v.payment_link ?? "").slice(0, 500),
+        })
+      }
+
+      let sent = 0
+      let failed = 0
+      for (const rawPhone of body.to) {
+        const phone = normalizePhone(rawPhone)
+        if (!phone) {
+          failed++
+          continue
+        }
+
+        const vars = { ...(varsByPhone.get(phone) ?? {}) }
+        const [invoiceData] = (await app.db.query(
+          `SELECT c.name, p.name AS package_name, i.id AS invoice_id, i.code AS invoice_code,
+                  i.amount, i.due_at
+           FROM customers c
+           LEFT JOIN packages p ON p.id = c.package_id
+           LEFT JOIN invoices i ON i.customer_id = c.id AND i.status IN ('Unpaid', 'Overdue')
+           WHERE c.phone LIKE ?
+           ORDER BY i.id DESC LIMIT 1`,
+          [`%${phone.replace(/^62/, "0")}%`],
+        )) as Record<string, unknown>[]
+
+        vars.nama ||= String(invoiceData?.name ?? "").slice(0, 200)
+        vars.jumlah ||= invoiceData?.amount == null ? "" : String(invoiceData.amount).slice(0, 100)
+        vars.tanggal ||= String(invoiceData?.due_at ?? "").slice(0, 100)
+        vars.no_invoice ||= String(invoiceData?.invoice_code ?? "").slice(0, 100)
+        vars.paket ||= String(invoiceData?.package_name ?? "").slice(0, 100)
+
+        if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
+          vars.payment_link =
+            (await buildPaymentLinkForInvoice(app, {
+              invoice_id: Number(invoiceData.invoice_id),
+              customer_id: Number(invoiceData.customer_id ?? 0),
+              amount: Number(invoiceData.amount ?? 0),
+            })) ?? ""
+        }
+
+        const message = fillPlaceholders(body.template.body, vars)
+        const result = await sendWhatsAppMessage(app, { phone: rawPhone, message })
+        const ntCode = await app.db.transaction(async (q) => {
+          return nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 })
+        })
+        const [cust] = (await app.db.query("SELECT id FROM customers WHERE phone LIKE ? LIMIT 1", [
+          `%${phone.replace(/^62/, "0")}%`,
+        ])) as Record<string, unknown>[]
+
+        if (result.ok) {
+          sent++
+        } else {
+          failed++
+          app.log.warn({ phone, error: result.error }, "Gagal kirim WA (manual)")
+        }
+
+        await app.db.query(
+          "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'reminder', ?, 'WhatsApp', ?, ?)",
+          [ntCode, cust?.id ?? null, result.ok ? "Terkirim" : "Gagal", result.ok ? null : result.error?.slice(0, 255)],
+        )
+
+        if (sent + failed > 0 && (sent + failed) % 5 === 0) {
+          await sleep(1000)
+        }
+      }
+      return reply.send({ data: { sent, failed } })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Validasi gagal"
+      app.log.warn({ error: msg }, "Send message validation failed")
+      return reply.code(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: msg,
+        },
+      })
+    }
   })
 
   // GET /wa-gateway/logs

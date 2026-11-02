@@ -2,96 +2,23 @@ import type { FastifyInstance } from "fastify"
 
 import { nextCode, nextDailyCode } from "../utils/codegen.js"
 import { config } from "../config.js"
-import { decryptSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
 import { createSumopodPayment } from "../utils/sumopod.js"
+import { sendWhatsAppMessage as baileysSend } from "./baileys.service.js"
 
-/**
- * Service integrasi WA Gateway pihak ketiga (Go WhatsApp API).
- *
- * Konfigurasi diambil dari tabel `wa_api_config` (single row id=1):
- *   - server_url : base URL gateway (mis. https://wa.example.com)
- *   - api_key    : API key terenkripsi
- *
- * Format request ke gateway (standar umum Go WhatsApp API):
- *   POST {server_url}/send
- *   Headers: { "X-Api-Key": <api_key>, "Content-Type": "application/json" }
- *   Body:    { "phone": "628xxxx", "message": "..." }
- *
- * Jika format gateway Anda berbeda, cukup sesuaikan bagian `buildRequest`
- * di bawah tanpa mengubah pemanggil.
- */
-
-export interface SendResult {
-  ok: boolean
-  error?: string
-}
+export type SendResult = Awaited<ReturnType<typeof baileysSend>>
 
 export interface SendMessageInput {
-  phone: string // nomor mentah (akan dinormalisasi ke 62)
+  phone: string
   message: string
 }
 
-/** Ambil config gateway dari DB. Mengembalikan null jika belum dikonfigurasi. */
-async function getGatewayConfig(app: FastifyInstance): Promise<{ serverUrl: string; apiKey: string } | null> {
-  const [row] = (await app.db.query("SELECT server_url, api_key FROM wa_api_config WHERE id = 1")) as Record<
-    string,
-    unknown
-  >[]
-  const serverUrl = String(row?.server_url ?? "").trim()
-  const apiKey = decryptSecret(String(row?.api_key ?? "")).trim()
-  if (!serverUrl || !apiKey) return null
-  return { serverUrl, apiKey }
-}
-
-/**
- * Normalisasi nomor ke format JID yang diharapkan gateway go-whatsapp-web-multidevice.
- * Gateway menolak nomor yang dimulai "0" dan mengharapkan suffix "@s.whatsapp.net".
- * Contoh: "0815-1111-2222" -> "628151112222@s.whatsapp.net"
- */
-function toWhatsAppJID(phone: string): string {
-  const normalized = normalizePhone(phone) // "628151112222"
-  if (normalized.includes("@")) return normalized
-  return `${normalized}@s.whatsapp.net`
-}
-
-/** Kirim satu pesan WhatsApp ke gateway pihak ketiga (aldinokemal/go-whatsapp-web-multidevice). */
-export async function sendWhatsAppMessage(app: FastifyInstance, input: SendMessageInput): Promise<SendResult> {
-  const cfg = await getGatewayConfig(app)
-  if (!cfg) {
-    return { ok: false, error: "WA Gateway belum dikonfigurasi (server_url/api_key kosong)" }
-  }
-
-  const phone = toWhatsAppJID(input.phone)
-  const url = `${cfg.serverUrl.replace(/\/$/, "")}/send/message`
-
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": cfg.apiKey,
-      },
-      body: JSON.stringify({ phone, message: input.message }),
-      signal: AbortSignal.timeout(15_000),
-    })
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
-      return { ok: false, error: `Gateway ${res.status}: ${text.slice(0, 200)}` }
-    }
-
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    // Gateway mengembalikan { code: "SUCCESS", status: 200, ... } saat berhasil
-    const code = String(data.code ?? "")
-    if (code.toUpperCase() !== "SUCCESS") {
-      return { ok: false, error: String(data.message ?? data.error ?? "Gateway mengembalikan bukan SUCCESS") }
-    }
-    return { ok: true }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return { ok: false, error: `Gagal menghubungi gateway: ${msg}` }
-  }
+/** Wrapper sendWhatsAppMessage — gunakan Baileys */
+export async function sendWhatsAppMessage(
+  app: FastifyInstance,
+  input: SendMessageInput,
+): Promise<SendResult> {
+  return baileysSend(app, input)
 }
 
 /**
@@ -136,13 +63,6 @@ export async function buildPaymentLinkForInvoice(
   return created.paymentLinkUrl
 }
 
-/**
- * Tipe reminder tagihan yang didukung.
- * - h7  : pengingat 7 hari sebelum jatuh tempo
- * - h3  : pengingat 3 hari sebelum jatuh tempo
- * - h1  : pengingat 1 hari sebelum jatuh tempo
- * - isolir : pemberitahuan isolir (koneksi diputus)
- */
 export type ReminderType = "h7" | "h3" | "h1" | "isolir"
 
 const REMINDER_TYPE_KEYWORDS: Record<ReminderType, string[]> = {
@@ -171,20 +91,12 @@ const REMINDER_FALLBACK: Record<ReminderType, { name: string; body: string }> = 
   },
 }
 
-/**
- * Ambil template pesan reminder berdasarkan tipe (H-7/H-3/H-1/Isolir).
- * Prioritas:
- *   1. Template di DB dengan nama mengandung keyword tipe tersebut
- *   2. Template pertama di DB (jika ada, agar admin bisa atur satu template umum)
- *   3. Fallback pesan default per-tipe (hardcoded) — hanya jika tabel wa_templates kosong
- */
 export async function getReminderTemplate(
   app: FastifyInstance,
   type: ReminderType,
 ): Promise<{ id: number; name: string; body: string }> {
   const rows = (await app.db.query("SELECT * FROM wa_templates ORDER BY id ASC")) as Record<string, unknown>[]
 
-  // Tabel kosong -> gunakan fallback hardcoded per-tipe
   if (rows.length === 0) {
     const fallback = REMINDER_FALLBACK[type]
     return { id: 0, name: fallback.name, body: fallback.body }
@@ -199,20 +111,14 @@ export async function getReminderTemplate(
     return { id: Number(byName.id), name: String(byName.name), body: String(byName.body) }
   }
 
-  // Template spesifik tipe belum dibuat: pakai template pertama yang ada di DB
   const first = rows[0]
   return { id: Number(first.id), name: String(first.name), body: String(first.body) }
 }
 
-/** Helper delay (jeda antar-batch pengiriman massal). */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/**
- * Pesan default saat pelanggan bayar namun Mikrotik/server sedang offline
- * (mis. karena PLN padam). Bisa dioverride admin lewat halaman WA Gateway.
- */
 export const DEFAULT_OFFLINE_MESSAGE =
   "Yth {nama}, pembayaran Anda sebesar {jumlah} melalui {metode} telah kami terima. Terima kasih.\n\n" +
   "Saat ini Server sedang down biasanya karena PLN Off, anda jangan khawatir, pembayaran anda tetap kami terima " +
@@ -224,15 +130,7 @@ export interface OfflineMessageTemplate {
   body: string
 }
 
-/**
- * Ambil template pesan "server offline" (Mikrotik down saat transaksi).
- * Prioritas:
- *   1. Kolom offline_message di wa_api_config (custom admin dari halaman WA Gateway)
- *   2. Template di DB dengan nama mengandung keyword "offline/server down"
- *   3. Fallback pesan default (DEFAULT_OFFLINE_MESSAGE)
- */
 export async function getOfflineMessage(app: FastifyInstance): Promise<OfflineMessageTemplate> {
-  // 1) Custom text khusus offline message dari wa_api_config
   const [row] = (await app.db.query("SELECT offline_message FROM wa_api_config WHERE id = 1")) as Record<
     string,
     unknown
@@ -240,7 +138,6 @@ export async function getOfflineMessage(app: FastifyInstance): Promise<OfflineMe
   const custom = String(row?.offline_message ?? "").trim()
   if (custom) return { id: 0, name: "Server Offline (custom)", body: custom }
 
-  // 2) Cari template bernama "offline" / "server down" di wa_templates
   const rows = (await app.db.query("SELECT * FROM wa_templates ORDER BY id ASC")) as Record<string, unknown>[]
   const keywords = ["offline", "server down", "server off", "pln"]
   const byName = rows.find((r) => {
@@ -251,6 +148,5 @@ export async function getOfflineMessage(app: FastifyInstance): Promise<OfflineMe
     return { id: Number(byName.id), name: String(byName.name), body: String(byName.body) }
   }
 
-  // 3) Fallback default
   return { id: 0, name: "Server Offline (default)", body: DEFAULT_OFFLINE_MESSAGE }
 }

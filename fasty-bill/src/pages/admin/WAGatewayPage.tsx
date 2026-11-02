@@ -16,11 +16,11 @@ import {
   Clock,
   MessageCircle,
   Braces,
-  ExternalLink,
   Search,
   ListChecks,
   Filter,
   AlertTriangle,
+  LogOut,
 } from "lucide-react"
 
 import { PageHeader } from "@/components/layouts/PageHeader"
@@ -30,7 +30,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -64,10 +63,6 @@ import { useCustomers } from "@/lib/customerStore"
 import api from "@/lib/axios"
 import { renderWhatsApp, WHATSAPP_FORMAT_HINT } from "@/lib/whatsappFormat"
 
-/* ================================================================
-   Types & Data
-   ================================================================ */
-
 type CustomerStatus = "Active" | "Isolated"
 
 const statusLabel: Record<CustomerStatus, string> = {
@@ -80,7 +75,6 @@ const statusBadgeClass: Record<CustomerStatus, string> = {
   Isolated: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
 }
 
-/** Ubah "0812-3456-7890" → "6281234567890" */
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/[^\d]/g, "")
   if (!digits) return ""
@@ -95,60 +89,80 @@ type Template = {
   updatedAt: string
 }
 
-type ApiConfig = {
-  serverUrl: string
-  apiKey: string
-  deviceName: string
-  webhookUrl: string
-  autoReconnect: boolean
+type BaileyStatus = {
+  connected: boolean
+  state: "disconnected" | "connecting" | "connected"
+  qr: string | null
 }
 
-const defaultApiConfig: ApiConfig = {
-  serverUrl: "https://api.go-whatsapp.example.com",
-  apiKey: "",
-  deviceName: "RT-RW-Net-Bot",
-  webhookUrl: "https://billing.example.com/webhook/wa",
-  autoReconnect: true,
+const defaultBaileyStatus: BaileyStatus = {
+  connected: false,
+  state: "disconnected",
+  qr: null,
 }
-
-/* ---------- initial templates (kosong — dimuat dari API) ---------- */
-const defaultTemplates: Template[] = []
 
 /* ================================================================
-   Tab: Pengaturan API
+   Tab: Pengaturan Baileys (Login QR)
    ================================================================ */
 
-function PengaturanApiTab() {
-  const [config, setConfig] = useState<ApiConfig>(defaultApiConfig)
+function PengaturanBaileysTab() {
+  const [status, setStatus] = useState<BaileyStatus>(defaultBaileyStatus)
+  const [loading, setLoading] = useState(true)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [deviceName, setDeviceName] = useState("Fasty Bot")
   const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [connected, setConnected] = useState<boolean | null>(null)
 
-  const handleSave = () => {
-    setSaving(true)
-    setTimeout(() => {
-      setSaving(false)
-      toast.success("Konfigurasi API berhasil disimpan")
-    }, 800)
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data } = await api.get("/wa-gateway/status")
+        setStatus(data?.data ?? defaultBaileyStatus)
+      } catch (err) {
+        toast.error("Gagal memuat status WhatsApp")
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const handleGenerateQR = async () => {
+    setLoading(true)
+    try {
+      const { data } = await api.post("/wa-gateway/qr")
+      setStatus(data?.data ?? defaultBaileyStatus)
+      if (data?.data?.qr) {
+        toast.info("QR code berhasil dimuat. Scan dengan WhatsApp Anda.")
+      }
+    } catch (err) {
+      toast.error("Gagal membuat QR code")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleTestConnection = () => {
-    if (!config.serverUrl || !config.apiKey) {
-      toast.error("URL server dan API key harus diisi terlebih dahulu")
-      return
+  const handleDisconnect = async () => {
+    setDisconnecting(true)
+    try {
+      await api.post("/wa-gateway/disconnect")
+      setStatus(defaultBaileyStatus)
+      toast.success("WhatsApp berhasil disconnect")
+    } catch (err) {
+      toast.error("Gagal disconnect WhatsApp")
+    } finally {
+      setDisconnecting(false)
     }
-    setTesting(true)
-    setConnected(null)
-    setTimeout(() => {
-      setTesting(false)
-      const ok = Math.random() > 0.3
-      setConnected(ok)
-      if (ok) {
-        toast.success("Terhubung ke GO WhatsApp API — status OK")
-      } else {
-        toast.error("Gagal terhubung. Periksa URL dan API key.")
-      }
-    }, 1500)
+  }
+
+  const handleSaveConfig = async () => {
+    setSaving(true)
+    try {
+      await api.put("/wa-gateway/config", { deviceName })
+      toast.success("Konfigurasi WhatsApp disimpan")
+    } catch (err) {
+      toast.error("Gagal menyimpan konfigurasi")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -157,83 +171,87 @@ function PengaturanApiTab() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Settings2 className="size-4 text-muted-foreground" />
-            Konfigurasi GO WhatsApp API
+            Login WhatsApp (Baileys)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="serverUrl">Server URL</Label>
-              <Input
-                id="serverUrl"
-                value={config.serverUrl}
-                onChange={(e) => setConfig({ ...config, serverUrl: e.target.value })}
-                placeholder="https://api.go-whatsapp.example.com"
-              />
+          <p className="text-sm text-muted-foreground">
+            Scan QR code di bawah dengan aplikasi WhatsApp Anda untuk menghubungkan device.
+          </p>
+
+          {loading ? (
+            <div className="flex h-72 items-center justify-center rounded-lg border border-border bg-muted">
+              <RefreshCw className="size-6 animate-spin text-muted-foreground" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="deviceName">Nama Perangkat</Label>
-              <Input
-                id="deviceName"
-                value={config.deviceName}
-                onChange={(e) => setConfig({ ...config, deviceName: e.target.value })}
-                placeholder="RT-RW-Net-Bot"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="apiKey">API Key / Token</Label>
-            <div className="flex gap-2">
-              <Input
-                id="apiKey"
-                type="password"
-                value={config.apiKey}
-                onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                placeholder="Masukkan API key..."
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  navigator.clipboard.writeText(config.apiKey)
-                  toast.success("API key disalin ke clipboard")
-                }}
-                disabled={!config.apiKey}
-              >
-                <Copy className="size-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="webhookUrl">Webhook URL (callback)</Label>
-            <Input
-              id="webhookUrl"
-              value={config.webhookUrl}
-              onChange={(e) => setConfig({ ...config, webhookUrl: e.target.value })}
-              placeholder="https://billing.example.com/webhook/wa"
-            />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="autoReconnect" className="text-sm font-medium">
-                Auto-reconnect
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Otomatis sambungkan ulang jika koneksi terputus
+          ) : status.qr ? (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted/40 p-6">
+              <img src={status.qr} alt="QR Code" className="size-56" />
+              <p className="text-xs text-muted-foreground text-center max-w-xs">
+                QR code ini akan expire dalam beberapa menit. Jika sudah expire, klik "Buat QR Baru".
               </p>
             </div>
-            <Switch
-              id="autoReconnect"
-              checked={config.autoReconnect}
-              onCheckedChange={(v) => setConfig({ ...config, autoReconnect: !!v })}
+          ) : (
+            <div className="flex h-72 items-center justify-center rounded-lg border-2 border-dashed border-border">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Belum ada QR code</p>
+                <p className="text-xs text-muted-foreground mt-1">Klik tombol di bawah untuk membuat</p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="deviceName">Nama Perangkat</Label>
+            <Input
+              id="deviceName"
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+              placeholder="Fasty Bot"
             />
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              onClick={handleGenerateQR}
+              disabled={loading || status.state === "connecting"}
+              className="flex-1"
+              variant={status.connected ? "outline" : "default"}
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="mr-1.5 size-3.5 animate-spin" />
+                  Memproses…
+                </>
+              ) : status.connected ? (
+                "Buat QR Baru"
+              ) : (
+                "Buat QR Code"
+              )}
+            </Button>
+            <Button
+              onClick={handleSaveConfig}
+              disabled={saving}
+              variant="outline"
+            >
+              {saving ? "Menyimpan…" : "Simpan"}
+            </Button>
+            {status.connected && (
+              <Button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                variant="destructive"
+                size="icon"
+              >
+                {disconnecting ? (
+                  <RefreshCw className="size-4 animate-spin" />
+                ) : (
+                  <LogOut className="size-4" />
+                )}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Status & Actions */}
       <div className="flex flex-col gap-5">
         <Card className="border-border">
           <CardHeader className="pb-3">
@@ -241,11 +259,11 @@ function PengaturanApiTab() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              {connected === null ? (
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
-                  <Clock className="size-4 text-muted-foreground" />
+              {status.state === "connecting" ? (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-yellow-600 dark:bg-yellow-900/40 dark:text-yellow-300">
+                  <RefreshCw className="size-4 animate-spin" />
                 </div>
-              ) : connected ? (
+              ) : status.connected ? (
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
                   <CheckCircle2 className="size-4" />
                 </div>
@@ -256,41 +274,20 @@ function PengaturanApiTab() {
               )}
               <div>
                 <p className="text-sm font-medium">
-                  {connected === null
-                    ? "Belum diuji"
-                    : connected
+                  {status.state === "connecting"
+                    ? "Menghubungkan…"
+                    : status.connected
                       ? "Terhubung"
-                      : "Gagal"}
+                      : "Tidak Terhubung"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {connected === null
-                    ? "Klik 'Tes Koneksi'"
-                    : connected
-                      ? "GO WhatsApp API siap"
-                      : "Periksa konfigurasi"}
+                  {status.state === "connecting"
+                    ? "Scan QR code di perangkat Anda"
+                    : status.connected
+                      ? "WhatsApp siap mengirim pesan"
+                      : "Buat QR code untuk login"}
                 </p>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={handleTestConnection}
-                disabled={testing}
-              >
-                {testing ? (
-                  <>
-                    <RefreshCw className="mr-1.5 size-3.5 animate-spin" />
-                    Menguji…
-                  </>
-                ) : (
-                  "Tes Koneksi"
-                )}
-              </Button>
-              <Button size="sm" className="flex-1" onClick={handleSave} disabled={saving}>
-                {saving ? "Menyimpan…" : "Simpan"}
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -301,13 +298,12 @@ function PengaturanApiTab() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              GO WhatsApp API memungkinkan pengiriman pesan WhatsApp secara
-              otomatis untuk notifikasi tagihan, konfirmasi pembayaran, dan
-              broadcast ke pelanggan.
+              Baileys adalah library WhatsApp yang memungkinkan pengiriman pesan otomatis
+              dari device Anda.
             </p>
             <p>
-              Pastikan nomor WhatsApp perangkat telah terverifikasi di dashboard
-              GO WhatsApp sebelum digunakan.
+              Device akan terus terhubung selama aplikasi berjalan. Pastikan nomor WhatsApp
+              aktif dan terpasang.
             </p>
           </CardContent>
         </Card>
@@ -331,9 +327,8 @@ function KirimPesanTab() {
   const [templateId, setTemplateId] = useState("")
   const [sending, setSending] = useState(false)
   const [log, setLog] = useState<{ time: string; phone: string; status: "ok" | "fail"; note: string }[]>([])
-  const [templates, setTemplates] = useState<Template[]>(defaultTemplates)
+  const [templates, setTemplates] = useState<Template[]>([])
 
-  // Muat template dari backend agar dropdown template tersedia di tab Kirim Pesan
   useEffect(() => {
     ;(async () => {
       try {
@@ -350,7 +345,7 @@ function KirimPesanTab() {
           )
         }
       } catch {
-        /* abaikan — template opsional di tab kirim */
+        /* abaikan */
       }
     })()
   }, [])
@@ -364,7 +359,6 @@ function KirimPesanTab() {
     }
   }
 
-  // ---- Pelanggan terfilter untuk mode bulk ----
   const filteredCustomers = customers.filter((c) => {
     if (statusFilter !== "Semua" && c.status !== statusFilter) return false
     const q = search.trim().toLowerCase()
@@ -437,7 +431,7 @@ function KirimPesanTab() {
         time: now,
         phone: p,
         status: (index < result.sent ? "ok" : "fail") as "ok" | "fail",
-        note: index < result.sent ? "Terkirim" : "Nomor tidak terdaftar",
+        note: index < result.sent ? "Terkirim" : "Gagal",
       }))
       setLog((prev) => [...newLog, ...prev].slice(0, 50))
       toast.success(`${result.sent}/${recipients.length} pesan terkirim`)
@@ -452,7 +446,6 @@ function KirimPesanTab() {
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
-      {/* Compose */}
       <Card className="border-border lg:col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -461,7 +454,6 @@ function KirimPesanTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Mode toggle */}
           <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
             <button
               type="button"
@@ -491,7 +483,6 @@ function KirimPesanTab() {
             </button>
           </div>
 
-          {/* Recipient */}
           {mode === "single" ? (
             <div className="space-y-1.5">
               <Label htmlFor="phone">Nomor Tujuan</Label>
@@ -511,7 +502,6 @@ function KirimPesanTab() {
                 </span>
               </div>
 
-              {/* Filter status */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <Filter className="size-3.5 text-muted-foreground" />
                 {(["Semua", "Active", "Isolated"] as const).map((f) => {
@@ -538,7 +528,6 @@ function KirimPesanTab() {
                 })}
               </div>
 
-              {/* Search */}
               <div className="relative">
                 <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -549,7 +538,6 @@ function KirimPesanTab() {
                 />
               </div>
 
-              {/* Select all visible / clear */}
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
                   {filteredCustomers.length} pelanggan tampil
@@ -573,7 +561,6 @@ function KirimPesanTab() {
                 </div>
               </div>
 
-              {/* Customer list */}
               <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-1.5">
                 {filteredCustomers.length === 0 ? (
                   <p className="py-6 text-center text-xs text-muted-foreground">
@@ -619,7 +606,6 @@ function KirimPesanTab() {
             </div>
           )}
 
-          {/* Template selector */}
           <div className="space-y-1.5">
             <Label>Template Cepat</Label>
             <Select value={templateId} onValueChange={(v) => applyTemplate(v ?? "")}>
@@ -637,7 +623,6 @@ function KirimPesanTab() {
             </Select>
           </div>
 
-          {/* Message body */}
           <div className="space-y-1.5">
             <Label htmlFor="message">
               Isi Pesan
@@ -694,7 +679,6 @@ function KirimPesanTab() {
         </CardContent>
       </Card>
 
-      {/* Placeholder reference */}
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -721,10 +705,6 @@ function KirimPesanTab() {
               </div>
             ))}
           </div>
-          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-            <ExternalLink className="mt-0.5 size-3 shrink-0" />
-            <span>{"{payment_link}"} berisi link QRIS SumoPod untuk invoice belum lunas.</span>
-          </p>
           <Separator className="my-1" />
           <p className="text-xs font-medium">Format Teks WhatsApp</p>
           <div className="grid gap-2 text-xs">
@@ -741,7 +721,6 @@ function KirimPesanTab() {
         </CardContent>
       </Card>
 
-      {/* Send Log */}
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between text-base font-semibold">
@@ -793,7 +772,7 @@ function KirimPesanTab() {
    ================================================================ */
 
 function TemplatePesanTab() {
-  const [templates, setTemplates] = useState<Template[]>(defaultTemplates)
+  const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -802,7 +781,6 @@ function TemplatePesanTab() {
   const [formName, setFormName] = useState("")
   const [formBody, setFormBody] = useState("")
 
-  // Muat template dari backend saat mount
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -993,7 +971,6 @@ function TemplatePesanTab() {
         </div>
       )}
 
-      {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1028,20 +1005,6 @@ function TemplatePesanTab() {
                 onChange={(e) => setFormBody(e.target.value)}
                 placeholder="Tulis template pesan…"
               />
-              <p className="text-xs text-muted-foreground">
-                Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
-              </p>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Pratinjau</Label>
-                <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed">
-                  {formBody.trim()
-                    ? renderWhatsApp(formBody)
-                    : <span className="text-xs text-muted-foreground">Pesan akan tampil di sini…</span>}
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Format didukung: *tebal*, _miring_, ~coret~, `kode`, dan baris baru (Enter).
-                </p>
-              </div>
             </div>
           </div>
           <DialogFooter>
@@ -1055,7 +1018,6 @@ function TemplatePesanTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
@@ -1066,8 +1028,7 @@ function TemplatePesanTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus template?</AlertDialogTitle>
             <AlertDialogDescription>
-              Template <strong>{deleteTarget?.name}</strong> ({deleteTarget?.id}) akan
-              dihapus permanen. Tindakan ini tidak dapat dibatalkan.
+              Template <strong>{deleteTarget?.name}</strong> akan dihapus permanen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1086,13 +1047,12 @@ function TemplatePesanTab() {
 }
 
 /* ================================================================
-   Tab: Pesan Offline (server down saat transaksi)
+   Tab: Pesan Offline
    ================================================================ */
 
 function PesanOfflineTab() {
   const [body, setBody] = useState("")
   const [defaultBody, setDefaultBody] = useState("")
-  const [isCustom, setIsCustom] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -1102,7 +1062,6 @@ function PesanOfflineTab() {
         const { data } = await api.get("/wa-gateway/offline-message")
         setBody(String(data?.data?.body ?? ""))
         setDefaultBody(String(data?.data?.defaultBody ?? ""))
-        setIsCustom(Boolean(data?.data?.isCustom))
       } catch {
         toast.error("Gagal memuat pesan offline")
       } finally {
@@ -1119,10 +1078,7 @@ function PesanOfflineTab() {
     setSaving(true)
     try {
       await api.put("/wa-gateway/offline-message", { body: body.trim() })
-      setIsCustom(true)
-      toast.success("Pesan server offline disimpan", {
-        description: "Pesan ini dikirim otomatis saat pembayaran sukses namun Mikrotik sedang offline.",
-      })
+      toast.success("Pesan offline disimpan")
     } catch {
       toast.error("Gagal menyimpan pesan offline")
     } finally {
@@ -1132,10 +1088,8 @@ function PesanOfflineTab() {
 
   const handleReset = () => {
     setBody(defaultBody)
-    toast.info("Menggunakan teks default. Klik Simpan untuk menerapkan.")
+    toast.info("Reset ke default")
   }
-
-  const dirty = body.trim() !== defaultBody.trim()
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
@@ -1147,20 +1101,10 @@ function PesanOfflineTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Pesan ini dikirim otomatis ke pelanggan saat pembayaran <strong>berhasil dicatat</strong> namun
-            Mikrotik sedang offline/terputus (mis. karena PLN padam). Sistem tetap menerima pembayaran dan
-            akan menyinkronkan profile PPPoE otomatis begitu server online kembali.
-          </p>
           <div className="space-y-1.5">
             <Label htmlFor="offlineMessage">
               Isi Pesan
               <span className="ml-2 text-xs text-muted-foreground">({body.length} karakter)</span>
-              {isCustom && (
-                <Badge className="ml-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  Custom
-                </Badge>
-              )}
             </Label>
             <Textarea
               id="offlineMessage"
@@ -1170,79 +1114,36 @@ function PesanOfflineTab() {
               disabled={loading}
               placeholder="Tulis pesan untuk pelanggan saat server offline…"
             />
-            <p className="text-xs text-muted-foreground">
-              Variabel: {"{nama}"}, {"{paket}"}, {"{jumlah}"}, {"{tanggal}"}, {"{metode}"}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Pratinjau</Label>
-            <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed">
-              {body.trim()
-                ? renderWhatsApp(body)
-                : <span className="text-xs text-muted-foreground">Pesan akan tampil di sini…</span>}
-            </div>
           </div>
           <div className="flex gap-2">
             <Button onClick={handleSave} disabled={saving || loading}>
-              {saving ? "Menyimpan…" : "Simpan Pesan"}
+              {saving ? "Menyimpan…" : "Simpan"}
             </Button>
-            <Button variant="outline" onClick={handleReset} disabled={saving || loading || !dirty}>
-              Kembalikan ke Default
+            <Button variant="outline" onClick={handleReset} disabled={saving || loading}>
+              Reset
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Braces className="size-4 text-muted-foreground" />
-            Variabel Pesan
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Gunakan variabel berikut di isi pesan. Nilainya diisi otomatis dari data pelanggan dan pembayaran.
-          </p>
-          <div className="grid gap-2 text-xs">
-            {[
-              ["{nama}", "Nama pelanggan"],
-              ["{paket}", "Nama paket layanan"],
-              ["{jumlah}", "Jumlah pembayaran"],
-              ["{tanggal}", "Tanggal transaksi"],
-              ["{metode}", "Metode pembayaran (QRIS/Tunai)"],
-            ].map(([variable, description]) => (
-              <div key={variable} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-2.5 py-2">
-                <code className="font-medium text-primary">{variable}</code>
-                <span className="text-right text-muted-foreground">{description}</span>
-              </div>
-            ))}
-          </div>
-          <Separator className="my-1" />
-          <p className="text-xs text-muted-foreground">
-            Jika field dikosongkan (disimpan tanpa teks), sistem memakai pesan default.
-          </p>
         </CardContent>
       </Card>
     </div>
   )
 }
 
-/* ================================================================
-   WA Gateway Page
-   ================================================================ */
-
 export function WAGatewayPage() {
   return (
     <div className="space-y-5">
       <PageHeader
         breadcrumbs={[{ label: "Dashboard", to: "/admin" }, { label: "WA Gateway" }]}
-        title="WA Gateway"
-        description="Kelola pengiriman pesan WhatsApp melalui GO WhatsApp API."
+        title="WA Gateway (Baileys)"
+        description="Kelola pengiriman pesan WhatsApp melalui Baileys."
       />
 
-      <Tabs defaultValue="kirim-pesan" className="w-full">
+      <Tabs defaultValue="pengaturan-baileys" className="w-full">
         <TabsList>
+          <TabsTrigger value="pengaturan-baileys">
+            <Settings2 className="mr-1.5 size-3.5" />
+            Pengaturan Baileys
+          </TabsTrigger>
           <TabsTrigger value="kirim-pesan">
             <Send className="mr-1.5 size-3.5" />
             Kirim Pesan
@@ -1255,11 +1156,11 @@ export function WAGatewayPage() {
             <AlertTriangle className="mr-1.5 size-3.5" />
             Pesan Offline
           </TabsTrigger>
-          <TabsTrigger value="pengaturan-api">
-            <Settings2 className="mr-1.5 size-3.5" />
-            Pengaturan API
-          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="pengaturan-baileys" className="mt-4">
+          <PengaturanBaileysTab />
+        </TabsContent>
 
         <TabsContent value="kirim-pesan" className="mt-4">
           <KirimPesanTab />
@@ -1271,10 +1172,6 @@ export function WAGatewayPage() {
 
         <TabsContent value="pesan-offline" className="mt-4">
           <PesanOfflineTab />
-        </TabsContent>
-
-        <TabsContent value="pengaturan-api" className="mt-4">
-          <PengaturanApiTab />
         </TabsContent>
       </Tabs>
     </div>
