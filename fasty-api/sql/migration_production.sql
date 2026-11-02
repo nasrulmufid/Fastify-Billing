@@ -229,6 +229,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
+-- system_config — key-value store untuk konfigurasi per-module
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS system_config (
+  config_key VARCHAR(64) NOT NULL PRIMARY KEY,
+  config_value TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
 -- payment_gateway_config — kredensial SumoPod (single-row)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS payment_gateway_config (
