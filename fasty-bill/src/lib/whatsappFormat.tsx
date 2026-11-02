@@ -14,7 +14,7 @@ import type { ReactNode } from "react"
 
 type Style = "bold" | "italic" | "strike" | "mono"
 
-const FORMAT_RE = /(\*([^*]+)\*)|(_([^_]+)_)|(~([^~]+)~)|(`([^`]+)`)/g
+const FORMAT_RE = /(\*([^*]*)\*)|(_([^_]*)_)|(~([^~]*)~)|(`([^`]*)`)/g
 
 function renderPlain(text: string, keyBase: string): ReactNode[] {
   if (text.length === 0) return []
@@ -74,6 +74,11 @@ export function renderWhatsApp(text: string, keyPrefix = "wa"): ReactNode[] {
     const strike = match[6]
     const mono = match[8]
     const inner = bold ?? italic ?? strike ?? mono ?? ""
+    if (!inner) {
+      nodes.push(full)
+      lastIndex = match.index + full.length
+      continue
+    }
     const style: Style = bold ? "bold" : italic ? "italic" : strike ? "strike" : "mono"
     nodes.push(renderStyled(style, inner, `${keyPrefix}-${key++}`))
     lastIndex = match.index + full.length

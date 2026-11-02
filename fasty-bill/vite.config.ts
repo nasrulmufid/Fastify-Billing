@@ -14,6 +14,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // Izinkan akses dari domain tunnel (Cloudflare/ngrok) — dev server
+    host: '0.0.0.0',  
     allowedHosts: true,
     proxy: {
       "/api": {

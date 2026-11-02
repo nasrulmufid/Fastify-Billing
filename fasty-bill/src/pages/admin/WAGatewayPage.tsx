@@ -184,8 +184,8 @@ function PengaturanBaileysTab() {
               <RefreshCw className="size-6 animate-spin text-muted-foreground" />
             </div>
           ) : status.qr ? (
-            <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted/40 p-6">
-              <img src={status.qr} alt="QR Code" className="size-56" />
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:p-6">
+              <img src={status.qr} alt="QR Code" className="size-40 sm:size-56" />
               <p className="text-xs text-muted-foreground text-center max-w-xs">
                 QR code ini akan expire dalam beberapa menit. Jika sudah expire, klik "Buat QR Baru".
               </p>
@@ -209,7 +209,7 @@ function PengaturanBaileysTab() {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               onClick={handleGenerateQR}
               disabled={loading || status.state === "connecting"}
@@ -459,27 +459,30 @@ function KirimPesanTab() {
               type="button"
               onClick={() => setMode("single")}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                "flex flex-1 items-center justify-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
                 mode === "single"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Phone className="size-3.5" />
-              Single
+              <span className="hidden sm:inline">Single</span>
+              <span className="sm:hidden">1</span>
             </button>
             <button
               type="button"
               onClick={() => setMode("bulk")}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                "flex flex-1 items-center justify-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
                 mode === "bulk"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Users className="size-3.5" />
-              Bulk ({bulkCount})
+              <span className="hidden sm:inline">Bulk</span>
+              <span className="sm:hidden">M</span>
+              ({bulkCount})
             </button>
           </div>
 
@@ -498,12 +501,12 @@ function KirimPesanTab() {
               <div className="flex items-center justify-between">
                 <Label>Pilih Pelanggan</Label>
                 <span className="text-xs text-muted-foreground">
-                  {selectedIds.length} dipilih · {selectedPhones.length} nomor valid
+                  {selectedIds.length} dipilih · {selectedPhones.length} nomor
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Filter className="size-3.5 text-muted-foreground" />
+              <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
+                <Filter className="size-3.5 shrink-0 text-muted-foreground" />
                 {(["Semua", "Active", "Isolated"] as const).map((f) => {
                   const count =
                     f === "Semua"
@@ -516,7 +519,7 @@ function KirimPesanTab() {
                       type="button"
                       onClick={() => setStatusFilter(f)}
                       className={cn(
-                        "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                        "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap",
                         statusFilter === f
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:text-foreground",
@@ -533,12 +536,12 @@ function KirimPesanTab() {
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari nama, kode, no. HP, atau paket…"
+                  placeholder="Cari nama, kode, no. HP…"
                   className="pl-8"
                 />
               </div>
 
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
                 <span className="text-muted-foreground">
                   {filteredCustomers.length} pelanggan tampil
                 </span>
@@ -546,15 +549,15 @@ function KirimPesanTab() {
                   <button
                     type="button"
                     onClick={selectVisible}
-                    className="flex items-center gap-1 font-medium text-primary hover:underline"
+                    className="flex items-center gap-1 font-medium text-primary hover:underline whitespace-nowrap"
                   >
                     <ListChecks className="size-3.5" />
-                    Pilih semua tampil
+                    Pilih semua
                   </button>
                   <button
                     type="button"
                     onClick={clearSelection}
-                    className="text-muted-foreground hover:text-foreground hover:underline"
+                    className="text-muted-foreground hover:text-foreground hover:underline whitespace-nowrap"
                   >
                     Bersihkan
                   </button>
@@ -594,7 +597,7 @@ function KirimPesanTab() {
                               {statusLabel[c.status]}
                             </Badge>
                           </div>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
                             {c.code} · {c.packageName} · {normalizePhone(c.phone)}
                           </p>
                         </div>
@@ -645,7 +648,7 @@ function KirimPesanTab() {
             </p>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Pratinjau</Label>
-              <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed">
+              <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed overflow-x-auto">
                 {message.trim()
                   ? renderWhatsApp(message)
                   : <span className="text-xs text-muted-foreground">Pesan akan tampil di sini…</span>}
@@ -672,7 +675,7 @@ function KirimPesanTab() {
                 <Send className="size-4" />
                 {mode === "single"
                   ? "Kirim Pesan"
-                  : `Kirim ke ${selectedPhones.length} Pelanggan`}
+                  : `Kirim ke ${selectedPhones.length}`}
               </>
             )}
           </Button>
@@ -682,26 +685,27 @@ function KirimPesanTab() {
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Braces className="size-4 text-muted-foreground" />
-            Variabel Pesan
+            <Braces className="size-3.5 sm:size-4 text-muted-foreground" />
+            <span className="hidden sm:inline">Variabel Pesan</span>
+            <span className="sm:hidden">Variabel</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Gunakan variabel berikut di isi pesan. Nilainya diisi otomatis berdasarkan pelanggan dan tagihan terbaru.
+            Gunakan variabel berikut di isi pesan. Nilainya diisi otomatis.
           </p>
           <div className="grid gap-2 text-xs">
             {[
               ["{nama}", "Nama pelanggan"],
               ["{jumlah}", "Jumlah tagihan"],
               ["{tanggal}", "Tanggal jatuh tempo"],
-              ["{no_invoice}", "Nomor invoice"],
+              ["{no_invoice}", "No. invoice"],
               ["{paket}", "Nama paket"],
-              ["{payment_link}", "Link pembayaran QRIS"],
+              ["{payment_link}", "Link QRIS"],
             ].map(([variable, description]) => (
-              <div key={variable} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-2.5 py-2">
-                <code className="font-medium text-primary">{variable}</code>
-                <span className="text-right text-muted-foreground">{description}</span>
+              <div key={variable} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2">
+                <code className="font-medium text-primary text-[11px]">{variable}</code>
+                <span className="text-right text-muted-foreground text-[10px]">{description}</span>
               </div>
             ))}
           </div>
@@ -711,10 +715,10 @@ function KirimPesanTab() {
             {WHATSAPP_FORMAT_HINT.map(([syntax, description]) => (
               <div
                 key={syntax}
-                className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-2.5 py-2"
+                className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2"
               >
-                <code className="font-medium text-primary">{syntax}</code>
-                <span className="text-right text-muted-foreground">{description}</span>
+                <code className="font-medium text-primary text-[11px]">{syntax}</code>
+                <span className="text-right text-muted-foreground text-[10px]">{description}</span>
               </div>
             ))}
           </div>
@@ -726,7 +730,8 @@ function KirimPesanTab() {
           <CardTitle className="flex items-center justify-between text-base font-semibold">
             <span className="flex items-center gap-2">
               <Clock className="size-4 text-muted-foreground" />
-              Riwayat Kirim
+              <span className="hidden sm:inline">Riwayat Kirim</span>
+              <span className="sm:hidden">Riwayat</span>
             </span>
             {log.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setLog([])} className="h-auto px-2 py-1 text-xs">
@@ -753,10 +758,10 @@ function KirimPesanTab() {
                     <XCircle className="mt-0.5 size-3.5 shrink-0 text-rose-500" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium">{item.phone}</p>
+                    <p className="text-xs font-medium break-all">{item.phone}</p>
                     <p className="text-xs text-muted-foreground">{item.note}</p>
                   </div>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{item.time}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
                 </div>
               ))}
             </div>
@@ -913,21 +918,21 @@ function TemplatePesanTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((tpl) => (
             <Card
               key={tpl.id}
               className="group border-border transition-shadow hover:shadow-md"
             >
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-sm font-semibold">{tpl.name}</CardTitle>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-sm font-semibold truncate">{tpl.name}</CardTitle>
                     <Badge variant="outline" className="mt-1 text-[10px] font-normal">
                       {tpl.id}
                     </Badge>
                   </div>
-                  <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 shrink-0">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -948,17 +953,17 @@ function TemplatePesanTab() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="line-clamp-4 text-xs leading-relaxed text-muted-foreground">
+                <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
                   {tpl.body}
                 </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-[10px] text-muted-foreground truncate">
                     Diperbarui {tpl.updatedAt}
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto px-2 py-1 text-[10px]"
+                    className="h-auto px-2 py-1 text-[10px] shrink-0"
                     onClick={() => copyTemplate(tpl.body)}
                   >
                     <Copy className="mr-1 size-3" />
@@ -1139,22 +1144,26 @@ export function WAGatewayPage() {
       />
 
       <Tabs defaultValue="pengaturan-baileys" className="w-full">
-        <TabsList>
-          <TabsTrigger value="pengaturan-baileys">
+        <TabsList className="w-full overflow-x-auto">
+          <TabsTrigger value="pengaturan-baileys" className="whitespace-nowrap">
             <Settings2 className="mr-1.5 size-3.5" />
-            Pengaturan Baileys
+            <span className="hidden sm:inline">Pengaturan Baileys</span>
+            <span className="sm:hidden">Pengaturan</span>
           </TabsTrigger>
-          <TabsTrigger value="kirim-pesan">
+          <TabsTrigger value="kirim-pesan" className="whitespace-nowrap">
             <Send className="mr-1.5 size-3.5" />
-            Kirim Pesan
+            <span className="hidden sm:inline">Kirim Pesan</span>
+            <span className="sm:hidden">Kirim</span>
           </TabsTrigger>
-          <TabsTrigger value="template-pesan">
+          <TabsTrigger value="template-pesan" className="whitespace-nowrap">
             <MessageSquareText className="mr-1.5 size-3.5" />
-            Template Pesan
+            <span className="hidden sm:inline">Template Pesan</span>
+            <span className="sm:hidden">Template</span>
           </TabsTrigger>
-          <TabsTrigger value="pesan-offline">
+          <TabsTrigger value="pesan-offline" className="whitespace-nowrap">
             <AlertTriangle className="mr-1.5 size-3.5" />
-            Pesan Offline
+            <span className="hidden sm:inline">Pesan Offline</span>
+            <span className="sm:hidden">Offline</span>
           </TabsTrigger>
         </TabsList>
 
