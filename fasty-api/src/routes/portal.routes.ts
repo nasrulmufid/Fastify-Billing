@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
+import { config } from "../config.js"
 
 import { nextDailyCode } from "../utils/codegen.js"
-import { decryptSecret } from "../utils/crypto.js"
 import { fromISODate } from "../utils/date.js"
 import { createSumopodPayment } from "../utils/sumopod.js"
 
@@ -87,18 +87,9 @@ function mapTicket(row: Record<string, unknown>) {
   }
 }
 
-/** Baca konfigurasi payment gateway (dekripsi). null jika belum diset. */
-async function getStoredConfig(app: FastifyInstance) {
-  const [row] = (await app.db.query("SELECT * FROM payment_gateway_config WHERE id = 1")) as Record<
-    string,
-    unknown
-  >[]
-  if (!row) return null
-  return {
-    apiKey: decryptSecret(String(row.api_key ?? "")),
-    webhookSigningSecret: decryptSecret(String(row.webhook_signing_secret ?? "")),
-    webhookToken: decryptSecret(String(row.webhook_token ?? "")),
-  }
+/** SumoPod configuration comes only from environment variables. */
+async function getStoredConfig(_app: FastifyInstance) {
+  return { apiKey: config.sumopod.apiKey }
 }
 
 export async function portalRoutes(app: FastifyInstance) {

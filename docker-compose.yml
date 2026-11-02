@@ -12,7 +12,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "127.0.0.1:3306:3306"
+      - "3307:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -44,6 +44,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_this_encryption_key_32}
       SUMODOP_BASE_URL: ${SUMODOP_BASE_URL:-https://api-pay-sandbox.sumopod.com}
+      SUMODOP_API_KEY: ${SUMODOP_API_KEY:-}
       SUMODOP_WEBHOOK_SECRET: ${SUMODOP_WEBHOOK_SECRET:-}
       SUMODOP_WEBHOOK_TOKEN: ${SUMODOP_WEBHOOK_TOKEN:-}
       GENIEACS_BASE_URL: ${GENIEACS_BASE_URL:-}

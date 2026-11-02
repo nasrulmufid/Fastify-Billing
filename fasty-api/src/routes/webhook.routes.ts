@@ -3,7 +3,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { completePaymentFlow } from "../services/payment.service.js"
 import { notifyTelegram } from "../services/telegram.service.js"
 import { config } from "../config.js"
-import { decryptSecret } from "../utils/crypto.js"
 import { verifyWebhookSignature, verifyWebhookToken } from "../utils/sumopod.js"
 
 /**
@@ -16,23 +15,11 @@ export async function webhookRoutes(app: FastifyInstance) {
     done(null, body)
   })
 
-  /** Baca secret webhook dari DB (konfigurasi UI) — fallback ke env. */
-  async function getWebhookSecrets() {
-    const [row] = (await app.db.query("SELECT * FROM payment_gateway_config WHERE id = 1")) as Record<
-      string,
-      unknown
-    >[]
-    if (!row) {
-      return {
-        webhookSecret: config.sumopod.webhookSecret,
-        webhookToken: config.sumopod.webhookToken,
-      }
-    }
+  /** Webhook secrets come only from environment variables. */
+  function getWebhookSecrets() {
     return {
-      webhookSecret:
-        decryptSecret(String(row.webhook_signing_secret ?? "")) || config.sumopod.webhookSecret,
-      webhookToken:
-        decryptSecret(String(row.webhook_token ?? "")) || config.sumopod.webhookToken,
+      webhookSecret: config.sumopod.webhookSecret,
+      webhookToken: config.sumopod.webhookToken,
     }
   }
 

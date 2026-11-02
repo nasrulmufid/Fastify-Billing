@@ -1157,6 +1157,7 @@ function SecretField({
             placeholder={placeholder}
             className="h-9 pr-9 font-mono"
             autoComplete="off"
+            disabled
           />
           <Button
             type="button"
@@ -1190,7 +1191,6 @@ function SecretField({
 
 function TabPaymentGateway() {
   const [config, setConfig] = useState<SumopodConfig>(defaultSumopodConfig)
-  const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [connected, setConnected] = useState<boolean | null>(null)
 
@@ -1201,40 +1201,6 @@ function TabPaymentGateway() {
     typeof window !== "undefined"
       ? `${window.location.origin}/api/webhook/payment`
       : "http://localhost:3000/api/webhook/payment"
-
-  const handleSave = () => {
-    async function doSave() {
-      try {
-        setSaving(true)
-        // Only send fields that are not masked (masked value contains '*')
-        const payload: Partial<SumopodConfig> = {}
-        const isMasked = (v: string) => v.includes("*")
-        if (config.apiKey && !isMasked(config.apiKey)) payload.apiKey = config.apiKey
-        if (config.webhookSigningSecret && !isMasked(config.webhookSigningSecret)) payload.webhookSigningSecret = config.webhookSigningSecret
-        if (config.webhookToken && !isMasked(config.webhookToken)) payload.webhookToken = config.webhookToken
-
-        await api.put("/payment-gateway/config", payload)
-        toast.success("Konfigurasi payment gateway disimpan", {
-          description: "Kredensial SumoPod tersimpan. Webhook akan diverifikasi otomatis.",
-        })
-        // reload masked values from server
-        const res = await api.get("/payment-gateway/config")
-        const data = res.data?.data
-        if (data) {
-          setConfig({
-            apiKey: data.apiKey || "",
-            webhookSigningSecret: data.webhookSigningSecret || "",
-            webhookToken: data.webhookToken || "",
-          })
-        }
-      } catch (err: any) {
-        toast.error(err?.response?.data?.error?.message || "Gagal menyimpan konfigurasi")
-      } finally {
-        setSaving(false)
-      }
-    }
-    void doSave()
-  }
 
   const handleTestConnection = () => {
     async function doTest() {
@@ -1463,10 +1429,9 @@ function TabPaymentGateway() {
         </CardContent>
       </Card>
 
-      <Button className="w-full sm:w-auto" onClick={handleSave} disabled={saving}>
-        {saving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Save className="mr-1.5 size-4" />}
-        {saving ? "Menyimpan…" : "Simpan Konfigurasi"}
-      </Button>
+      <p className="rounded-xl border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        Kredensial SumoPod hanya dibaca dari environment backend: `SUMODOP_API_KEY`, `SUMODOP_WEBHOOK_SECRET`, dan `SUMODOP_WEBHOOK_TOKEN`. Ubah `.env`, lalu restart container API.
+      </p>
     </div>
   )
 }

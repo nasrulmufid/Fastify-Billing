@@ -47,4 +47,4 @@ fi
 
 # Drop privileges ke app user & start aplikasi
 echo "[INFO] Memulai aplikasi..."
-exec su-exec app node /app/dist/server.js
+exec su -s /bin/sh app -c "node /app/dist/server.js"

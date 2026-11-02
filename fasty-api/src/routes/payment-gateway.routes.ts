@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
-import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
+import { maskSecret } from "../utils/crypto.js"
 import { createSumopodPayment } from "../utils/sumopod.js"
+import { config } from "../config.js"
 
 const configSchema = z.object({
   apiKey: z.string().optional(),
@@ -16,16 +17,11 @@ const createPaymentSchema = z.object({
   expiresInHours: z.coerce.number().int().min(1).max(24).optional(),
 })
 
-async function getStoredConfig(app: FastifyInstance) {
-  const [row] = (await app.db.query("SELECT * FROM payment_gateway_config WHERE id = 1")) as Record<
-    string,
-    unknown
-  >[]
-  if (!row) return null
+async function getStoredConfig(_app: FastifyInstance) {
   return {
-    apiKey: decryptSecret(String(row.api_key ?? "")),
-    webhookSigningSecret: decryptSecret(String(row.webhook_signing_secret ?? "")),
-    webhookToken: decryptSecret(String(row.webhook_token ?? "")),
+    apiKey: config.sumopod.apiKey,
+    webhookSigningSecret: config.sumopod.webhookSecret,
+    webhookToken: config.sumopod.webhookToken,
   }
 }
 
@@ -50,25 +46,11 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
   })
 
   // PUT /payment-gateway/config — simpan terenkripsi; field kosong = pertahankan lama
-  app.put("/payment-gateway/config", adminAuth, async (req, reply) => {
-    const body = configSchema.parse(req.body)
-    const current = await getStoredConfig(app)
-    const next = {
-      apiKey: body.apiKey ? encryptSecret(body.apiKey) : current ? encryptSecret(current.apiKey) : "",
-      webhookSigningSecret: body.webhookSigningSecret
-        ? encryptSecret(body.webhookSigningSecret)
-        : current
-          ? encryptSecret(current.webhookSigningSecret)
-          : "",
-      webhookToken: body.webhookToken ? encryptSecret(body.webhookToken) : current ? encryptSecret(current.webhookToken) : "",
-    }
-    await app.db.query(
-      `INSERT INTO payment_gateway_config (id, api_key, webhook_signing_secret, webhook_token) VALUES (1, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE api_key = VALUES(api_key), webhook_signing_secret = VALUES(webhook_signing_secret), webhook_token = VALUES(webhook_token)`,
-      [next.apiKey, next.webhookSigningSecret, next.webhookToken],
-    )
-    return reply.send({ data: { message: "Konfigurasi payment gateway disimpan" } })
-  })
+  app.put("/payment-gateway/config", adminAuth, async (_req, reply) =>
+    reply.code(405).send({
+      error: { code: "ENV_ONLY", message: "Konfigurasi SumoPod hanya dapat diatur melalui environment variables" },
+    }),
+  )
 
   // POST /payment-gateway/test — tes koneksi
   app.post("/payment-gateway/test", adminAuth, async (req, reply) => {

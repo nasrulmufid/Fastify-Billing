@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
 import { nextCode } from "../utils/codegen.js"
+import { config } from "../config.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
 import { fillPlaceholders } from "../utils/template.js"
@@ -185,10 +186,7 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     const needsPaymentLink = body.template.body.includes("{payment_link}")
     let paymentGatewayApiKey = ""
     if (needsPaymentLink) {
-      const [paymentConfig] = (await app.db.query(
-        "SELECT api_key FROM payment_gateway_config WHERE id = 1",
-      )) as Record<string, unknown>[]
-      paymentGatewayApiKey = decryptSecret(String(paymentConfig?.api_key ?? ""))
+      paymentGatewayApiKey = config.sumopod.apiKey.trim()
       if (!paymentGatewayApiKey) {
         return reply.code(400).send({
           error: {

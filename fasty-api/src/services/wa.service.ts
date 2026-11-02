@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify"
 
-import { decryptSecret } from "../utils/crypto.js"
 import { nextCode, nextDailyCode } from "../utils/codegen.js"
+import { config } from "../config.js"
+import { decryptSecret } from "../utils/crypto.js"
 import { normalizePhone } from "../utils/phone.js"
 import { createSumopodPayment } from "../utils/sumopod.js"
 
@@ -103,10 +104,7 @@ export async function buildPaymentLinkForInvoice(
   app: FastifyInstance,
   invoice: { invoice_id: number | string; customer_id: number | string; amount: number | string },
 ): Promise<string | null> {
-  const [paymentConfig] = (await app.db.query(
-    "SELECT api_key FROM payment_gateway_config WHERE id = 1",
-  )) as Record<string, unknown>[]
-  const apiKey = decryptSecret(String(paymentConfig?.api_key ?? "")).trim()
+  const apiKey = config.sumopod.apiKey.trim()
   if (!apiKey) return null
 
   const [existing] = (await app.db.query(

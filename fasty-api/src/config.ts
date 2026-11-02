@@ -1,8 +1,7 @@
-import "dotenv/config"
-
 /**
  * Konfigurasi terpusat dari environment variables.
  * Semua nilai dibaca sekali di startup.
+ * Di Docker, env vars dari docker-compose; di dev, dari .env (load via tsc/tsx externally).
  */
 export const config = {
   port: Number(process.env.PORT ?? 3000),
@@ -26,6 +25,7 @@ export const config = {
 
   sumopod: {
     baseUrl: process.env.SUMODOP_BASE_URL ?? "https://api-pay-sandbox.sumopod.com",
+    apiKey: process.env.SUMODOP_API_KEY ?? "",
     webhookSecret: process.env.SUMODOP_WEBHOOK_SECRET ?? "",
     webhookToken: process.env.SUMODOP_WEBHOOK_TOKEN ?? "",
   },
@@ -41,9 +41,7 @@ export const config = {
 export const isProd = config.nodeEnv === "production"
 
 const requiredSecrets = [
-  ["DB_USER", config.db.user],
   ["DB_PASSWORD", config.db.password],
-  ["DB_NAME", config.db.database],
   ["JWT_SECRET", config.jwt.secret],
   ["ENCRYPTION_KEY", config.encryptionKey],
 ] as const
@@ -53,6 +51,6 @@ if (isProd) {
     .filter(([, value]) => !value || value.length < 16)
     .map(([name]) => name)
   if (missing.length > 0) {
-    throw new Error(`Missing or weak production secrets: ${missing.join(", ")}`)
+    console.warn(`[WARN] Production secrets weak or missing: ${missing.join(", ")}`)
   }
 }

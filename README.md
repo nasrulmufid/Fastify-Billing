@@ -76,7 +76,8 @@ npm install --prefix fasty-api
 npm install --prefix fasty-bill
 ```
 
-Copy `fasty-api/.env.example` to `fasty-api/.env`, then set DB credentials and secrets. PowerShell:
+Copy `fasty-api/.env.example` to `fasty-api/.env`, then set DB credentials and
+secrets. PowerShell:
 
 ```powershell
 Copy-Item fasty-api/.env.example fasty-api/.env
@@ -88,9 +89,12 @@ macOS/Linux:
 cp fasty-api/.env.example fasty-api/.env
 ```
 
-Frontend has no `.env.example`; its API URL defaults to `/api`. Create `fasty-bill/.env` only when overriding `VITE_API_URL`, for example `VITE_API_URL=http://localhost:3000/api`.
+Frontend has no `.env.example`; its API URL defaults to `/api`. Create
+`fasty-bill/.env` only when overriding `VITE_API_URL`, for example
+`VITE_API_URL=http://localhost:3000/api`.
 
-The MySQL database must already exist, and `DB_HOST` in `fasty-api/.env` must reach it. Apply schema and seed once:
+The MySQL database must already exist, and `DB_HOST` in `fasty-api/.env` must
+reach it. Apply schema and seed once:
 
 ```bash
 npm run db:migrate --prefix fasty-api
@@ -106,7 +110,9 @@ npm run dev
 - API: `http://localhost:3000`
 - Swagger: `http://localhost:3000/docs`
 
-Start one service independently with `npm run dev --prefix fasty-api` or `npm run dev --prefix fasty-bill`.
+Start one service independently with `npm run dev --prefix fasty-api` or
+`npm run dev --prefix fasty-bill`.
+
 ## Environment Variables
 
 ### Backend .env example
@@ -128,6 +134,7 @@ JWT_EXPIRES_IN=8h
 CORS_ORIGIN=http://localhost:5173
 
 SUMODOP_BASE_URL=https://api-pay-sandbox.sumopod.com
+SUMODOP_API_KEY=your_sumopod_api_key
 SUMODOP_WEBHOOK_SECRET=your_webhook_secret
 SUMODOP_WEBHOOK_TOKEN=your_webhook_token
 
@@ -142,7 +149,8 @@ VITE_API_URL=http://localhost:3000/api
 
 ## Deployment (Docker Compose)
 
-Production setup: MySQL, backend (`fasty-api`), frontend (`fasty-bill` via nginx), WhatsApp gateway.
+Production setup: MySQL, backend (`fasty-api`), frontend (`fasty-bill` via
+nginx), WhatsApp gateway.
 
 ### Prerequisites
 
@@ -159,14 +167,14 @@ Production setup: MySQL, backend (`fasty-api`), frontend (`fasty-bill` via nginx
 
    Edit `.env` — ubah nilai berikut (jangan gunakan default):
 
-   | Variabel | Deskripsi |
-   |----------|-----------|
-   | `MYSQL_ROOT_PASSWORD` | MySQL root password (32+ chars, random) |
-   | `DB_USER` / `DB_PASSWORD` | Kredensial aplikasi ke database |
-   | `JWT_SECRET` | JWT signing key (run: `openssl rand -base64 32`) |
-   | `ENCRYPTION_KEY` | Data encryption key (32 chars, run: `openssl rand -base64 32`) |
-   | `WA_BASIC_AUTH` | WhatsApp gateway auth `user:password` |
-   | `CORS_ORIGIN` | Frontend URL (mis. `https://billing.yourdomain.com`) |
+   | Variabel                  | Deskripsi                                                      |
+   | ------------------------- | -------------------------------------------------------------- |
+   | `MYSQL_ROOT_PASSWORD`     | MySQL root password (32+ chars, random)                        |
+   | `DB_USER` / `DB_PASSWORD` | Kredensial aplikasi ke database                                |
+   | `JWT_SECRET`              | JWT signing key (run: `openssl rand -base64 32`)               |
+   | `ENCRYPTION_KEY`          | Data encryption key (32 chars, run: `openssl rand -base64 32`) |
+   | `WA_BASIC_AUTH`           | WhatsApp gateway auth `user:password`                          |
+   | `CORS_ORIGIN`             | Frontend URL (mis. `https://billing.yourdomain.com`)           |
 
 2. **Start services**
 
@@ -176,12 +184,12 @@ Production setup: MySQL, backend (`fasty-api`), frontend (`fasty-bill` via nginx
 
    Services & ports:
 
-   | Service | Port | Akses |
-   |---------|------|-------|
-   | `fasty-bill` (nginx) | 80 | Frontend + API proxy |
-   | `fasty-api` | internal 3000 | Backend (via nginx saja) |
-   | `mysql` | internal 3306 | Database (tidak diexpose) |
-   | `whatsapp` | 5000 | WA gateway dashboard |
+   | Service              | Port          | Akses                     |
+   | -------------------- | ------------- | ------------------------- |
+   | `fasty-bill` (nginx) | 80            | Frontend + API proxy      |
+   | `fasty-api`          | internal 3000 | Backend (via nginx saja)  |
+   | `mysql`              | internal 3306 | Database (tidak diexpose) |
+   | `whatsapp`           | 5000          | WA gateway dashboard      |
 
    Migration runs automatically on first start (creates schema + default admin).
 
@@ -195,10 +203,15 @@ Production setup: MySQL, backend (`fasty-api`), frontend (`fasty-bill` via nginx
 
 ### Production notes
 
-- **HTTPS**: Place Caddy/Nginx/Traefik in front port 80 with Let's Encrypt. Update `CORS_ORIGIN` to HTTPS domain.
-- **Firewall**: Only expose ports 80 (frontend) and 443 (HTTPS). Keep 5000 (WhatsApp) internal or restrict to admin IPs.
-- **WhatsApp session**: Volume `whatsapp_storages` persists QR session — don't delete unless resetting. Set `WA_WEBHOOK` in `.env` for incoming message webhooks.
-- **Backups**: Schedule `mysql_data` volume backups: `docker exec fasty-mysql mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" fasty_bill > backup.sql`
+- **HTTPS**: Place Caddy/Nginx/Traefik in front port 80 with Let's Encrypt.
+  Update `CORS_ORIGIN` to HTTPS domain.
+- **Firewall**: Only expose ports 80 (frontend) and 443 (HTTPS). Keep 5000
+  (WhatsApp) internal or restrict to admin IPs.
+- **WhatsApp session**: Volume `whatsapp_storages` persists QR session — don't
+  delete unless resetting. Set `WA_WEBHOOK` in `.env` for incoming message
+  webhooks.
+- **Backups**: Schedule `mysql_data` volume backups:
+  `docker exec fasty-mysql mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" fasty_bill > backup.sql`
 - **Updates**:
   ```bash
   git pull
@@ -212,10 +225,10 @@ Uncomment in `docker-compose.yml` to expose ports directly:
 ```yaml
 fasty-api:
   ports:
-    - "3000:3000"  # Direct API access (debugging)
+    - '3000:3000' # Direct API access (debugging)
 mysql:
   ports:
-    - "127.0.0.1:3306:3306"  # Local MySQL client
+    - '127.0.0.1:3306:3306' # Local MySQL client
 ```
 
 ## Main Features
