@@ -1144,7 +1144,7 @@ export function WAGatewayPage() {
       />
 
       <Tabs defaultValue="pengaturan-baileys" className="w-full">
-        <TabsList className="w-full overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-2 sm:flex sm:overflow-x-auto">
           <TabsTrigger value="pengaturan-baileys" className="whitespace-nowrap">
             <Settings2 className="mr-1.5 size-3.5" />
             <span className="hidden sm:inline">Pengaturan Baileys</span>
