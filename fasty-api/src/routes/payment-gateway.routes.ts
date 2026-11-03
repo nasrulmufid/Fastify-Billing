@@ -62,12 +62,27 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
       })
     }
     try {
-      await fetch(`${config.sumopod.baseUrl}/api/v1/payments`, {
-        method: "GET",
-        headers: { "X-Api-Key": cfg.apiKey },
-      })
-      return reply.send({ data: { connected: true } })
-    } catch {
+      const baseUrl = config.sumopod.baseUrl.replace(/\/$/, "")
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10000)
+      let response: Response
+      try {
+        response = await fetch(`${baseUrl}/api/v1/payments`, {
+          method: "GET",
+          headers: { Accept: "application/json", "X-Api-Key": cfg.apiKey },
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeout)
+      }
+
+      const connected = response.status < 500
+      if (!connected) {
+        app.log.warn({ status: response.status, baseUrl }, "SumoPod connection test returned server error")
+      }
+      return reply.send({ data: { connected, status: response.status } })
+    } catch (err) {
+      app.log.warn({ error: err instanceof Error ? err.message : String(err), baseUrl: config.sumopod.baseUrl }, "SumoPod connection test failed")
       return reply.send({ data: { connected: false } })
     }
   })
