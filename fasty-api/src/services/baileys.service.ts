@@ -61,15 +61,7 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
         info: () => {},
         debug: () => {},
         trace: () => {},
-        child: () => ({
-          level: "fatal" as const,
-          log: () => {},
-          error: () => {},
-          warn: () => {},
-          info: () => {},
-          debug: () => {},
-          trace: () => {},
-        }),
+        child: () => app.log,
       },
     })
 
