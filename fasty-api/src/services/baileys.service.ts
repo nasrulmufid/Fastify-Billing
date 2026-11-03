@@ -26,37 +26,41 @@ let qrCodeData: string | null = null
 let pairingCode: string | null = null
 export let connectionState: GatewayState = "disconnected"
 
-function gowaHeaders(): Record<string, string> {
-  return {
+function gowaHeaders(deviceScoped: boolean): Record<string, string> {
+  const headers: Record<string, string> = {
     Authorization: `Basic ${Buffer.from(config.gowa.basicAuth).toString("base64")}`,
     "Content-Type": "application/json",
   }
+  if (deviceScoped) headers["X-Device-Id"] = config.gowa.deviceId
+  return headers
 }
 
-async function gowa<T>(path: string, init?: RequestInit): Promise<T> {
+async function gowa<T>(path: string, init?: RequestInit, deviceScoped = true): Promise<T> {
   if (!config.gowa.basicAuth) throw new Error("GOWA_BASIC_AUTH belum dikonfigurasi")
 
   const response = await fetch(`${config.gowa.baseUrl}${path}`, {
     ...init,
-    headers: { ...gowaHeaders(), ...init?.headers },
+    headers: { ...gowaHeaders(deviceScoped), ...init?.headers },
     signal: AbortSignal.timeout(15_000),
   })
-  const body = (await response.json().catch(() => null)) as GowaResponse<T> | null
+  const raw = await response.text()
+  const body = JSON.parse(raw || "null") as GowaResponse<T> | null
   if (!response.ok || !body || body.code !== "SUCCESS") {
-    throw new Error(body?.message || `GOWA request gagal (${response.status})`)
+    const detail = body?.message || raw.slice(0, 200) || "empty response"
+    throw new Error(`GOWA ${path} failed (${response.status}): ${detail}`)
   }
   return body.results
 }
 
 async function ensureDevice(): Promise<void> {
   if (initialized) return
-  const devices = await gowa<Array<{ id?: string; device_id?: string }>>("/devices")
+  const devices = await gowa<Array<{ id?: string; device_id?: string }>>("/devices", undefined, false)
   const exists = devices.some((device) => String(device.id ?? device.device_id ?? "") === config.gowa.deviceId)
   if (!exists) {
     await gowa<{ id: string }>("/devices", {
       method: "POST",
       body: JSON.stringify({ device_id: config.gowa.deviceId }),
-    })
+    }, false)
   }
   initialized = true
 }
@@ -65,7 +69,7 @@ async function loadQr(url: string): Promise<string> {
   const remote = new URL(url)
   const internalUrl = new URL(`${remote.pathname}${remote.search}`, `${config.gowa.baseUrl}/`).toString()
   const response = await fetch(internalUrl, {
-    headers: gowaHeaders(),
+    headers: gowaHeaders(false),
     signal: AbortSignal.timeout(15_000),
   })
   if (!response.ok) throw new Error(`Gagal mengunduh QR dari GOWA (${response.status})`)
