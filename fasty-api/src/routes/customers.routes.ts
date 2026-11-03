@@ -216,8 +216,8 @@ export async function customersRoutes(app: FastifyInstance) {
     const result = (await app.db.query(
       `INSERT INTO customers
         (code, name, email, phone, address, package_id, router_id, status, ip_address,
-         pppoe_username, pppoe_password, login_username, login_password, odp_id, gps, join_at, expiry_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Isolated', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         pppoe_username, pppoe_password, login_username, login_password, login_password_hash, odp_id, gps, join_at, expiry_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'Isolated', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         code,
         body.name,
@@ -231,6 +231,7 @@ export async function customersRoutes(app: FastifyInstance) {
         body.pppoePassword,
         body.loginUsername,
         body.loginPassword,
+        await bcrypt.hash(body.loginPassword, 12),
         body.odpId ?? "",
         body.gps ?? "",
         joinAt,
@@ -364,6 +365,7 @@ export async function customersRoutes(app: FastifyInstance) {
         pppoe_password = COALESCE(?, pppoe_password),
         login_username = COALESCE(?, login_username),
         login_password = COALESCE(?, login_password),
+        login_password_hash = COALESCE(?, login_password_hash),
         odp_id = COALESCE(?, odp_id),
         gps = COALESCE(?, gps)
        WHERE id = ?`,
@@ -379,6 +381,7 @@ export async function customersRoutes(app: FastifyInstance) {
         body.pppoePassword ?? null,
         body.loginUsername ?? null,
         body.loginPassword ?? null,
+        body.loginPassword ? await bcrypt.hash(body.loginPassword, 12) : null,
         body.odpId ?? null,
         body.gps ?? null,
         id,

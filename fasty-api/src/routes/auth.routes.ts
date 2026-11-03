@@ -116,7 +116,18 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       const passwordHash = String(row.login_password_hash ?? "")
-      const passwordMatches = Boolean(passwordHash) && await bcrypt.compare(body.password, passwordHash)
+      let passwordMatches = Boolean(passwordHash) && await bcrypt.compare(body.password, passwordHash)
+
+      // Upgrade legacy plaintext password after one successful login.
+      if (!passwordMatches && !passwordHash && row.login_password) {
+        passwordMatches = body.password === String(row.login_password)
+        if (passwordMatches) {
+          await app.db.query("UPDATE customers SET login_password_hash = ? WHERE id = ?", [
+            await bcrypt.hash(body.password, 12),
+            row.id,
+          ])
+        }
+      }
 
       if (!passwordMatches) {
         return reply.code(401).send({
