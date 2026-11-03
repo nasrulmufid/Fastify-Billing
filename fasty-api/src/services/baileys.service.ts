@@ -65,8 +65,11 @@ async function ensureDevice(): Promise<void> {
 async function loadQr(url: string): Promise<string> {
   const remote = new URL(url)
   const internalUrl = new URL(`${remote.pathname}${remote.search}`, `${config.gowa.baseUrl}/`).toString()
-  const response = await fetch(internalUrl, { signal: AbortSignal.timeout(15_000) })
-  if (!response.ok) throw new Error("Gagal mengunduh QR dari GOWA")
+  const response = await fetch(internalUrl, {
+    headers: gowaHeaders(),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!response.ok) throw new Error(`Gagal mengunduh QR dari GOWA (${response.status})`)
   const image = Buffer.from(await response.arrayBuffer()).toString("base64")
   return `data:${response.headers.get("content-type") || "image/png"};base64,${image}`
 }
