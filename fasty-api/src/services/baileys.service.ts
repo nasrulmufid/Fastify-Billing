@@ -26,20 +26,21 @@ let qrCodeData: string | null = null
 let pairingCode: string | null = null
 export let connectionState: GatewayState = "disconnected"
 
-function gowaHeaders(): Record<string, string> {
-  return {
+function gowaHeaders(deviceScoped = true): Record<string, string> {
+  const headers: Record<string, string> = {
     Authorization: `Basic ${Buffer.from(config.gowa.basicAuth).toString("base64")}`,
     "Content-Type": "application/json",
-    "X-Device-Id": config.gowa.deviceId,
   }
+  if (deviceScoped) headers["X-Device-Id"] = config.gowa.deviceId
+  return headers
 }
 
-async function gowa<T>(path: string, init?: RequestInit): Promise<T> {
+async function gowa<T>(path: string, init?: RequestInit, deviceScoped = true): Promise<T> {
   if (!config.gowa.basicAuth) throw new Error("GOWA_BASIC_AUTH belum dikonfigurasi")
 
   const response = await fetch(`${config.gowa.baseUrl}${path}`, {
     ...init,
-    headers: { ...gowaHeaders(), ...init?.headers },
+    headers: { ...gowaHeaders(deviceScoped), ...init?.headers },
     signal: AbortSignal.timeout(15_000),
   })
   const body = (await response.json().catch(() => null)) as GowaResponse<T> | null
@@ -55,7 +56,7 @@ async function ensureDevice(): Promise<void> {
     await gowa<{ id: string }>("/devices", {
       method: "POST",
       body: JSON.stringify({ device_id: config.gowa.deviceId }),
-    })
+    }, false)
   } catch (err) {
     // Slot existing returns an error; status below confirms it is usable.
     if (!(err instanceof Error) || !/exist|already/i.test(err.message)) throw err
