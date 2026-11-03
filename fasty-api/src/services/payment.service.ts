@@ -125,6 +125,13 @@ export async function completePaymentFlow(
         })
       })().catch(() => {})
     })
+
+    // Kirim pesan "pembayaran diterima" ke pelanggan via WA
+    setImmediate(() => {
+      void sendPaymentReceivedMessage(app, customer, payment, method).catch((err) => {
+        app.log.error(err, "Gagal mengirim pesan pembayaran diterima")
+      })
+    })
   }
 
   return { payment: { ...payment, status: "Sukses" }, invoice }
@@ -220,6 +227,47 @@ function paymentAmountOf(customer: Record<string, unknown>): string {
  * Template diambil dari konfigurasi WA Gateway (bisa dicustom admin);
  * bila belum diisi, gunakan pesan default.
  */
+/**
+ * Kirim pesan "pembayaran diterima" ke pelanggan via WA Gateway.
+ * Template diambil dari konfigurasi WA Gateway (bisa dicustom admin).
+ */
+export async function sendPaymentReceivedMessage(
+  app: FastifyInstance,
+  customer: Record<string, unknown>,
+  payment: Record<string, unknown>,
+  method: string,
+): Promise<void> {
+  try {
+    const [row] = (await app.db.query(
+      "SELECT payment_received_message FROM wa_api_config WHERE id = 1",
+    )) as Record<string, unknown>[]
+    const custom = String(row?.payment_received_message ?? "").trim()
+    
+    const defaultBody = "Yth {nama}, pembayaran Anda sebesar {jumlah} melalui {metode} telah kami terima. Terima kasih.\n\nLayanan internet Anda tetap aktif."
+    const template = custom || defaultBody
+
+    const vars: Record<string, string> = {
+      nama: String(customer.name ?? ""),
+      jumlah: payment.amount != null ? String(payment.amount) : "",
+      metode: method,
+    }
+    const message = fillPlaceholders(template, vars)
+    const result = await sendWhatsAppMessage(app, {
+      phone: String(customer.phone ?? ""),
+      message,
+    })
+    const ntCode = await app.db.transaction(async (q) =>
+      nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 }),
+    )
+    await app.db.query(
+      "INSERT INTO notification_logs (code, type, customer_id, channel, status, error) VALUES (?, 'payment', ?, 'WhatsApp', ?, ?)",
+      [ntCode, customer.id ?? null, result.ok ? "Terkirim" : "Gagal", result.ok ? null : result.error],
+    )
+  } catch (err) {
+    app.log.error(err, "Gagal mengirim pesan pembayaran diterima")
+  }
+}
+
 export async function sendOfflineNotice(
   app: FastifyInstance,
   customer: Record<string, unknown>,
