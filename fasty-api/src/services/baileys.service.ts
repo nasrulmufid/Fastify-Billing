@@ -137,9 +137,10 @@ export async function requestBaileyPairingCode(
   pairingCode = null
 
   await initBaileysSock(app)
-  if (!baileysSocket) throw new Error("WhatsApp belum siap")
+  const socket = baileysSocket
+  if (!socket) throw new Error("WhatsApp belum siap")
 
-  pairingCode = await baileysSocket.requestPairingCode(normalized)
+  pairingCode = await socket.requestPairingCode(normalized)
   app.log.info(`Pairing code requested untuk ${normalized}`)
   return pairingCode
 }
