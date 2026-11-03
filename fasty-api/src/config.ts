@@ -24,7 +24,7 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
 
   sumopod: {
-    baseUrl: (process.env.SUMOPOD_URL ?? "https://api-pay.sumopod.com").trim().replace(/\/$/, ""),
+    baseUrl: (process.env.SUMOPOD_URL ?? "https://api-pay-sandbox.sumopod.com").trim().replace(/\/$/, ""),
     apiKey: process.env.SUMOPOD_API_KEY ?? process.env.SUMODOP_API_KEY ?? "",
     webhookSecret: process.env.SUMOPOD_WEBHOOK_SECRET ?? process.env.SUMODOP_WEBHOOK_SECRET ?? "",
     webhookToken: process.env.SUMOPOD_WEBHOOK_TOKEN ?? process.env.SUMODOP_WEBHOOK_TOKEN ?? "",
