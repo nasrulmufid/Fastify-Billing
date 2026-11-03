@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
 import { maskSecret } from "../utils/crypto.js"
-import { createSumopodPayment } from "../utils/sumopod.js"
+import { createSumopodPayment, sumopodPaymentsUrl } from "../utils/sumopod.js"
 import { config } from "../config.js"
 
 const configSchema = z.object({
@@ -67,7 +67,7 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
       const timeout = setTimeout(() => controller.abort(), 10000)
       let response: Response
       try {
-        response = await fetch(`${baseUrl}/api/v1/payments`, {
+        response = await fetch(sumopodPaymentsUrl(), {
           method: "GET",
           headers: { Accept: "application/json", "X-Api-Key": cfg.apiKey },
           signal: controller.signal,

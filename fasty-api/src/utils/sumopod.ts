@@ -27,6 +27,11 @@ export interface CreatedPayment {
   expiresAt: string | null
 }
 
+/** Endpoint Managed Payment SumoPod: base URL tidak menyertakan /api/v1. */
+export function sumopodPaymentsUrl(): string {
+  return `${config.sumopod.baseUrl.replace(/\/$/, "")}/payments`
+}
+
 /** Buat payment QRIS di SumoPod */
 export async function createSumopodPayment(params: CreatePaymentParams): Promise<CreatedPayment> {
   const body = {
@@ -40,7 +45,7 @@ export async function createSumopodPayment(params: CreatePaymentParams): Promise
   const timeout = setTimeout(() => controller.abort(), 15000)
   let res: Response
   try {
-    res = await fetch(`${config.sumopod.baseUrl}/api/v1/payments`, {
+    res = await fetch(sumopodPaymentsUrl(), {
       method: "POST",
       headers: {
         Accept: "application/json",
