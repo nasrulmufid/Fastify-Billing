@@ -53,16 +53,7 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
     baileysSocket = makeWASocket({
       auth: state,
       printQRInTerminal: false,
-      logger: {
-        level: "fatal" as const,
-        log: () => {},
-        error: () => {},
-        warn: () => {},
-        info: () => {},
-        debug: () => {},
-        trace: () => {},
-        child: () => app.log,
-      },
+      logger: app.log.child({ level: "fatal" }),
     })
 
     baileysSocket.ev.on("connection.update", async (update) => {
