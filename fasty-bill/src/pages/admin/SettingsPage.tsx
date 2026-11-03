@@ -1447,7 +1447,7 @@ function TabPaymentGateway() {
       </Card>
 
       <p className="rounded-xl border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-        Kredensial SumoPod dibaca dari environment backend: `SUMOPOD_URL`, `SUMODOP_API_KEY`, `SUMODOP_WEBHOOK_SECRET`, dan `SUMODOP_WEBHOOK_TOKEN`. Ubah `.env`, lalu restart container API.
+        Kredensial SumoPod dibaca dari environment backend: `SUMOPOD_URL`, `SUMOPOD_API_KEY`, `SUMOPOD_WEBHOOK_SECRET`, dan `SUMOPOD_WEBHOOK_TOKEN`. Ubah `.env`, lalu restart container API.
       </p>
     </div>
   )

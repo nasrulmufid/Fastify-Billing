@@ -25,9 +25,9 @@ export const config = {
 
   sumopod: {
     baseUrl: (process.env.SUMOPOD_URL ?? process.env.SUMODOP_BASE_URL ?? "https://api-pay.sumopod.com").trim().replace(/\/$/, ""),
-    apiKey: process.env.SUMODOP_API_KEY ?? "",
-    webhookSecret: process.env.SUMODOP_WEBHOOK_SECRET ?? "",
-    webhookToken: process.env.SUMODOP_WEBHOOK_TOKEN ?? "",
+    apiKey: process.env.SUMOPOD_API_KEY ?? process.env.SUMODOP_API_KEY ?? "",
+    webhookSecret: process.env.SUMOPOD_WEBHOOK_SECRET ?? process.env.SUMODOP_WEBHOOK_SECRET ?? "",
+    webhookToken: process.env.SUMOPOD_WEBHOOK_TOKEN ?? process.env.SUMODOP_WEBHOOK_TOKEN ?? "",
   },
 
   genieacs: {
