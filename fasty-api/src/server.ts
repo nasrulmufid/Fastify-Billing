@@ -1,5 +1,10 @@
 import "dotenv/config.js"
+import dns from "node:dns"
 import { buildApp } from "./app.js"
+
+// Banyak VPS punya IPv6 aktif tetapi routing IPv6 keluar tidak tersedia.
+// SumoPod tetap diakses melalui IPv4 agar fetch tidak timeout pada koneksi IPv6.
+dns.setDefaultResultOrder("ipv4first")
 import { config } from "./config.js"
 
 async function main() {

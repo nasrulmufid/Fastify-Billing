@@ -36,14 +36,26 @@ export async function createSumopodPayment(params: CreatePaymentParams): Promise
     expires_in_hours: params.expiresInHours ?? 24,
     payment_method_type_code: "QRIS",
   }
-  const res = await fetch(`${config.sumopod.baseUrl}/api/v1/payments`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-Key": params.apiKey,
-    },
-    body: JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)
+  let res: Response
+  try {
+    res = await fetch(`${config.sumopod.baseUrl}/api/v1/payments`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Api-Key": params.apiKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    const cause = err instanceof Error && err.cause ? `: ${String(err.cause)}` : ""
+    throw new Error(`SumoPod tidak dapat dihubungi di ${config.sumopod.baseUrl}${cause}`)
+  } finally {
+    clearTimeout(timeout)
+  }
   if (!res.ok) {
     throw new Error(`SumoPod API error: ${res.status} ${await res.text()}`)
   }

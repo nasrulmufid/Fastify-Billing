@@ -133,7 +133,7 @@ JWT_EXPIRES_IN=8h
 
 CORS_ORIGIN=http://localhost:5173
 
-SUMODOP_BASE_URL=https://api-pay-sandbox.sumopod.com
+SUMOPOD_URL=https://api-pay-sandbox.sumopod.com
 SUMODOP_API_KEY=your_sumopod_api_key
 SUMODOP_WEBHOOK_SECRET=your_webhook_secret
 SUMODOP_WEBHOOK_TOKEN=your_webhook_token
