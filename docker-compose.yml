@@ -75,30 +75,11 @@ services:
     ports:
       - "80:80"
     networks: [fasty-net]
-  whatsapp:
-    image: aldinokemal2104/go-whatsapp-web-multidevice:latest
-    container_name: fasty-whatsapp
-    restart: always
-    command: ["rest", "--basic-auth=${WA_BASIC_AUTH:-admin:admin}", "--port=5000", "--os=FastifyBilling", "--account-validation=false"]
-    environment:
-      APP_PORT: 5000
-      APP_DEBUG: "false"
-      APP_BASIC_AUTH: ${WA_BASIC_AUTH:-admin:admin}
-      WHATSAPP_WEBHOOK: ${WA_WEBHOOK:-}
-      WHATSAPP_WEBHOOK_SECRET: ${WA_WEBHOOK_SECRET:-secret}
-    volumes:
-      - whatsapp_storages:/app/storages
-      - whatsapp_statics:/app/statics
-    ports:
-      - "5000:5000"
-    networks: [fasty-net]
     # NOTE: Baileys QR login sudah terintegrasi di fasty-api service
     # Container ini deprecated — bisa dihapus untuk production Baileys-only
 volumes:
   mysql_data:
   baileys_auth:
-  whatsapp_storages:
-  whatsapp_statics:
 networks:
   fasty-net:
     driver: bridge
