@@ -109,6 +109,28 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
       app.log.info("✓ Column 'payment_received_message' added")
     }
 
+    // Ensure customers.login_password_hash column exists
+    const [loginHashColExists] = await db.query<Record<string, unknown>[]>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'login_password_hash'`,
+      [config.db.database],
+    )
+    if (!loginHashColExists || loginHashColExists.length === 0) {
+      app.log.info("Adding 'login_password_hash' column to customers...")
+      await db.query(
+        `ALTER TABLE customers ADD COLUMN login_password_hash VARCHAR(255) NULL AFTER login_password`,
+      )
+      app.log.info("✓ Column 'login_password_hash' added")
+      
+      // Copy existing login_password to login_password_hash as fallback
+      // (app will properly hash on next login attempt)
+      await db.query(
+        `UPDATE customers SET login_password_hash = login_password 
+         WHERE login_password_hash IS NULL AND login_password IS NOT NULL`,
+      )
+      app.log.info("✓ Copied existing login_password values")
+    }
+
     app.log.info("✓ All migrations completed")
   } catch (err) {
     app.log.warn(err, "Migration warning (may already exist)")

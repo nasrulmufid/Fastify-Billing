@@ -114,8 +114,30 @@ export async function authRoutes(app: FastifyInstance) {
         })
       }
 
+      // Try hashed password first, fallback to plain text for backward compatibility
       const passwordHash = String(row.login_password_hash ?? "")
-      const passwordMatches = passwordHash && await bcrypt.compare(body.password, passwordHash)
+      const plainPassword = String(row.login_password ?? "")
+      
+      let passwordMatches = false
+      if (passwordHash) {
+        passwordMatches = await bcrypt.compare(body.password, passwordHash)
+      }
+      
+      // Fallback: plain text comparison (legacy support)
+      if (!passwordMatches && plainPassword && body.password === plainPassword) {
+        passwordMatches = true
+        // Auto-migrate: hash the plain password for next login
+        try {
+          const hash = await bcrypt.hash(body.password, 10)
+          await app.db.query("UPDATE customers SET login_password_hash = ? WHERE id = ?", [
+            hash,
+            row.id,
+          ])
+        } catch (err) {
+          app.log.warn(err, "Failed to auto-hash customer password")
+        }
+      }
+      
       if (!passwordMatches) {
         return reply.code(401).send({
           error: { code: "INVALID_CREDENTIALS", message: "Username atau password salah" },
