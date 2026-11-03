@@ -40,7 +40,7 @@ export async function requestSumopod(
   method: "GET" | "POST" = "POST",
 ): Promise<{ status: number; body: string }> {
   const target = new URL(url)
-  return new Promise((resolve, reject) => {
+  return new Promise<{ status: number; body: string }>((resolve, reject) => {
     const req = https.request({
       protocol: target.protocol,
       hostname: target.hostname,
