@@ -132,17 +132,15 @@ export async function requestBaileyPairingCode(
   if (!/^\d{8,15}$/.test(normalized)) throw new Error("Nomor WhatsApp tidak valid")
 
   // Reset socket untuk fresh pairing attempt
-  baileysSocket = null
-  qrCodeData = null
-  pairingCode = null
+  await disconnectBaileys()
 
   await initBaileysSock(app)
-  const socket = baileysSocket
-  if (!socket) throw new Error("WhatsApp belum siap")
+  if (!baileysSocket) throw new Error("WhatsApp belum siap")
 
-  pairingCode = await socket.requestPairingCode(normalized)
+  const code = await baileysSocket.requestPairingCode(normalized)
+  pairingCode = code
   app.log.info(`Pairing code requested untuk ${normalized}`)
-  return pairingCode
+  return code
 }
 
 /** Disconnect Baileys */
