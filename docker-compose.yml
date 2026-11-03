@@ -19,6 +19,20 @@ services:
       timeout: 5s
       retries: 10
     networks: [fasty-net]
+  gowa:
+    image: aldinokemal2104/go-whatsapp-web-multidevice:latest
+    container_name: fasty-gowa
+    restart: always
+    command: ["rest"]
+    environment:
+      APP_BASIC_AUTH: ${GOWA_BASIC_AUTH:-admin:change_this_gowa_password}
+      APP_HOST: 0.0.0.0
+    volumes:
+      - gowa_storages:/app/storages
+      - gowa_statics:/app/statics
+    expose: ["3000"]
+    networks: [fasty-net]
+
   fasty-api:
     build:
       context: ./fasty-api
@@ -29,6 +43,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      gowa:
+        condition: service_started
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -49,8 +65,9 @@ services:
       SUMODOP_WEBHOOK_TOKEN: ${SUMODOP_WEBHOOK_TOKEN:-}
       GENIEACS_BASE_URL: ${GENIEACS_BASE_URL:-}
       GENIEACS_API_KEY: ${GENIEACS_API_KEY:-}
-    volumes:
-      - baileys_auth:/app/.baileys
+      GOWA_BASE_URL: ${GOWA_BASE_URL:-http://gowa:3000}
+      GOWA_BASIC_AUTH: ${GOWA_BASIC_AUTH:-admin:change_this_gowa_password}
+      GOWA_DEVICE_ID: ${GOWA_DEVICE_ID:-fasty-billing}
     expose: ["3000"]
     ports:
       - "3000:3000"
@@ -79,7 +96,8 @@ services:
     # Container ini deprecated — bisa dihapus untuk production Baileys-only
 volumes:
   mysql_data:
-  baileys_auth:
+  gowa_storages:
+  gowa_statics:
 networks:
   fasty-net:
     driver: bridge

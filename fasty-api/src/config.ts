@@ -35,6 +35,12 @@ export const config = {
     apiKey: process.env.GENIEACS_API_KEY ?? "",
   },
 
+  gowa: {
+    baseUrl: (process.env.GOWA_BASE_URL ?? "http://gowa:3000").replace(/\/$/, ""),
+    basicAuth: process.env.GOWA_BASIC_AUTH ?? "",
+    deviceId: process.env.GOWA_DEVICE_ID ?? "fasty-billing",
+  },
+
   encryptionKey: process.env.ENCRYPTION_KEY ?? "",
 }
 

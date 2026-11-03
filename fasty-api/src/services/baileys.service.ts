@@ -1,12 +1,6 @@
 import type { FastifyInstance } from "fastify"
-import type { WASocket } from "baileys"
-import { default as makeWASocket, DisconnectReason, useMultiFileAuthState } from "baileys"
-import { Boom } from "@hapi/boom"
-import path from "path"
-import fs from "fs/promises"
-import QRCode from "qrcode"
 
-import { decryptSecret, encryptSecret } from "../utils/crypto.js"
+import { config } from "../config.js"
 import { normalizePhone } from "../utils/phone.js"
 
 export interface SendResult {
@@ -19,214 +13,152 @@ export interface SendMessageInput {
   message: string
 }
 
-let baileysSocket: WASocket | null = null
+type GatewayState = "disconnected" | "connecting" | "connected"
+
+type GowaResponse<T> = {
+  code: string
+  message: string
+  results: T
+}
+
+let initialized = false
 let qrCodeData: string | null = null
 let pairingCode: string | null = null
-export let connectionState: "disconnected" | "connecting" | "connected" = "disconnected"
+export let connectionState: GatewayState = "disconnected"
 
-function setConnectionState(
-  state: "disconnected" | "connecting" | "connected",
-): void {
-  connectionState = state
-}
-
-const BAILEYS_AUTH_DIR = path.join(process.cwd(), ".baileys")
-
-/** Init Baileys auth dir */
-async function ensureAuthDir(): Promise<void> {
-  try {
-    await fs.mkdir(BAILEYS_AUTH_DIR, { recursive: true })
-  } catch {
-    /* dir exists */
+function gowaHeaders(): HeadersInit {
+  return {
+    Authorization: `Basic ${Buffer.from(config.gowa.basicAuth).toString("base64")}`,
+    "Content-Type": "application/json",
   }
 }
 
-/** Start Baileys connection */
-export async function initBaileysSock(app: FastifyInstance): Promise<void> {
-  connectionState = "connecting"
-  await ensureAuthDir()
+async function gowa<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!config.gowa.basicAuth) throw new Error("GOWA_BASIC_AUTH belum dikonfigurasi")
 
+  const response = await fetch(`${config.gowa.baseUrl}${path}`, {
+    ...init,
+    headers: { ...gowaHeaders(), ...init?.headers },
+    signal: AbortSignal.timeout(15_000),
+  })
+  const body = (await response.json().catch(() => null)) as GowaResponse<T> | null
+  if (!response.ok || !body || body.code !== "SUCCESS") {
+    throw new Error(body?.message || `GOWA request gagal (${response.status})`)
+  }
+  return body.results
+}
+
+async function ensureDevice(): Promise<void> {
+  if (initialized) return
   try {
-    const { state, saveCreds } = await useMultiFileAuthState(BAILEYS_AUTH_DIR)
-
-    baileysSocket = makeWASocket({
-      auth: state,
-      printQRInTerminal: false,
-      logger: app.log.child({ level: "fatal" }),
-      browser: ["Ubuntu", "Chrome", "120.0"],
-      syncFullHistory: false,
-      markOnlineOnConnect: true,
+    await gowa<{ id: string }>("/devices", {
+      method: "POST",
+      body: JSON.stringify({ device_id: config.gowa.deviceId }),
     })
-
-    baileysSocket.ev.on("connection.update", async (update) => {
-      const { connection, lastDisconnect, qr } = update
-
-      if (qr) {
-        qrCodeData = await QRCode.toDataURL(qr)
-        pairingCode = null
-        app.log.info("QR code updated")
-      }
-
-      if (connection === "connecting") {
-        setConnectionState("connecting")
-        app.log.info("Connecting to WhatsApp...")
-      }
-
-      if (connection === "open") {
-        setConnectionState("connected")
-        qrCodeData = null
-        pairingCode = null
-        app.log.info("WhatsApp connected successfully")
-      }
-
-      if (connection === "close") {
-        setConnectionState("disconnected")
-        const reason = new Boom(lastDisconnect?.error).output.statusCode
-        const shouldReconnect = reason !== DisconnectReason.loggedOut
-        app.log.warn(`Connection closed. Reason: ${reason}. Reconnect: ${shouldReconnect}`)
-
-        if (shouldReconnect) {
-          setTimeout(() => {
-            baileysSocket = null
-            qrCodeData = null
-            pairingCode = null
-            initBaileysSock(app).catch((err) => app.log.error(err, "Failed to reconnect"))
-          }, 3000)
-        } else {
-          baileysSocket = null
-          qrCodeData = null
-          pairingCode = null
-          setConnectionState("disconnected")
-        }
-      }
-    })
-
-    baileysSocket.ev.on("creds.update", saveCreds)
   } catch (err) {
-    app.log.error(err, "Failed to init Baileys socket")
-    setConnectionState("disconnected")
-    baileysSocket = null
-    throw err
+    // Slot existing returns an error; status below confirms it is usable.
+    if (!(err instanceof Error) || !/exist|already/i.test(err.message)) throw err
   }
+  initialized = true
 }
 
-/** Get connection status & QR */
+async function loadQr(url: string): Promise<string> {
+  const remote = new URL(url)
+  const internalUrl = new URL(`${remote.pathname}${remote.search}`, `${config.gowa.baseUrl}/`).toString()
+  const response = await fetch(internalUrl, { signal: AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new Error("Gagal mengunduh QR dari GOWA")
+  const image = Buffer.from(await response.arrayBuffer()).toString("base64")
+  return `data:${response.headers.get("content-type") || "image/png"};base64,${image}`
+}
+
+/** Connect GOWA device slot. Kept name for existing route callers. */
+export async function initBaileysSock(_app: FastifyInstance): Promise<void> {
+  await ensureDevice()
+  const status = await gowa<{ is_connected: boolean; is_logged_in: boolean }>(
+    `/devices/${encodeURIComponent(config.gowa.deviceId)}/status`,
+  )
+  connectionState = status.is_connected && status.is_logged_in ? "connected" : "disconnected"
+}
+
 export function getBaileyStatus(): {
   connected: boolean
-  state: "disconnected" | "connecting" | "connected"
+  state: GatewayState
   qr: string | null
   pairingCode: string | null
 } {
-  return {
-    connected: connectionState === "connected",
-    state: connectionState,
-    qr: qrCodeData,
-    pairingCode,
-  }
+  return { connected: connectionState === "connected", state: connectionState, qr: qrCodeData, pairingCode }
+}
+
+export async function requestBaileyQr(app: FastifyInstance): Promise<void> {
+  connectionState = "connecting"
+  qrCodeData = null
+  pairingCode = null
+  await ensureDevice()
+  const result = await gowa<{ qr_link: string }>(`/devices/${encodeURIComponent(config.gowa.deviceId)}/login`)
+  qrCodeData = await loadQr(result.qr_link)
+  await initBaileysSock(app)
 }
 
 export async function requestBaileyPairingCode(
-  app: FastifyInstance,
+  _app: FastifyInstance,
   phone: string,
 ): Promise<string> {
   const normalized = normalizePhone(phone)
   if (!/^\d{8,15}$/.test(normalized)) throw new Error("Nomor WhatsApp tidak valid")
 
-  // Reset socket untuk fresh pairing attempt
-  await disconnectBaileys()
-
-  await initBaileysSock(app)
-  if (!baileysSocket) throw new Error("WhatsApp belum siap")
-
-  const code = await baileysSocket.requestPairingCode(normalized)
-  pairingCode = code
-  app.log.info(`Pairing code requested untuk ${normalized}`)
-  return code
+  connectionState = "connecting"
+  qrCodeData = null
+  await ensureDevice()
+  const result = await gowa<{ pair_code: string }>(
+    `/devices/${encodeURIComponent(config.gowa.deviceId)}/login/code?phone=${encodeURIComponent(normalized)}`,
+    { method: "POST" },
+  )
+  pairingCode = result.pair_code
+  return pairingCode
 }
 
-/** Disconnect Baileys */
 export async function disconnectBaileys(): Promise<void> {
-  if (baileysSocket) {
-    try {
-      await baileysSocket.logout()
-    } catch {
-      /* ignore */
-    }
-    baileysSocket = null
-    setConnectionState("disconnected")
-    qrCodeData = null
-    pairingCode = null
-  }
+  await ensureDevice()
+  await gowa(`/devices/${encodeURIComponent(config.gowa.deviceId)}/logout`, { method: "POST" })
+  connectionState = "disconnected"
+  qrCodeData = null
+  pairingCode = null
 }
 
-/** Send message via Baileys */
+/** Send message via GOWA. Kept name for existing notification callers. */
 export async function sendWhatsAppMessage(
-  app: FastifyInstance,
+  _app: FastifyInstance,
   input: SendMessageInput,
 ): Promise<SendResult> {
-  if (!baileysSocket || connectionState !== "connected") {
-    return {
-      ok: false,
-      error: "WhatsApp bot belum terhubung. Scan QR code terlebih dahulu.",
-    }
-  }
+  const phone = normalizePhone(input.phone)
+  const message = String(input.message ?? "").trim()
+  if (!/^\d{8,15}$/.test(phone)) return { ok: false, error: "Nomor telepon tidak valid" }
+  if (!message || message.length > 4096) return { ok: false, error: "Pesan tidak valid" }
 
   try {
-    // Input validation
-    const phone = normalizePhone(input.phone)
-    if (!phone || !/^\d+$/.test(phone)) {
-      return { ok: false, error: "Nomor telepon tidak valid" }
-    }
-
-    // Message validation: prevent injection, max length
-    const message = String(input.message ?? "").trim()
-    if (!message || message.length === 0) {
-      return { ok: false, error: "Pesan tidak boleh kosong" }
-    }
-    if (message.length > 4096) {
-      return { ok: false, error: "Pesan terlalu panjang (maks 4096 karakter)" }
-    }
-
-    const jid = `${phone}@s.whatsapp.net`
-    await baileysSocket.sendMessage(jid, { text: message })
+    await gowa("/send/message", {
+      method: "POST",
+      headers: { "X-Device-Id": config.gowa.deviceId },
+      body: JSON.stringify({ phone, message }),
+    })
     return { ok: true }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    app.log.warn({ phone: input.phone, error: msg }, "Failed to send WhatsApp message")
-    return { ok: false, error: `Gagal mengirim pesan: ${msg.slice(0, 100)}` }
+    return { ok: false, error: err instanceof Error ? err.message : "Gagal mengirim pesan" }
   }
 }
 
-/** Store device credentials (encrypted, validated) */
-export async function storeDeviceCredentials(
-  app: FastifyInstance,
-  deviceName: string,
-): Promise<void> {
-  // Input validation
+/** GOWA keeps device identity and session; display name stays in existing DB config. */
+export async function storeDeviceCredentials(app: FastifyInstance, deviceName: string): Promise<void> {
   const name = String(deviceName ?? "").trim()
-  if (!name || name.length === 0) {
-    throw new Error("Nama perangkat tidak boleh kosong")
-  }
-  if (name.length > 120) {
-    throw new Error("Nama perangkat terlalu panjang (maks 120 karakter)")
-  }
-  if (!/^[a-zA-Z0-9\s\-_()]+$/.test(name)) {
-    throw new Error("Nama perangkat mengandung karakter tidak valid")
-  }
-
-  const encrypted = encryptSecret(name)
+  if (!name || name.length > 120) throw new Error("Nama perangkat tidak valid")
   await app.db.query(
     `INSERT INTO wa_api_config (id, device_name) VALUES (1, ?)
      ON DUPLICATE KEY UPDATE device_name = VALUES(device_name)`,
-    [encrypted],
+    [name],
   )
 }
 
-/** Get device name (decrypted) */
-export async function getDeviceName(app: FastifyInstance): Promise<string> {
-  const [row] = (await app.db.query("SELECT device_name FROM wa_api_config WHERE id = 1")) as Record<
-    string,
-    unknown
-  >[]
-  return decryptSecret(String(row?.device_name ?? ""))
+export async function getDeviceName(app: FastifyInstance): Promise<string | null> {
+  const [row] = (await app.db.query("SELECT device_name FROM wa_api_config WHERE id = 1")) as Array<{ device_name: string | null }>
+  return row?.device_name ?? null
 }

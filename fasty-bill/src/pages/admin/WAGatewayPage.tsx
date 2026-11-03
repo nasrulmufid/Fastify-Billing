@@ -103,7 +103,7 @@ const defaultBaileyStatus: BaileyStatus = {
 }
 
 /* ================================================================
-   Tab: Pengaturan Baileys (Login QR)
+   Tab: Pengaturan GOWA (Login WhatsApp)
    ================================================================ */
 
 function PengaturanBaileysTab() {
@@ -195,7 +195,7 @@ function PengaturanBaileysTab() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Settings2 className="size-4 text-muted-foreground" />
-            Login WhatsApp (Baileys)
+            Login WhatsApp (GOWA)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -331,7 +331,7 @@ function PengaturanBaileysTab() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Baileys adalah library WhatsApp yang memungkinkan pengiriman pesan otomatis
+              GOWA mengelola koneksi WhatsApp dan pengiriman pesan otomatis
               dari device Anda.
             </p>
             <p>
@@ -1173,15 +1173,15 @@ export function WAGatewayPage() {
     <div className="space-y-5">
       <PageHeader
         breadcrumbs={[{ label: "Dashboard", to: "/admin" }, { label: "WA Gateway" }]}
-        title="WA Gateway (Baileys)"
-        description="Kelola pengiriman pesan WhatsApp melalui Baileys."
+        title="WA Gateway (GOWA)"
+        description="Kelola pengiriman pesan WhatsApp melalui GOWA."
       />
 
       <Tabs defaultValue="pengaturan-baileys" className="w-full">
         <TabsList className="grid w-full grid-cols-2 gap-1 sm:flex sm:overflow-x-auto p-1 mb-4 sm:mb-0">
           <TabsTrigger value="pengaturan-baileys" className="whitespace-nowrap">
             <Settings2 className="mr-1.5 size-3.5" />
-            <span className="hidden sm:inline">Pengaturan Baileys</span>
+            <span className="hidden sm:inline">Pengaturan GOWA</span>
             <span className="sm:hidden">Pengaturan</span>
           </TabsTrigger>
           <TabsTrigger value="kirim-pesan" className="whitespace-nowrap">

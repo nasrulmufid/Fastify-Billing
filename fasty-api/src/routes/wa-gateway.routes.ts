@@ -4,7 +4,6 @@ import { z } from "zod"
 import { nextCode } from "../utils/codegen.js"
 import { config } from "../config.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
-import { normalizePhone } from "../utils/phone.js"
 import { fillPlaceholders } from "../utils/template.js"
 import {
   sendWhatsAppMessage,
@@ -15,11 +14,11 @@ import {
 } from "../services/wa.service.js"
 import {
   initBaileysSock,
+  requestBaileyQr,
   getBaileyStatus,
   disconnectBaileys,
   storeDeviceCredentials,
   getDeviceName,
-  connectionState,
   requestBaileyPairingCode,
 } from "../services/baileys.service.js"
 
@@ -94,7 +93,7 @@ export async function waGatewayRoutes(app: FastifyInstance) {
   app.post("/wa-gateway/qr", superOnly, async (_req, reply) => {
     try {
       await resetBaileySession()
-      await ensureBaileysInit()
+      await requestBaileyQr(app)
       return reply.send({ data: getBaileyStatus() })
     } catch (err) {
       return reply.code(500).send({ error: { code: "QR_FAILED", message: err instanceof Error ? err.message : "Gagal membuat QR" } })
