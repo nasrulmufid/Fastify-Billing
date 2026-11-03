@@ -27,9 +27,9 @@ export interface CreatedPayment {
   expiresAt: string | null
 }
 
-/** Endpoint Managed Payment SumoPod: base URL tidak menyertakan /api/v1. */
+/** Endpoint Managed Payment SumoPod sesuai API: POST /api/v1/payments. */
 export function sumopodPaymentsUrl(): string {
-  return `${config.sumopod.baseUrl.replace(/\/$/, "")}/payments`
+  return `${config.sumopod.baseUrl.replace(/\/$/, "")}/api/v1/payments`
 }
 
 /** Buat payment QRIS di SumoPod */
