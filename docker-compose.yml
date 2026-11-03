@@ -89,7 +89,7 @@ services:
       fasty-api:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "9980:80"
     networks: [fasty-net]
     # NOTE: Baileys QR login sudah terintegrasi di fasty-api service
     # Container ini deprecated — bisa dihapus untuk production Baileys-only
