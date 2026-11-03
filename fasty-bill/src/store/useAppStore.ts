@@ -41,7 +41,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       return null
     }
   })(),
-  token: "cookie",
+  token: localStorage.getItem("user") ? "cookie" : null,
   isAuthenticated: !!localStorage.getItem("user"),
   login: (user, _token) => {
     localStorage.removeItem("token")

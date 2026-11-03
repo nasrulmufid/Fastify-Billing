@@ -31,7 +31,8 @@ api.interceptors.response.use(
         // menghapus pesan error sebelum user sempat membacanya.
         const isLoginEndpoint =
           url.startsWith("/auth/login") || url.startsWith("/auth/customer-login")
-        if (!isLoginEndpoint) {
+        const onLoginPage = window.location.pathname === "/login" || window.location.pathname === "/portal/login"
+        if (!isLoginEndpoint && !onLoginPage) {
           const isCustomerRoute = CUSTOMER_ROUTES.some((p) => url.startsWith(p))
           if (isCustomerRoute) {
             useCustomerStore.getState().logout()

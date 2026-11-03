@@ -46,7 +46,7 @@ export const useCustomerStore = create<CustomerAuthState>((set) => ({
       return null
     }
   })(),
-  token: "cookie",
+  token: localStorage.getItem("portal_customer") ? "cookie" : null,
   isAuthenticated: !!localStorage.getItem("portal_customer"),
 
   login: async (username, password) => {
