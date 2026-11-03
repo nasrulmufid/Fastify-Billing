@@ -78,6 +78,10 @@ export async function initBaileysSock(_app: FastifyInstance): Promise<void> {
     `/devices/${encodeURIComponent(config.gowa.deviceId)}/status`,
   )
   connectionState = status.is_connected && status.is_logged_in ? "connected" : "disconnected"
+  if (connectionState === "connected") {
+    qrCodeData = null
+    pairingCode = null
+  }
 }
 
 export function getBaileyStatus(): {

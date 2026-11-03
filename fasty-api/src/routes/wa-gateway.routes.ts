@@ -79,17 +79,27 @@ export async function waGatewayRoutes(app: FastifyInstance) {
 
   // ---- Status & QR ----
   app.get("/wa-gateway/status", superOnly, async (_req, reply) => {
-    await ensureBaileysInit()
-    const status = getBaileyStatus()
-    return reply.send({
-      data: {
-        connected: status.connected,
-        state: status.state,
-        qr: status.qr,
-        pairingCode: status.pairingCode,
-      },
-    })
+    try {
+      await initBaileysSock(app)
+      const status = getBaileyStatus()
+      return reply.send({
+        data: {
+          connected: status.connected,
+          state: status.state,
+          qr: status.qr,
+          pairingCode: status.pairingCode,
+        },
+      })
+    } catch (err) {
+      return reply.code(502).send({
+        error: {
+          code: "GOWA_UNAVAILABLE",
+          message: err instanceof Error ? err.message : "GOWA tidak tersedia",
+        },
+      })
+    }
   })
+
 
   app.post("/wa-gateway/qr", superOnly, async (_req, reply) => {
     try {

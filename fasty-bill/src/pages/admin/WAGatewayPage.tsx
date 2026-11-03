@@ -122,10 +122,11 @@ function PengaturanBaileysTab() {
         const { data } = await api.get("/wa-gateway/status")
         const next = data?.data ?? defaultBaileyStatus
         setStatus(next)
+        if (next.connected) setPairingCode(null)
         setLoading(false)
-        if (next.connected && timer) clearInterval(timer)
-      } catch {
+      } catch (err) {
         setLoading(false)
+        toast.error(err instanceof Error ? err.message : "Gagal memuat status WhatsApp")
       }
     }
 
@@ -157,10 +158,11 @@ function PengaturanBaileysTab() {
   const handlePairingCode = async () => {
     try {
       const { data } = await api.post("/wa-gateway/pairing-code", { phone })
+      setStatus({ ...defaultBaileyStatus, state: "connecting" })
       setPairingCode(data?.data?.pairingCode ?? null)
       toast.info("Masukkan kode di WhatsApp: Perangkat tertaut > Tautkan dengan nomor telepon")
-    } catch {
-      toast.error("Gagal membuat pairing code")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal membuat pairing code")
     }
   }
 
@@ -206,6 +208,11 @@ function PengaturanBaileysTab() {
           {loading ? (
             <div className="flex h-72 items-center justify-center rounded-lg border border-border bg-muted">
               <RefreshCw className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : status.connected ? (
+            <div className="flex h-72 flex-col items-center justify-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+              <CheckCircle2 className="size-12 text-emerald-600" />
+              <p className="font-medium text-emerald-700 dark:text-emerald-300">WhatsApp sudah terhubung</p>
             </div>
           ) : status.qr ? (
             <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:p-6">
