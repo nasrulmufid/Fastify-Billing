@@ -19,7 +19,7 @@ export function ActivityLogPage() {
 
   useEffect(() => {
     if (!token) return
-    api.get("/activity-logs", { headers: { Authorization: `Bearer ${token}` } })
+    api.get("/activity-logs")
       .then((res) => {
         setLogs(res.data.data || [])
         setLoading(false)

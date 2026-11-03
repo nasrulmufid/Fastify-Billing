@@ -138,8 +138,8 @@ export function AdminDashboard() {
     const fetchAll = async () => {
       try {
         const [statsRes, actRes] = await Promise.all([
-          api.get("/dashboard/stats", { headers: { Authorization: `Bearer ${token}` } }),
-          api.get("/dashboard/activity", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/dashboard/stats"),
+          api.get("/dashboard/activity"),
         ])
         setStats(statsRes.data.data)
         setRecentActivity((actRes.data.data || []).map((a: any) => ({
@@ -160,9 +160,7 @@ export function AdminDashboard() {
     const fetchRevenue = async () => {
       setRevenueLoading(true)
       try {
-        const response = await api.get(`/dashboard/revenue?months=${revenuePeriod}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const response = await api.get(`/dashboard/revenue?months=${revenuePeriod}`)
         setRevenueTrend(response.data.data || [])
       } catch (err) {
         console.error("Gagal memuat tren pemasukan:", err)

@@ -173,9 +173,9 @@ export function CustomerDetailPage() {
     setError(null)
 
     Promise.all([
-      api.get(`/customers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-      api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-      api.get("/tickets", { headers: { Authorization: `Bearer ${token}` } }),
+      api.get(`/customers/${id}`),
+      api.get(`/invoices?customerId=${id}`),
+      api.get("/tickets"),
     ])
       .then(([custRes, invRes, tickRes]) => {
         setCustomer(custRes.data.data)
@@ -297,7 +297,7 @@ export function CustomerDetailPage() {
       setPayInvoice(null)
       // Refresh data pelanggan (store) & daftar invoice lokal
       void refreshCustomers()
-      const invRes = await api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      const invRes = await api.get(`/invoices?customerId=${id}`)
       setInvoices(invRes.data.data || [])
     } catch (err: any) {
       console.error("Gagal memproses pembayaran:", err)
@@ -310,7 +310,7 @@ export function CustomerDetailPage() {
   const handleOpenCash = async () => {
     setCashLoading(true)
     try {
-      const res = await api.get("/packages", { headers: { Authorization: `Bearer ${token}` } })
+      const res = await api.get("/packages")
       setPackages((res.data.data || []).filter((p: any) => p.status === "Aktif"))
       setSelectedPackageId(null)
       setCashOpen(true)
@@ -331,7 +331,6 @@ export function CustomerDetailPage() {
       const res = await api.post(
         `/customers/${customer.id}/purchase-cash`,
         { packageId: selectedPackageId },
-        { headers: { Authorization: `Bearer ${token}` } },
       )
       const pkg = packages.find((p) => p.id === selectedPackageId)
       // Ambil no invoice & kode payment BARU dari response backend
@@ -347,7 +346,7 @@ export function CustomerDetailPage() {
       setSelectedPackageId(null)
       // Refresh data pelanggan (store) & daftar invoice lokal
       void refreshCustomers()
-      const invRes = await api.get(`/invoices?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      const invRes = await api.get(`/invoices?customerId=${id}`)
       setInvoices(invRes.data.data || [])
     } catch (err: any) {
       console.error("Gagal order paket tunai:", err)
