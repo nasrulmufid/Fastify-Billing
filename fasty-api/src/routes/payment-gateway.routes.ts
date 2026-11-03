@@ -82,7 +82,11 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
       }
       return reply.send({ data: { connected, status: response.status } })
     } catch (err) {
-      app.log.warn({ error: err instanceof Error ? err.message : String(err), baseUrl: config.sumopod.baseUrl }, "SumoPod connection test failed")
+      app.log.warn({
+        error: err instanceof Error ? err.message : String(err),
+        cause: err instanceof Error && err.cause ? String(err.cause) : undefined,
+        baseUrl: config.sumopod.baseUrl,
+      }, "SumoPod connection test failed")
       return reply.send({ data: { connected: false } })
     }
   })
