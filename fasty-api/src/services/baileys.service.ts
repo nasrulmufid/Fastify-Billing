@@ -54,7 +54,7 @@ async function gowa<T>(path: string, init?: RequestInit, deviceScoped = true): P
 
 async function ensureDevice(): Promise<void> {
   if (initialized) return
-  const devices = await gowa<Array<{ id?: string; device_id?: string }>>("/devices", undefined, false)
+  const devices = (await gowa<Array<{ id?: string; device_id?: string }> | null>("/devices", undefined, false)) ?? []
   const exists = devices.some((device) => String(device.id ?? device.device_id ?? "") === config.gowa.deviceId)
   if (!exists) {
     await gowa<{ id: string }>("/devices", {
