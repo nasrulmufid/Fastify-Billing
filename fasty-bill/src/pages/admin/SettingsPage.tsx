@@ -1116,12 +1116,14 @@ function TabUmum() {
    ---------------------------------------------------------------- */
 
 type SumopodConfig = {
+  url: string
   apiKey: string
   webhookSigningSecret: string
   webhookToken: string
 }
 
 const defaultSumopodConfig: SumopodConfig = {
+  url: "",
   apiKey: "",
   webhookSigningSecret: "",
   webhookToken: "",
@@ -1232,6 +1234,7 @@ function TabPaymentGateway() {
         const data = res.data?.data
         if (mounted && data) {
           setConfig({
+            url: data.sumopodUrl || "",
             apiKey: data.apiKey || "",
             webhookSigningSecret: data.webhookSigningSecret || "",
             webhookToken: data.webhookToken || "",
@@ -1318,8 +1321,22 @@ function TabPaymentGateway() {
             )}
           </div>
 
-          <SecretField
-            id="pg-api-key"
+          <div className="space-y-1.5">
+            <Label htmlFor="pg-sumopod-url">SUMOPOD_URL</Label>
+            <Input
+              id="pg-sumopod-url"
+              value={config.url}
+              readOnly
+              className="h-9 font-mono text-xs"
+              onFocus={(e) => e.target.select()}
+            />
+            <p className="text-xs text-muted-foreground">
+              URL API SumoPod dari environment backend: <code>SUMOPOD_URL</code>.
+            </p>
+          </div>
+
+           <SecretField
+             id="pg-api-key"
             label="API Key"
             value={config.apiKey}
             onChange={(v) => setConfig({ ...config, apiKey: v })}
@@ -1430,7 +1447,7 @@ function TabPaymentGateway() {
       </Card>
 
       <p className="rounded-xl border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-        Kredensial SumoPod hanya dibaca dari environment backend: `SUMODOP_API_KEY`, `SUMODOP_WEBHOOK_SECRET`, dan `SUMODOP_WEBHOOK_TOKEN`. Ubah `.env`, lalu restart container API.
+        Kredensial SumoPod dibaca dari environment backend: `SUMOPOD_URL`, `SUMODOP_API_KEY`, `SUMODOP_WEBHOOK_SECRET`, dan `SUMODOP_WEBHOOK_TOKEN`. Ubah `.env`, lalu restart container API.
       </p>
     </div>
   )

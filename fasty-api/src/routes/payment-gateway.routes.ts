@@ -38,6 +38,7 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
     return reply.send({
       data: {
         isConfigured,
+        sumopodUrl: config.sumopod.baseUrl,
         apiKey: cfg ? maskSecret(cfg.apiKey) : "",
         webhookSigningSecret: cfg ? maskSecret(cfg.webhookSigningSecret) : "",
         webhookToken: cfg ? maskSecret(cfg.webhookToken) : "",
@@ -61,7 +62,7 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
       })
     }
     try {
-      await fetch(`${process.env.SUMODOP_BASE_URL ?? "https://api-pay-sandbox.sumopod.com"}/api/v1/payments`, {
+      await fetch(`${config.sumopod.baseUrl}/api/v1/payments`, {
         method: "GET",
         headers: { "X-Api-Key": cfg.apiKey },
       })

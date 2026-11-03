@@ -59,7 +59,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_this_encryption_key_32}
-      SUMODOP_BASE_URL: ${SUMODOP_BASE_URL:-https://api-pay-sandbox.sumopod.com}
+      SUMOPOD_URL: ${SUMOPOD_URL:-https://api-pay-sandbox.sumopod.com}
       SUMODOP_API_KEY: ${SUMODOP_API_KEY:-}
       SUMODOP_WEBHOOK_SECRET: ${SUMODOP_WEBHOOK_SECRET:-}
       SUMODOP_WEBHOOK_TOKEN: ${SUMODOP_WEBHOOK_TOKEN:-}
