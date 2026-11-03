@@ -89,7 +89,7 @@ export async function authRoutes(app: FastifyInstance) {
       ])
 
       const token = app.jwt.sign({ sub: row.id, role: row.role })
-      reply.setCookie("access_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
+      reply.setCookie("access_token", token, { httpOnly: true, secure: req.protocol === "https", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
       return reply.send({ data: { user: publicUser(row) } })
     },
   )
@@ -126,7 +126,7 @@ export async function authRoutes(app: FastifyInstance) {
 
       // Active = layanan aktif; Isolated = akun aktif tapi layanan diisolir (bisa login & bayar).
       const token = app.jwt.sign({ sub: row.id, role: "customer" })
-      reply.setCookie("access_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
+      reply.setCookie("access_token", token, { httpOnly: true, secure: req.protocol === "https", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
       return reply.send({ data: { customer: publicCustomer(row) } })
     },
   )
