@@ -65,10 +65,16 @@ export async function waGatewayRoutes(app: FastifyInstance) {
       try {
         await initBaileysSock(app)
       } catch (err) {
-        app.log.warn(err, "Baileys init failed (will retry on next request)")
+        app.log.warn(err, "Baileys init failed")
         baileysInitialized = false
+        throw err
       }
     }
+  }
+
+  const resetBaileySession = async () => {
+    baileysInitialized = false
+    await disconnectBaileys()
   }
 
   // ---- Status & QR ----
@@ -86,8 +92,13 @@ export async function waGatewayRoutes(app: FastifyInstance) {
   })
 
   app.post("/wa-gateway/qr", superOnly, async (_req, reply) => {
-    await ensureBaileysInit()
-    return reply.send({ data: getBaileyStatus() })
+    try {
+      await resetBaileySession()
+      await ensureBaileysInit()
+      return reply.send({ data: getBaileyStatus() })
+    } catch (err) {
+      return reply.code(500).send({ error: { code: "QR_FAILED", message: err instanceof Error ? err.message : "Gagal membuat QR" } })
+    }
   })
 
   app.post<{ Body: { phone: string } }>("/wa-gateway/pairing-code", superOnly, async (req, reply) => {

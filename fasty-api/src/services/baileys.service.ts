@@ -43,8 +43,6 @@ async function ensureAuthDir(): Promise<void> {
 
 /** Start Baileys connection */
 export async function initBaileysSock(app: FastifyInstance): Promise<void> {
-  if (baileysSocket) return
-
   connectionState = "connecting"
   await ensureAuthDir()
 
@@ -55,6 +53,8 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
       auth: state,
       printQRInTerminal: false,
       logger: app.log.child({ level: "fatal" }),
+      browser: ["Fastify Billing", "Chrome", "5.0"],
+      syncFullHistory: false,
     })
 
     baileysSocket.ev.on("connection.update", async (update) => {
@@ -87,11 +87,14 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
         if (shouldReconnect) {
           setTimeout(() => {
             baileysSocket = null
+            qrCodeData = null
+            pairingCode = null
             initBaileysSock(app).catch((err) => app.log.error(err, "Failed to reconnect"))
           }, 3000)
         } else {
           baileysSocket = null
           qrCodeData = null
+          pairingCode = null
           setConnectionState("disconnected")
         }
       }
@@ -127,9 +130,17 @@ export async function requestBaileyPairingCode(
 ): Promise<string> {
   const normalized = normalizePhone(phone)
   if (!/^\d{8,15}$/.test(normalized)) throw new Error("Nomor WhatsApp tidak valid")
+
+  // Reset socket untuk fresh pairing attempt
+  baileysSocket = null
+  qrCodeData = null
+  pairingCode = null
+
   await initBaileysSock(app)
   if (!baileysSocket) throw new Error("WhatsApp belum siap")
+
   pairingCode = await baileysSocket.requestPairingCode(normalized)
+  app.log.info(`Pairing code requested untuk ${normalized}`)
   return pairingCode
 }
 
