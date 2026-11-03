@@ -57,6 +57,24 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     preHandler: [app.requireRoles(["super_admin"])],
   }
 
+  // Ensure wa_templates type column exists (idempotent)
+  try {
+    const [cols] = (await app.db.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'wa_templates' AND COLUMN_NAME = 'type'`,
+      [process.env.DB_NAME || "fasty_bill"],
+    )) as Record<string, unknown>[][]
+    if (!cols || cols.length === 0) {
+      app.log.info("Adding 'type' column to wa_templates...")
+      await app.db.query(
+        `ALTER TABLE wa_templates ADD COLUMN type ENUM('general', 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') NULL AFTER body COMMENT 'Tipe template: general atau reminder_*'`,
+      )
+      app.log.info("✓ Column 'type' added to wa_templates")
+    }
+  } catch (err) {
+    app.log.warn(err, "Failed to ensure wa_templates type column")
+  }
+
   // Lazy init Baileys — run saat first request, bukan saat app startup
   let baileysInitialized = false
   const ensureBaileysInit = async () => {
