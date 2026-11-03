@@ -119,14 +119,10 @@ function PengaturanBaileysTab() {
         const { data } = await api.get("/wa-gateway/status")
         const next = data?.data ?? defaultBaileyStatus
         setStatus(next)
-        if (next.qr || next.connected) {
-          setLoading(false)
-          if (timer) clearInterval(timer)
-        }
-      } catch {
-        toast.error("Gagal memuat status WhatsApp")
         setLoading(false)
-        if (timer) clearInterval(timer)
+        if (next.connected && timer) clearInterval(timer)
+      } catch {
+        setLoading(false)
       }
     }
 
@@ -145,6 +141,8 @@ function PengaturanBaileysTab() {
       setStatus(data?.data ?? defaultBaileyStatus)
       if (data?.data?.qr) {
         toast.info("QR code berhasil dimuat. Scan dengan WhatsApp Anda.")
+      } else if (data?.data?.state === "disconnected") {
+        toast.error("Koneksi WhatsApp gagal. Cek koneksi keluar container ke WhatsApp.")
       }
     } catch (err) {
       toast.error("Gagal membuat QR code")
