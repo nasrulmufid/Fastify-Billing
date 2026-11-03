@@ -50,14 +50,13 @@ async function gowa<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function ensureDevice(): Promise<void> {
   if (initialized) return
-  try {
+  const devices = await gowa<Array<{ id?: string; device_id?: string }>>("/devices")
+  const exists = devices.some((device) => String(device.id ?? device.device_id ?? "") === config.gowa.deviceId)
+  if (!exists) {
     await gowa<{ id: string }>("/devices", {
       method: "POST",
       body: JSON.stringify({ device_id: config.gowa.deviceId }),
     })
-  } catch (err) {
-    // Slot existing returns an error; status below confirms it is usable.
-    if (!(err instanceof Error) || !/exist|already/i.test(err.message)) throw err
   }
   initialized = true
 }
