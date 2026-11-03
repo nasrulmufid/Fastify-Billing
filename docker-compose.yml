@@ -24,7 +24,8 @@ services:
     restart: always
     command: ["rest"]
     environment:
-      APP_BASIC_AUTH: ${GOWA_BASIC_AUTH:?GOWA_BASIC_AUTH required}
+      APP_BASIC_AUTH: ${WA_BASIC_AUTH:?WA_BASIC_AUTH required}
+      WHATSAPP_WEBHOOK_SECRET: ${WA_WEBHOOK_SECRET:?WA_WEBHOOK_SECRET required}
       APP_HOST: 0.0.0.0
     volumes:
       - gowa_storages:/app/storages
@@ -66,7 +67,7 @@ services:
       GENIEACS_BASE_URL: ${GENIEACS_BASE_URL:-}
       GENIEACS_API_KEY: ${GENIEACS_API_KEY:-}
       GOWA_BASE_URL: ${GOWA_BASE_URL:-http://gowa:3000}
-      GOWA_BASIC_AUTH: ${GOWA_BASIC_AUTH:?GOWA_BASIC_AUTH required}
+      GOWA_BASIC_AUTH: ${WA_BASIC_AUTH:?WA_BASIC_AUTH required}
       GOWA_DEVICE_ID: ${GOWA_DEVICE_ID:-fasty-billing}
     expose: ["3000"]
     # API internal only; frontend nginx proxies /api.
