@@ -4,6 +4,7 @@ import { z } from "zod"
 import { nextCode } from "../utils/codegen.js"
 import { config } from "../config.js"
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js"
+import { normalizePhone } from "../utils/phone.js"
 import { fillPlaceholders } from "../utils/template.js"
 import {
   sendWhatsAppMessage,

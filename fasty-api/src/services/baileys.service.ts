@@ -26,7 +26,7 @@ let qrCodeData: string | null = null
 let pairingCode: string | null = null
 export let connectionState: GatewayState = "disconnected"
 
-function gowaHeaders(): HeadersInit {
+function gowaHeaders(): Record<string, string> {
   return {
     Authorization: `Basic ${Buffer.from(config.gowa.basicAuth).toString("base64")}`,
     "Content-Type": "application/json",
