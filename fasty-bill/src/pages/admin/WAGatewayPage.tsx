@@ -1164,16 +1164,39 @@ function ReminderTemplateTab() {
 
     setSaving(true)
     try {
-      await api.put(`/wa-gateway/reminder-templates/${editing.id}`, {
-        name: formName.trim(),
-        bodyText: formBody.trim(),
-      })
-      setTemplates((prev) =>
-        prev.map((t) =>
-          t.id === editing.id ? { ...t, name: formName.trim(), body: formBody.trim() } : t,
-        ),
-      )
-      toast.success(`Template "${formName.trim()}" diperbarui`)
+      if (editing.id !== "0") {
+        // Update existing
+        await api.put(`/wa-gateway/reminder-templates/${editing.id}`, {
+          name: formName.trim(),
+          bodyText: formBody.trim(),
+        })
+        setTemplates((prev) =>
+          prev.map((t) =>
+            t.id === editing.id ? { ...t, name: formName.trim(), body: formBody.trim() } : t,
+          ),
+        )
+        toast.success(`Template "${formName.trim()}" diperbarui`)
+      } else {
+        // Create new
+        const { data } = await api.post(`/wa-gateway/reminder-templates`, {
+          name: formName.trim(),
+          bodyText: formBody.trim(),
+          type: editing.type,
+        })
+        const created = data?.data
+        setTemplates((prev) => [
+          ...prev,
+          {
+            id: String(created?.id ?? `${Date.now()}`),
+            name: formName.trim(),
+            body: formBody.trim(),
+            type: editing.type,
+            createdAt: created?.createdAt ?? "",
+            updatedAt: created?.updatedAt ?? "",
+          },
+        ])
+        toast.success(`Template "${formName.trim()}" dibuat`)
+      }
       setEditing(null)
     } catch (err) {
       toast.error("Gagal menyimpan template")
@@ -1204,9 +1227,10 @@ function ReminderTemplateTab() {
               const tpl = templates.find((t) => t.type === type)
               const info = REMINDER_TYPE_INFO[type]
               return (
-                <div
+                <button
                   key={type}
-                  className="rounded-lg border border-border p-4 space-y-3"
+                  onClick={() => openEdit(tpl || { id: "0", name: info.label, body: "", type, createdAt: "", updatedAt: "" })}
+                  className="rounded-lg border border-border p-4 space-y-3 text-left transition-colors hover:bg-muted/40 cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1226,21 +1250,15 @@ function ReminderTemplateTab() {
                       <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground bg-muted/40 rounded p-2">
                         {tpl.body}
                       </p>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 pt-2">
                         <Button
                           variant="outline"
                           size="sm"
                           className="text-xs h-auto px-2 py-1"
-                          onClick={() => openEdit(tpl)}
-                        >
-                          <Pencil className="mr-1 size-3" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs h-auto px-2 py-1"
-                          onClick={() => copyTemplate(tpl.body)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            copyTemplate(tpl.body)
+                          }}
                         >
                           <Copy className="mr-1 size-3" />
                           Salin
@@ -1248,9 +1266,9 @@ function ReminderTemplateTab() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground italic">Menggunakan template default</p>
+                    <p className="text-xs text-muted-foreground italic pt-2">Klik untuk customize template default</p>
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
@@ -1259,9 +1277,16 @@ function ReminderTemplateTab() {
         <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Edit Template Reminder</DialogTitle>
+              <DialogTitle>
+                {editing?.id === "0" ? "Buat Template Reminder" : "Edit Template Reminder"}
+              </DialogTitle>
               <DialogDescription>
-                {editing && REMINDER_TYPE_INFO[editing.type]?.label} - {editing && REMINDER_TYPE_INFO[editing.type]?.description}
+                {editing && (
+                  <>
+                    {REMINDER_TYPE_INFO[editing.type]?.label} -{" "}
+                    {REMINDER_TYPE_INFO[editing.type]?.description}
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
             {editing && (
@@ -1300,7 +1325,7 @@ function ReminderTemplateTab() {
                 Batal
               </Button>
               <Button onClick={handleSaveTemplate} disabled={saving}>
-                {saving ? "Menyimpan…" : "Simpan Perubahan"}
+                {saving ? "Menyimpan…" : editing?.id === "0" ? "Buat Template" : "Simpan Perubahan"}
               </Button>
             </DialogFooter>
           </DialogContent>
