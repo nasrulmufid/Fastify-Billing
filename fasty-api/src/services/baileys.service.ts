@@ -21,6 +21,7 @@ export interface SendMessageInput {
 
 let baileysSocket: WASocket | null = null
 let qrCodeData: string | null = null
+let pairingCode: string | null = null
 export let connectionState: "disconnected" | "connecting" | "connected" = "disconnected"
 
 function setConnectionState(
@@ -61,6 +62,7 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
 
       if (qr) {
         qrCodeData = await QRCode.toDataURL(qr)
+        pairingCode = null
         app.log.info("QR code updated")
       }
 
@@ -72,6 +74,7 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
       if (connection === "open") {
         setConnectionState("connected")
         qrCodeData = null
+        pairingCode = null
         app.log.info("WhatsApp connected successfully")
       }
 
@@ -108,12 +111,26 @@ export function getBaileyStatus(): {
   connected: boolean
   state: "disconnected" | "connecting" | "connected"
   qr: string | null
+  pairingCode: string | null
 } {
   return {
     connected: connectionState === "connected",
     state: connectionState,
     qr: qrCodeData,
+    pairingCode,
   }
+}
+
+export async function requestBaileyPairingCode(
+  app: FastifyInstance,
+  phone: string,
+): Promise<string> {
+  const normalized = normalizePhone(phone)
+  if (!/^\d{8,15}$/.test(normalized)) throw new Error("Nomor WhatsApp tidak valid")
+  await initBaileysSock(app)
+  if (!baileysSocket) throw new Error("WhatsApp belum siap")
+  pairingCode = await baileysSocket.requestPairingCode(normalized)
+  return pairingCode
 }
 
 /** Disconnect Baileys */
@@ -127,6 +144,7 @@ export async function disconnectBaileys(): Promise<void> {
     baileysSocket = null
     setConnectionState("disconnected")
     qrCodeData = null
+    pairingCode = null
   }
 }
 

@@ -93,6 +93,7 @@ type BaileyStatus = {
   connected: boolean
   state: "disconnected" | "connecting" | "connected"
   qr: string | null
+  pairingCode?: string | null
 }
 
 const defaultBaileyStatus: BaileyStatus = {
@@ -110,6 +111,8 @@ function PengaturanBaileysTab() {
   const [loading, setLoading] = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
   const [deviceName, setDeviceName] = useState("Fasty Bot")
+  const [phone, setPhone] = useState("")
+  const [pairingCode, setPairingCode] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -148,6 +151,16 @@ function PengaturanBaileysTab() {
       toast.error("Gagal membuat QR code")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePairingCode = async () => {
+    try {
+      const { data } = await api.post("/wa-gateway/pairing-code", { phone })
+      setPairingCode(data?.data?.pairingCode ?? null)
+      toast.info("Masukkan kode di WhatsApp: Perangkat tertaut > Tautkan dengan nomor telepon")
+    } catch {
+      toast.error("Gagal membuat pairing code")
     }
   }
 
@@ -209,6 +222,15 @@ function PengaturanBaileysTab() {
               </div>
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="phone">Nomor WhatsApp untuk Pairing</Label>
+            <div className="flex gap-2">
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="628123456789" />
+              <Button onClick={handlePairingCode} disabled={!phone.trim() || status.state === "connecting"}>Pairing</Button>
+            </div>
+            {pairingCode && <p className="rounded bg-muted p-3 text-center font-mono text-lg tracking-widest">{pairingCode}</p>}
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="deviceName">Nama Perangkat</Label>

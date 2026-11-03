@@ -20,6 +20,7 @@ import {
   storeDeviceCredentials,
   getDeviceName,
   connectionState,
+  requestBaileyPairingCode,
 } from "../services/baileys.service.js"
 
 const templateSchema = z.object({
@@ -79,14 +80,23 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         connected: status.connected,
         state: status.state,
         qr: status.qr,
+        pairingCode: status.pairingCode,
       },
     })
   })
 
   app.post("/wa-gateway/qr", superOnly, async (_req, reply) => {
     await ensureBaileysInit()
-    const status = getBaileyStatus()
-    return reply.send({ data: status })
+    return reply.send({ data: getBaileyStatus() })
+  })
+
+  app.post<{ Body: { phone: string } }>("/wa-gateway/pairing-code", superOnly, async (req, reply) => {
+    try {
+      const pairingCode = await requestBaileyPairingCode(app, req.body.phone)
+      return reply.send({ data: { pairingCode } })
+    } catch (err) {
+      return reply.code(400).send({ error: { code: "PAIRING_CODE_FAILED", message: err instanceof Error ? err.message : "Gagal membuat pairing code" } })
+    }
   })
 
   app.post("/wa-gateway/disconnect", superOnly, async (_req, reply) => {
