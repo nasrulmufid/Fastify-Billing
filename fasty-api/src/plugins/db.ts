@@ -76,7 +76,7 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
     if (!typeColExists || typeColExists.length === 0) {
       app.log.info("Adding 'type' column to wa_templates...")
       await db.query(
-        `ALTER TABLE wa_templates ADD COLUMN type ENUM('general', 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') NULL AFTER body COMMENT 'Tipe template: general atau reminder_*'`,
+        `ALTER TABLE wa_templates ADD COLUMN type ENUM('general', 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') NULL AFTER body`,
       )
       app.log.info("✓ Column 'type' added")
     }
@@ -90,7 +90,7 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
     if (!offlineColExists || offlineColExists.length === 0) {
       app.log.info("Adding 'offline_message' column to wa_api_config...")
       await db.query(
-        `ALTER TABLE wa_api_config ADD COLUMN offline_message TEXT NULL COMMENT 'Pesan WA saat Mikrotik offline saat transaksi (custom WA Gateway)' AFTER auto_reconnect`,
+        `ALTER TABLE wa_api_config ADD COLUMN offline_message TEXT NULL AFTER auto_reconnect`,
       )
       app.log.info("✓ Column 'offline_message' added")
     }
