@@ -1,4 +1,5 @@
 import crypto from "node:crypto"
+import https from "node:https"
 
 import { config } from "../config.js"
 
@@ -32,6 +33,41 @@ export function sumopodPaymentsUrl(): string {
   return `${config.sumopod.baseUrl.replace(/\/$/, "")}/api/v1/payments`
 }
 
+export async function requestSumopod(
+  url: string,
+  apiKey: string,
+  body = "",
+  method: "GET" | "POST" = "POST",
+): Promise<{ status: number; body: string }> {
+  const target = new URL(url)
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port || 443,
+      path: `${target.pathname}${target.search}`,
+      method,
+      family: 4,
+      timeout: 15000,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+        "X-Api-Key": apiKey,
+      },
+    }, (res) => {
+      const chunks: Buffer[] = []
+      res.on("data", (chunk: Buffer) => chunks.push(chunk))
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }))
+    })
+    req.on("timeout", () => req.destroy(new Error("SumoPod request timeout")))
+    req.on("error", reject)
+    req.end(body)
+  }).catch((err) => {
+    throw new Error(`SumoPod tidak dapat dihubungi di ${url}: ${err instanceof Error ? err.message : String(err)}`)
+  })
+}
+
 /** Buat payment QRIS di SumoPod */
 export async function createSumopodPayment(params: CreatePaymentParams): Promise<CreatedPayment> {
   const body = {
@@ -41,30 +77,11 @@ export async function createSumopodPayment(params: CreatePaymentParams): Promise
     expires_in_hours: params.expiresInHours ?? 24,
     payment_method_type_code: "QRIS",
   }
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15000)
-  let res: Response
-  try {
-    res = await fetch(sumopodPaymentsUrl(), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Api-Key": params.apiKey,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-  } catch (err) {
-    const cause = err instanceof Error && err.cause ? `: ${String(err.cause)}` : ""
-    throw new Error(`SumoPod tidak dapat dihubungi di ${config.sumopod.baseUrl}${cause}`)
-  } finally {
-    clearTimeout(timeout)
+  const raw = await requestSumopod(sumopodPaymentsUrl(), params.apiKey, JSON.stringify(body))
+  if (raw.status < 200 || raw.status >= 300) {
+    throw new Error(`SumoPod API error: ${raw.status} ${raw.body}`)
   }
-  if (!res.ok) {
-    throw new Error(`SumoPod API error: ${res.status} ${await res.text()}`)
-  }
-  const data = (await res.json()) as Record<string, unknown>
+  const data = JSON.parse(raw.body) as Record<string, unknown>
   return {
     paymentId: String(data.payment_id ?? ""),
     orderId: String(data.order_id ?? ""),

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
 import { maskSecret } from "../utils/crypto.js"
-import { createSumopodPayment, sumopodPaymentsUrl } from "../utils/sumopod.js"
+import { createSumopodPayment, requestSumopod, sumopodPaymentsUrl } from "../utils/sumopod.js"
 import { config } from "../config.js"
 
 const configSchema = z.object({
@@ -62,23 +62,10 @@ export async function paymentGatewayRoutes(app: FastifyInstance) {
       })
     }
     try {
-      const baseUrl = config.sumopod.baseUrl.replace(/\/$/, "")
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
-      let response: Response
-      try {
-        response = await fetch(sumopodPaymentsUrl(), {
-          method: "GET",
-          headers: { Accept: "application/json", "X-Api-Key": cfg.apiKey },
-          signal: controller.signal,
-        })
-      } finally {
-        clearTimeout(timeout)
-      }
-
-      const connected = response.status < 500
+      const response = await requestSumopod(sumopodPaymentsUrl(), cfg.apiKey, "", "GET")
+      const connected = response.status > 0 && response.status < 500
       if (!connected) {
-        app.log.warn({ status: response.status, baseUrl }, "SumoPod connection test returned server error")
+        app.log.warn({ status: response.status, baseUrl: config.sumopod.baseUrl }, "SumoPod connection test returned server error")
       }
       return reply.send({ data: { connected, status: response.status } })
     } catch (err) {
