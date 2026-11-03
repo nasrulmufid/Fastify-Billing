@@ -84,7 +84,6 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
         if (shouldReconnect) {
           setTimeout(() => {
             baileysSocket = null
-            qrCodeData = null
             initBaileysSock(app).catch((err) => app.log.error(err, "Failed to reconnect"))
           }, 3000)
         } else {

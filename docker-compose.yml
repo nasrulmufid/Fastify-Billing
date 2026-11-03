@@ -50,7 +50,7 @@ services:
       GENIEACS_BASE_URL: ${GENIEACS_BASE_URL:-}
       GENIEACS_API_KEY: ${GENIEACS_API_KEY:-}
     volumes:
-      - baileys_auth:/.baileys
+      - baileys_auth:/app/.baileys
     expose: ["3000"]
     ports:
       - "3000:3000"

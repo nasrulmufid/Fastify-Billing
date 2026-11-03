@@ -113,16 +113,29 @@ function PengaturanBaileysTab() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    ;(async () => {
+    let timer: ReturnType<typeof setInterval> | undefined
+    const loadStatus = async () => {
       try {
         const { data } = await api.get("/wa-gateway/status")
-        setStatus(data?.data ?? defaultBaileyStatus)
-      } catch (err) {
+        const next = data?.data ?? defaultBaileyStatus
+        setStatus(next)
+        if (next.qr || next.connected) {
+          setLoading(false)
+          if (timer) clearInterval(timer)
+        }
+      } catch {
         toast.error("Gagal memuat status WhatsApp")
-      } finally {
         setLoading(false)
+        if (timer) clearInterval(timer)
       }
-    })()
+    }
+
+    loadStatus().finally(() => {
+      timer = setInterval(loadStatus, 2000)
+    })
+    return () => {
+      if (timer) clearInterval(timer)
+    }
   }, [])
 
   const handleGenerateQR = async () => {
