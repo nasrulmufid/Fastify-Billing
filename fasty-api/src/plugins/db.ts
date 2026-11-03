@@ -95,6 +95,20 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
       app.log.info("✓ Column 'offline_message' added")
     }
 
+    // Ensure wa_api_config.payment_received_message column exists
+    const [paymentMsgColExists] = await db.query<Record<string, unknown>[]>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'wa_api_config' AND COLUMN_NAME = 'payment_received_message'`,
+      [config.db.database],
+    )
+    if (!paymentMsgColExists || paymentMsgColExists.length === 0) {
+      app.log.info("Adding 'payment_received_message' column to wa_api_config...")
+      await db.query(
+        `ALTER TABLE wa_api_config ADD COLUMN payment_received_message TEXT NULL AFTER offline_message`,
+      )
+      app.log.info("✓ Column 'payment_received_message' added")
+    }
+
     app.log.info("✓ All migrations completed")
   } catch (err) {
     app.log.warn(err, "Migration warning (may already exist)")

@@ -443,6 +443,57 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     }
   })
 
+  // GET /wa-gateway/payment-received-message
+  app.get("/wa-gateway/payment-received-message", superOnly, async (_req, reply) => {
+    const [row] = (await app.db.query(
+      "SELECT payment_received_message FROM wa_api_config WHERE id = 1",
+    )) as Record<string, unknown>[]
+    const custom = String(row?.payment_received_message ?? "").trim()
+    
+    const defaultBody = "Yth {nama}, pembayaran Anda sebesar {jumlah} melalui {metode} telah kami terima. Terima kasih.\n\nLayanan internet Anda tetap aktif."
+    
+    if (custom) {
+      return reply.send({ data: { body: custom, isCustom: true, defaultBody } })
+    }
+    
+    return reply.send({ data: { body: defaultBody, isCustom: false, defaultBody } })
+  })
+
+  // PUT /wa-gateway/payment-received-message
+  app.put("/wa-gateway/payment-received-message", superOnly, async (req, reply) => {
+    try {
+      const body = z.object({ body: z.string().max(4096) }).parse(req.body ?? {})
+      const custom = body.body.trim()
+
+      if (custom && custom.length < 10) {
+        return reply.code(400).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Pesan minimal 10 karakter",
+          },
+        })
+      }
+
+      await app.db.query(
+        `INSERT INTO wa_api_config (id, payment_received_message) VALUES (1, ?)
+         ON DUPLICATE KEY UPDATE payment_received_message = VALUES(payment_received_message)`,
+        [custom || null],
+      )
+      return reply.send({
+        data: { message: "Pesan terima pembayaran disimpan", body: custom || "" },
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Validasi gagal"
+      app.log.warn({ error: msg }, "Payment received message validation failed")
+      return reply.code(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: msg,
+        },
+      })
+    }
+  })
+
   // GET /wa-gateway/offline-message
   app.get("/wa-gateway/offline-message", superOnly, async (_req, reply) => {
     const tpl = await getOfflineMessage(app)
