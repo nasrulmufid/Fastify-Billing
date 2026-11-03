@@ -30,6 +30,7 @@ function gowaHeaders(): Record<string, string> {
   return {
     Authorization: `Basic ${Buffer.from(config.gowa.basicAuth).toString("base64")}`,
     "Content-Type": "application/json",
+    "X-Device-Id": config.gowa.deviceId,
   }
 }
 
