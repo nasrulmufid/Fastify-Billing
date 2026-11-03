@@ -1335,7 +1335,110 @@ function ReminderTemplateTab() {
   )
 }
 
+/* ================================================================
+   Tab: Pesan Terima Pembayaran
+   ================================================================ */
 
+function PesanTerimaTab() {
+  const [body, setBody] = useState("")
+  const [defaultBody, setDefaultBody] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data } = await api.get("/wa-gateway/payment-received-message")
+        setBody(String(data?.data?.body ?? ""))
+        setDefaultBody(String(data?.data?.defaultBody ?? ""))
+      } catch {
+        toast.error("Gagal memuat pesan terima pembayaran")
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const handleSave = async () => {
+    if (!body.trim()) {
+      toast.error("Isi pesan tidak boleh kosong")
+      return
+    }
+    setSaving(true)
+    try {
+      await api.put("/wa-gateway/payment-received-message", { body: body.trim() })
+      toast.success("Pesan terima pembayaran disimpan")
+    } catch {
+      toast.error("Gagal menyimpan pesan terima pembayaran")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReset = () => {
+    setBody(defaultBody)
+    toast.info("Reset ke default")
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-3">
+      <Card className="border-border lg:col-span-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <CheckCircle2 className="size-4 text-muted-foreground" />
+            Pesan "Pembayaran Diterima"
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Pesan ini dikirim otomatis saat pembayaran invoice berhasil diverifikasi.
+          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="terimaMessage">
+              Isi Pesan
+              <span className="ml-2 text-xs text-muted-foreground">({body.length} karakter)</span>
+            </Label>
+            <Textarea
+              id="terimaMessage"
+              rows={6}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              disabled={loading}
+              placeholder="Tulis pesan untuk pelanggan saat pembayaran diterima…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Variabel: {"{nama}"}, {"{jumlah}"}, {"{metode}"}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving || loading}>
+              {saving ? "Menyimpan…" : "Simpan"}
+            </Button>
+            <Button variant="outline" onClick={handleReset} disabled={saving || loading}>
+              Reset
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Informasi</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+          <p>Pesan ini dikirim kepada pelanggan setelah pembayaran mereka berhasil diproses.</p>
+          <Separator className="my-3" />
+          <p className="font-medium text-foreground">Variabel yang tersedia:</p>
+          <ul className="space-y-1 text-xs ml-3">
+            <li>• {"{nama}"} - Nama pelanggan</li>
+            <li>• {"{jumlah}"} - Jumlah pembayaran</li>
+            <li>• {"{metode}"} - Metode pembayaran (QRIS, Transfer, dll)</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 function PesanOfflineTab() {
   const [body, setBody] = useState("")
@@ -1447,6 +1550,11 @@ export function WAGatewayPage() {
             <span className="hidden sm:inline">Template Reminder</span>
             <span className="sm:hidden">Reminder</span>
           </TabsTrigger>
+          <TabsTrigger value="pesan-terima" className="whitespace-nowrap">
+            <CheckCircle2 className="mr-1.5 size-3.5" />
+            <span className="hidden sm:inline">Pesan Terima</span>
+            <span className="sm:hidden">Terima</span>
+          </TabsTrigger>
           <TabsTrigger value="pesan-offline" className="whitespace-nowrap">
             <AlertTriangle className="mr-1.5 size-3.5" />
             <span className="hidden sm:inline">Pesan Offline</span>
@@ -1468,6 +1576,10 @@ export function WAGatewayPage() {
 
         <TabsContent value="template-reminder" className="mt-4">
           <ReminderTemplateTab />
+        </TabsContent>
+
+        <TabsContent value="pesan-terima" className="mt-4">
+          <PesanTerimaTab />
         </TabsContent>
 
         <TabsContent value="pesan-offline" className="mt-4">
