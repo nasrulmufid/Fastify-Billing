@@ -11,8 +11,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      # MySQL internal only; expose through controlled admin tunnel if needed.
+    # MySQL internal only; expose through controlled admin tunnel if needed.
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -55,6 +54,7 @@ services:
       DB_USER: ${DB_USER:-fasty}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD required}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
@@ -67,7 +67,7 @@ services:
       GENIEACS_BASE_URL: ${GENIEACS_BASE_URL:-}
       GENIEACS_API_KEY: ${GENIEACS_API_KEY:-}
       GOWA_BASE_URL: ${GOWA_BASE_URL:-http://gowa:3000}
-      GOWA_BASIC_AUTH: ${GOWA_BASIC_AUTH:-admin:change_this_gowa_password}
+      GOWA_BASIC_AUTH: ${GOWA_BASIC_AUTH:?GOWA_BASIC_AUTH required}
       GOWA_DEVICE_ID: ${GOWA_DEVICE_ID:-fasty-billing}
     expose: ["3000"]
     # API internal only; frontend nginx proxies /api.
