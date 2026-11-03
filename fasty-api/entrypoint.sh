@@ -9,7 +9,7 @@
 set -e
 
 # Konfigurasi dari environment
-DB_HOST="${DB_HOST:-localhost}"
+DB_HOST="${DB_HOST:-mysql}"
 DB_PORT="${DB_PORT:-3306}"
 DB_USER="${DB_USER:-fasty}"
 DB_PASSWORD="${DB_PASSWORD:-${DB_PASS:-changeme_db}}"
@@ -18,22 +18,15 @@ MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-changeme_root}"
 
 echo "[INFO] Menunggu MySQL siap di $DB_HOST:$DB_PORT..."
 
-# Loop sampai MySQL ready (max 60 detik)
-RETRIES=60
-while [ $RETRIES -gt 0 ]; do
-  if nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; then
-    echo "[OK] MySQL ready!"
-    break
-  fi
-  echo "[WAIT] Retry dalam 1 detik... ($RETRIES tersisa)"
+# Tunggu tanpa batas; MySQL dapat mengambil waktu lama saat inisialisasi volume.
+RETRIES=0
+until nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; do
+  RETRIES=$((RETRIES + 1))
+  echo "[WAIT] MySQL belum siap; retry dalam 1 detik... (percobaan $RETRIES)"
   sleep 1
-  RETRIES=$((RETRIES - 1))
 done
 
-if [ $RETRIES -eq 0 ]; then
-  echo "[ERROR] MySQL tidak merespons dalam 60 detik. Keluar."
-  exit 1
-fi
+echo "[OK] MySQL ready!"
 
 # Jalankan migrasi melalui mysql2 agar kompatibel dengan autentikasi MySQL 8.
 echo "[INFO] Menjalankan migrasi database..."
