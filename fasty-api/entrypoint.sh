@@ -2,7 +2,7 @@
 # ============================================================
 # Entrypoint script untuk fasty-api
 # 1. Tunggu MySQL ready
-# 2. Import migration database (sebagai root)
+# 2. Import migration database memakai user aplikasi
 # 3. Switch ke app user & start aplikasi
 # ============================================================
 
@@ -11,10 +11,9 @@ set -e
 # Konfigurasi dari environment
 DB_HOST="${DB_HOST:-mysql}"
 DB_PORT="${DB_PORT:-3306}"
-DB_USER="${DB_USER:-fasty}"
-DB_PASSWORD="${DB_PASSWORD:-${DB_PASS:-changeme_db}}"
+DB_USER="${DB_USER:?DB_USER required}"
+DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD required}"
 DB_NAME="${DB_NAME:-fasty_bill}"
-MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-changeme_root}"
 
 echo "[INFO] Menunggu MySQL siap di $DB_HOST:$DB_PORT..."
 
@@ -28,11 +27,11 @@ done
 
 echo "[OK] MySQL ready!"
 
-# Jalankan migrasi melalui mysql2 agar kompatibel dengan autentikasi MySQL 8.
+# Jalankan migrasi memakai user aplikasi; migration hanya butuh database fasty_bill.
 echo "[INFO] Menjalankan migrasi database..."
 if [ -f "/app/sql/migration_production.sql" ]; then
-  DB_HOST="$DB_HOST" DB_PORT="$DB_PORT" DB_USER="root" \
-    DB_PASSWORD="$MYSQL_ROOT_PASSWORD" node /app/dist/scripts/migrate_production.js
+  DB_HOST="$DB_HOST" DB_PORT="$DB_PORT" DB_USER="$DB_USER" \
+    DB_PASSWORD="$DB_PASSWORD" DB_NAME="$DB_NAME" node /app/dist/scripts/migrate_production.js
   echo "[OK] Migrasi database selesai!"
 else
   echo "[WARN] File migration_production.sql tidak ditemukan di /app/sql/"

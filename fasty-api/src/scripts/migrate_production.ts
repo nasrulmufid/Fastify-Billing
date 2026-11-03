@@ -4,12 +4,15 @@ import mysql from "mysql2/promise"
 import { config } from "../config.js"
 
 async function main() {
-  const sql = await readFile("/app/sql/migration_production.sql", "utf8")
+  const sql = (await readFile("/app/sql/migration_production.sql", "utf8"))
+    .replace(/CREATE DATABASE IF NOT EXISTS[\s\S]*?;\s*/i, "")
+    .replace(/USE `?[^`;]+`?;\s*/i, "")
   const connection = await mysql.createConnection({
     host: config.db.host,
     port: config.db.port,
     user: config.db.user,
     password: config.db.password,
+    database: config.db.database,
     multipleStatements: true,
   })
 

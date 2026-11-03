@@ -53,7 +53,6 @@ services:
       DB_NAME: fasty_bill
       DB_USER: ${DB_USER:-fasty}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD required}
       TRUST_PROXY: ${TRUST_PROXY:-false}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
