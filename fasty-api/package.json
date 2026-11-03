@@ -14,6 +14,7 @@
     "db:migrate:customer-ip-pools": "tsx src/scripts/migrate_customer_ip_pools.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.5",
     "@fastify/cors": "^10.0.1",
     "@fastify/helmet": "^13.2.0",
     "@fastify/jwt": "^9.1.0",

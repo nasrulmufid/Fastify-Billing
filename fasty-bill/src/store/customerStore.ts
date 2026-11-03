@@ -46,16 +46,16 @@ export const useCustomerStore = create<CustomerAuthState>((set) => ({
       return null
     }
   })(),
-  token: localStorage.getItem("portal_token"),
-  isAuthenticated: !!localStorage.getItem("portal_token"),
+  token: "cookie",
+  isAuthenticated: !!localStorage.getItem("portal_customer"),
 
   login: async (username, password) => {
     try {
       const { data } = await api.post("/auth/customer-login", { username, password })
-      const { token, customer } = data.data
-      localStorage.setItem("portal_token", token)
+      const { customer } = data.data
+      localStorage.removeItem("portal_token")
       localStorage.setItem("portal_customer", JSON.stringify(customer))
-      set({ token, customer, isAuthenticated: true })
+      set({ token: "cookie", customer, isAuthenticated: true })
       return true
     } catch (err: unknown) {
       console.error("Login customer gagal:", err)
@@ -64,6 +64,7 @@ export const useCustomerStore = create<CustomerAuthState>((set) => ({
   },
 
   logout: () => {
+    void fetch("/api/auth/logout", { method: "POST", credentials: "include" })
     localStorage.removeItem("portal_token")
     localStorage.removeItem("portal_customer")
     set({ customer: null, token: null, isAuthenticated: false })

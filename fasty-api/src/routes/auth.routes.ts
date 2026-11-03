@@ -24,7 +24,7 @@ const updateProfileSchema = z.object({
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Password saat ini wajib diisi"),
-  newPassword: z.string().min(6, "Password baru minimal 6 karakter"),
+  newPassword: z.string().min(10, "Password baru minimal 10 karakter"),
 })
 
 function publicUser(row: Record<string, unknown>) {
@@ -89,7 +89,8 @@ export async function authRoutes(app: FastifyInstance) {
       ])
 
       const token = app.jwt.sign({ sub: row.id, role: row.role })
-      return reply.send({ data: { token, user: publicUser(row) } })
+      reply.setCookie("access_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
+      return reply.send({ data: { user: publicUser(row) } })
     },
   )
 
@@ -114,30 +115,9 @@ export async function authRoutes(app: FastifyInstance) {
         })
       }
 
-      // Try hashed password first, fallback to plain text for backward compatibility
       const passwordHash = String(row.login_password_hash ?? "")
-      const plainPassword = String(row.login_password ?? "")
-      
-      let passwordMatches = false
-      if (passwordHash) {
-        passwordMatches = await bcrypt.compare(body.password, passwordHash)
-      }
-      
-      // Fallback: plain text comparison (legacy support)
-      if (!passwordMatches && plainPassword && body.password === plainPassword) {
-        passwordMatches = true
-        // Auto-migrate: hash the plain password for next login
-        try {
-          const hash = await bcrypt.hash(body.password, 10)
-          await app.db.query("UPDATE customers SET login_password_hash = ? WHERE id = ?", [
-            hash,
-            row.id,
-          ])
-        } catch (err) {
-          app.log.warn(err, "Failed to auto-hash customer password")
-        }
-      }
-      
+      const passwordMatches = Boolean(passwordHash) && await bcrypt.compare(body.password, passwordHash)
+
       if (!passwordMatches) {
         return reply.code(401).send({
           error: { code: "INVALID_CREDENTIALS", message: "Username atau password salah" },
@@ -146,9 +126,14 @@ export async function authRoutes(app: FastifyInstance) {
 
       // Active = layanan aktif; Isolated = akun aktif tapi layanan diisolir (bisa login & bayar).
       const token = app.jwt.sign({ sub: row.id, role: "customer" })
-      return reply.send({ data: { token, customer: publicCustomer(row) } })
+      reply.setCookie("access_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
+      return reply.send({ data: { customer: publicCustomer(row) } })
     },
   )
+
+  app.post("/auth/logout", async (_req, reply) => {
+    return reply.clearCookie("access_token", { path: "/" }).send({ data: { ok: true } })
+  })
 
   // GET /auth/me
   app.get(
@@ -169,7 +154,10 @@ export async function authRoutes(app: FastifyInstance) {
   // PUT /auth/me (update profil)
   app.put(
     "/auth/me",
-    { onRequest: [app.authenticate] },
+    {
+      onRequest: [app.authenticate],
+      preHandler: [app.requireRoles(["super_admin", "admin", "finance", "teknisi"])],
+    },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const body = updateProfileSchema.parse(req.body)
       const payload = req.user as { sub: string }

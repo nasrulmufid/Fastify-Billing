@@ -32,7 +32,10 @@ export async function notificationsRoutes(app: FastifyInstance) {
     }
   })
 
-  const auth = { onRequest: [app.authenticate] }
+  const auth = {
+    onRequest: [app.authenticate],
+    preHandler: [app.requireRoles(["super_admin", "admin", "finance", "teknisi"])],
+  }
 
   const SQL_SELECT = `
     SELECT n.*, c.name AS customer_name

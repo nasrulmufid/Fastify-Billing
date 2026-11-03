@@ -98,8 +98,7 @@ async function main() {
        ON DUPLICATE KEY UPDATE 
          name = VALUES(name), 
          role = VALUES(role), 
-         status = VALUES(status),
-         password_hash = VALUES(password_hash)`,
+         status = VALUES(status)`,
       [hash],
     )
     

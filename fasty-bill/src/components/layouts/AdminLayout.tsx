@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom"
 import {
   Search,
   Bell,
@@ -212,6 +212,8 @@ export function AdminLayout() {
   const [searchQuery, setSearchQuery] = useState("")
   const customers = useCustomers()
   const navigate = useNavigate()
+
+  if (!user) return <Navigate to="/login" replace />
   const location = useLocation()
 
   // Filter menu berdasarkan role user

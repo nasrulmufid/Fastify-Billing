@@ -42,7 +42,7 @@ export async function webhookRoutes(app: FastifyInstance) {
 
     const secrets = await getWebhookSecrets()
 
-    // Verifikasi: token ATAU signature Svix (cukup salah satu cocok)
+    // Verifikasi token atau signature; secret kosong selalu ditolak.
     const headers = req.headers
     const tokenOk = verifyWebhookToken(
       headers["x-webhook-token"] as string | undefined,
@@ -56,11 +56,7 @@ export async function webhookRoutes(app: FastifyInstance) {
       rawBody,
     )
 
-    // Webhook test dari SumoPod ("Save & Test") tidak menyertakan signature valid —
-    // jika secret belum dikonfigurasi, tetap balas 2xx supaya test sukses.
-    const hasConfiguredSecret = Boolean(secrets.webhookSecret || secrets.webhookToken)
-
-    if (!tokenOk && !sigOk && hasConfiguredSecret) {
+    if (!tokenOk && !sigOk) {
       return reply.code(401).send({ error: { code: "INVALID_SIGNATURE", message: "Signature webhook tidak valid" } })
     }
 
@@ -94,7 +90,7 @@ export async function webhookRoutes(app: FastifyInstance) {
       }
       case "payment.failed":
       case "payment.expired": {
-        await app.db.query("UPDATE payments SET status = 'Ditolak' WHERE id = ?", [payment.id])
+        await app.db.query("UPDATE payments SET status = 'Ditolak' WHERE id = ? AND status = 'Pending'", [payment.id])
         // Notifikasi Telegram: gagal / kadaluarsa (fire-and-forget)
         const isExpired = eventType === "payment.expired"
         setImmediate(() => {

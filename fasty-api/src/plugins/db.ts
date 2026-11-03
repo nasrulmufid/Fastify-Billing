@@ -122,13 +122,7 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
       )
       app.log.info("✓ Column 'login_password_hash' added")
       
-      // Copy existing login_password to login_password_hash as fallback
-      // (app will properly hash on next login attempt)
-      await db.query(
-        `UPDATE customers SET login_password_hash = login_password 
-         WHERE login_password_hash IS NULL AND login_password IS NOT NULL`,
-      )
-      app.log.info("✓ Copied existing login_password values")
+      app.log.info("✓ Customer password hash column added; legacy passwords require reset")
     }
 
     app.log.info("✓ All migrations completed")

@@ -3,15 +3,22 @@ import type { FastifyInstance } from "fastify"
 
 import { config } from "../config.js"
 
+function cookieValue(cookie: string | undefined, name: string): string | undefined {
+  return cookie?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1)
+}
+
 export const jwtPlugin = fp(async (app: FastifyInstance) => {
+  await app.register(import("@fastify/cookie"))
   await app.register(import("@fastify/jwt"), {
     secret: config.jwt.secret,
+    sign: { expiresIn: config.jwt.expiresIn },
+    cookie: { cookieName: "access_token", signed: false },
   })
 
   // Dekorasi helper autentikasi + RBAC
   app.decorate("authenticate", async (req, reply) => {
     try {
-      await req.jwtVerify()
+      await req.jwtVerify({ onlyCookie: false })
     } catch {
       return reply.code(401).send({
         error: { code: "UNAUTHORIZED", message: "Token tidak valid atau kedaluwarsa" },

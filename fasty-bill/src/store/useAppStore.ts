@@ -41,14 +41,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       return null
     }
   })(),
-  token: localStorage.getItem("token"),
-  isAuthenticated: !!localStorage.getItem("token"),
-  login: (user, token) => {
-    localStorage.setItem("token", token)
+  token: "cookie",
+  isAuthenticated: !!localStorage.getItem("user"),
+  login: (user, _token) => {
+    localStorage.removeItem("token")
     localStorage.setItem("user", JSON.stringify(user))
-    set({ user, token, isAuthenticated: true })
+    set({ user, token: "cookie", isAuthenticated: true })
   },
   logout: () => {
+    void fetch("/api/auth/logout", { method: "POST", credentials: "include" })
     localStorage.removeItem("token")
     localStorage.removeItem("user")
     set({ user: null, token: null, isAuthenticated: false })

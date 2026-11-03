@@ -73,8 +73,8 @@ export function LoginPage() {
     api
       .post("/auth/login", { username: trimmed, password })
       .then(({ data }) => {
-        const { token, user } = data.data
-        login(user, token)
+        const { user } = data.data
+        login(user, "cookie")
         setLoading(false)
         toast.success("Login berhasil, selamat datang!")
         navigate("/admin")

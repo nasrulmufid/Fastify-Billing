@@ -271,11 +271,7 @@ export function CustomersPage() {
   // Export Excel
   const handleExportExcel = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/customers/export`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      })
-      if (!response.ok) throw new Error("Export gagal")
-      const blob = await response.blob()
+      const { data: blob } = await api.get("/customers/export", { responseType: "blob" })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -295,11 +291,7 @@ export function CustomersPage() {
   // Download template
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/customers/template`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      })
-      if (!response.ok) throw new Error("Download template gagal")
-      const blob = await response.blob()
+      const { data: blob } = await api.get("/customers/template", { responseType: "blob" })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -322,13 +314,8 @@ export function CustomersPage() {
     formData.append("file", file)
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/customers/import`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: formData,
-      })
-
-      const result = await response.json()
+      const response = await api.post("/customers/import", formData, { headers: { "Content-Type": "multipart/form-data" } })
+      const result = response.data
 
       if (response.status === 422) {
         // Validation errors
@@ -347,7 +334,7 @@ export function CustomersPage() {
         return
       }
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success("Import berhasil", {
           description: `${result.data.successCount} pelanggan berhasil ditambahkan.`,
         })

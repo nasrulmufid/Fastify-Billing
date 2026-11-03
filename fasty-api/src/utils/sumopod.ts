@@ -110,9 +110,13 @@ export function verifyWebhookSignature(
   if (!svixId || !svixTimestamp || !svixSignature || !secret) return false
   const secretBytes = Buffer.from(secret.replace("whsec_", ""), "base64")
   const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`
-  const expected = crypto.createHmac("sha256", secretBytes).update(signedContent).digest("base64")
-  const signatures = svixSignature.split(" ").map((s) => s.split(",")[1])
-  return signatures.includes(expected)
+  const age = Math.abs(Math.floor(Date.now() / 1000) - Number(svixTimestamp))
+  if (!Number.isFinite(age) || age > 300) return false
+  const expected = Buffer.from(crypto.createHmac("sha256", secretBytes).update(signedContent).digest("base64"))
+  return svixSignature.split(" ").some((value) => {
+    const actual = Buffer.from(value.split(",")[1] ?? "")
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected)
+  })
 }
 
 /** Verifikasi webhook token sederhana — bandingkan header X-Webhook-Token */

@@ -57,6 +57,6 @@ if (isProd) {
     .filter(([, value]) => !value || value.length < 16)
     .map(([name]) => name)
   if (missing.length > 0) {
-    console.warn(`[WARN] Production secrets weak or missing: ${missing.join(", ")}`)
+    throw new Error(`Production secrets weak or missing: ${missing.join(", ")}`)
   }
 }

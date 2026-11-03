@@ -4,7 +4,10 @@ import { z } from "zod"
 import { fromISODate, formatIdDate } from "../utils/date.js"
 
 export async function dashboardRoutes(app: FastifyInstance) {
-  const auth = { onRequest: [app.authenticate] }
+  const auth = {
+    onRequest: [app.authenticate],
+    preHandler: [app.requireRoles(["super_admin", "admin", "finance", "teknisi"])],
+  }
 
   // GET /dashboard/stats
   app.get("/dashboard/stats", auth, async (req, reply: FastifyReply) => {

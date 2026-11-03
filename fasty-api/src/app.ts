@@ -31,6 +31,8 @@ import { registerJobs, registerAlwaysOnJobs } from "./jobs/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
+    trustProxy: process.env.TRUST_PROXY === "true",
+    bodyLimit: 5 * 1024 * 1024,
     logger: {
       transport:
         process.env.NODE_ENV === "development"
@@ -46,7 +48,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   })
 
   // Multipart for file uploads
-  await app.register(import("@fastify/multipart"))
+  await app.register(import("@fastify/multipart"), {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  })
 
   // Plugins
   await app.register(corsPlugin)

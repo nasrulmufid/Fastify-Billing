@@ -77,11 +77,14 @@ export async function acsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Never expose apiKey in full — mask it
-    const masked: GenieACSConfig & { apiKeyMasked: string } = {
-      ...configData,
+    const masked = {
+      baseUrl: configData.baseUrl,
+      apiKey: "",
       apiKeyMasked: configData.apiKey
         ? configData.apiKey.slice(0, 4) + "****" + configData.apiKey.slice(-4)
         : "",
+      syncIntervalMinutes: configData.syncIntervalMinutes,
+      autoSyncOnAccess: configData.autoSyncOnAccess,
     }
 
     return reply.send({ data: masked })

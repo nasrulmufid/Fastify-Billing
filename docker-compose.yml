@@ -5,14 +5,14 @@ services:
     container_name: fasty-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD required}
       MYSQL_DATABASE: fasty_bill
       MYSQL_USER: ${DB_USER:-fasty}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-changeme_db}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3307:3306"
+      # MySQL internal only; expose through controlled admin tunnel if needed.
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -25,7 +25,7 @@ services:
     restart: always
     command: ["rest"]
     environment:
-      APP_BASIC_AUTH: ${GOWA_BASIC_AUTH:-admin:change_this_gowa_password}
+      APP_BASIC_AUTH: ${GOWA_BASIC_AUTH:?GOWA_BASIC_AUTH required}
       APP_HOST: 0.0.0.0
     volumes:
       - gowa_storages:/app/storages
@@ -53,12 +53,12 @@ services:
       DB_PORT: 3306
       DB_NAME: fasty_bill
       DB_USER: ${DB_USER:-fasty}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme_db}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_root}
-      JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_this_encryption_key_32}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY required}
       SUMOPOD_URL: ${SUMOPOD_URL:-${SUMOPOD_BASE_URL:-https://api-pay-sandbox.sumopod.com}}
       SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-}
       SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
@@ -70,8 +70,7 @@ services:
       GOWA_BASIC_AUTH: ${GOWA_BASIC_AUTH:-admin:change_this_gowa_password}
       GOWA_DEVICE_ID: ${GOWA_DEVICE_ID:-fasty-billing}
     expose: ["3000"]
-    ports:
-      - "3000:3000"
+    # API internal only; frontend nginx proxies /api.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 15s
