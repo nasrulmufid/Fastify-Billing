@@ -8,6 +8,7 @@ async function main() {
   try {
     await app.listen({ port: config.port, host: config.host })
     app.log.info(`API siap di http://localhost:${config.port}`)
+    app.log.info({ sumopodUrl: config.sumopod.baseUrl }, "SumoPod URL aktif")
     app.log.info(`Dokumentasi Swagger: http://localhost:${config.port}/docs`)
   } catch (err) {
     app.log.error(err)
