@@ -65,29 +65,22 @@ export async function buildPaymentLinkForInvoice(
 
 export type ReminderType = "h7" | "h3" | "h1" | "isolir"
 
-const REMINDER_TYPE_KEYWORDS: Record<ReminderType, string[]> = {
-  h7: ["h-7", "h7", "7 hari", "tujuh hari"],
-  h3: ["h-3", "h3", "3 hari", "tiga hari"],
-  h1: ["h-1", "h1", "1 hari", "satu hari", "besok"],
-  isolir: ["isolir", "putus", "blokir", "suspend"],
-}
-
 const REMINDER_FALLBACK: Record<ReminderType, { name: string; body: string }> = {
   h7: {
     name: "Pengingat Tagihan H-7",
-    body: "Yth {nama}, kami mengingatkan bahwa tagihan internet Anda sebesar {jumlah} akan jatuh tempo pada {tanggal}. Mohon menyiapkan pembayaran. Terima kasih.",
+    body: "Yth {nama}, kami mengingatkan bahwa tagihan internet Anda sebesar {jumlah} akan jatuh tempo pada {tanggal}. Segera lakukan pembayaran di: {payment_link}\n\nTerima kasih.",
   },
   h3: {
     name: "Pengingat Tagihan H-3",
-    body: "Yth {nama}, tagihan internet Anda sebesar {jumlah} akan jatuh tempo dalam 3 hari ({tanggal}). Mohon segera melakukan pembayaran agar layanan tetap aktif. Terima kasih.",
+    body: "Yth {nama}, tagihan internet Anda sebesar {jumlah} akan jatuh tempo dalam 3 hari ({tanggal}). Mohon segera melakukan pembayaran di: {payment_link}\n\nAgar layanan tetap aktif. Terima kasih.",
   },
   h1: {
     name: "Pengingat Tagihan H-1",
-    body: "Yth {nama}, ini pengingat terakhir: tagihan internet Anda sebesar {jumlah} jatuh tempo besok ({tanggal}). Segera lakukan pembayaran untuk menghindari isolir. Terima kasih.",
+    body: "Yth {nama}, ini pengingat terakhir: tagihan internet Anda sebesar {jumlah} jatuh tempo besok ({tanggal}). Segera bayar di: {payment_link}\n\nUntuk menghindari isolir. Terima kasih.",
   },
   isolir: {
     name: "Pemberitahuan Isolir",
-    body: "Yth {nama}, koneksi internet Anda telah diisolir karena belum melakukan pembayaran tagihan sebesar {jumlah} (jatuh tempo {tanggal}). Hubungi admin untuk informasi dan cara pembayaran. Terima kasih.",
+    body: "Yth {nama}, koneksi internet Anda telah diisolir karena belum melakukan pembayaran tagihan sebesar {jumlah} (jatuh tempo {tanggal}).\n\nLakukan pembayaran di: {payment_link}\n\nHubungi admin untuk bantuan. Terima kasih.",
   },
 }
 
@@ -95,24 +88,25 @@ export async function getReminderTemplate(
   app: FastifyInstance,
   type: ReminderType,
 ): Promise<{ id: number; name: string; body: string }> {
-  const rows = (await app.db.query("SELECT * FROM wa_templates ORDER BY id ASC")) as Record<string, unknown>[]
+  const typeMap: Record<ReminderType, string> = {
+    h7: "reminder_h7",
+    h3: "reminder_h3",
+    h1: "reminder_h1",
+    isolir: "isolir",
+  }
+  const dbType = typeMap[type]
+  
+  const [row] = (await app.db.query(
+    "SELECT id, name, body FROM wa_templates WHERE type = ? LIMIT 1",
+    [dbType],
+  )) as Record<string, unknown>[]
 
-  if (rows.length === 0) {
-    const fallback = REMINDER_FALLBACK[type]
-    return { id: 0, name: fallback.name, body: fallback.body }
+  if (row) {
+    return { id: Number(row.id), name: String(row.name), body: String(row.body) }
   }
 
-  const keywords = REMINDER_TYPE_KEYWORDS[type]
-  const byName = rows.find((r) => {
-    const n = String(r.name ?? "").toLowerCase()
-    return keywords.some((kw) => n.includes(kw))
-  })
-  if (byName) {
-    return { id: Number(byName.id), name: String(byName.name), body: String(byName.body) }
-  }
-
-  const first = rows[0]
-  return { id: Number(first.id), name: String(first.name), body: String(first.body) }
+  const fallback = REMINDER_FALLBACK[type]
+  return { id: 0, name: fallback.name, body: fallback.body }
 }
 
 export function sleep(ms: number): Promise<void> {

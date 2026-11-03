@@ -1093,8 +1093,224 @@ function TemplatePesanTab() {
 }
 
 /* ================================================================
-   Tab: Pesan Offline
+   Tab: Template Reminder (h7, h3, h1, isolir)
    ================================================================ */
+
+type ReminderType = "reminder_h7" | "reminder_h3" | "reminder_h1" | "isolir"
+
+interface ReminderTemplate extends Template {
+  type: ReminderType
+}
+
+const REMINDER_TYPE_INFO: Record<ReminderType, { label: string; description: string }> = {
+  reminder_h7: { label: "H-7", description: "7 hari sebelum jatuh tempo" },
+  reminder_h3: { label: "H-3", description: "3 hari sebelum jatuh tempo" },
+  reminder_h1: { label: "H-1", description: "1 hari sebelum jatuh tempo" },
+  isolir: { label: "Isolir", description: "Saat koneksi diisolir" },
+}
+
+function ReminderTemplateTab() {
+  const [templates, setTemplates] = useState<ReminderTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState<ReminderTemplate | null>(null)
+  const [formName, setFormName] = useState("")
+  const [formBody, setFormBody] = useState("")
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const { data } = await api.get("/wa-gateway/reminder-templates")
+        if (active && Array.isArray(data?.data)) {
+          setTemplates(
+            data.data.map((t: Record<string, unknown>) => ({
+              id: String(t.id),
+              name: String(t.name ?? ""),
+              body: String(t.body ?? ""),
+              type: String(t.type) as ReminderType,
+              createdAt: String(t.createdAt ?? ""),
+              updatedAt: String(t.updatedAt ?? ""),
+            })),
+          )
+        }
+      } catch (err) {
+        toast.error("Gagal memuat template reminder")
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const openEdit = (tpl: ReminderTemplate) => {
+    setEditing(tpl)
+    setFormName(tpl.name)
+    setFormBody(tpl.body)
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!editing) return
+    if (!formName.trim()) {
+      toast.error("Nama template harus diisi")
+      return
+    }
+    if (!formBody.trim()) {
+      toast.error("Isi pesan tidak boleh kosong")
+      return
+    }
+
+    setSaving(true)
+    try {
+      await api.put(`/wa-gateway/reminder-templates/${editing.id}`, {
+        name: formName.trim(),
+        bodyText: formBody.trim(),
+      })
+      setTemplates((prev) =>
+        prev.map((t) =>
+          t.id === editing.id ? { ...t, name: formName.trim(), body: formBody.trim() } : t,
+        ),
+      )
+      toast.success(`Template "${formName.trim()}" diperbarui`)
+      setEditing(null)
+    } catch (err) {
+      toast.error("Gagal menyimpan template")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const copyTemplate = (body: string) => {
+    navigator.clipboard.writeText(body)
+    toast.success("Isi template disalin ke clipboard")
+  }
+
+  return (
+    <Card className="border-border">
+      <CardContent className="pt-6 space-y-5">
+        <p className="text-sm text-muted-foreground">
+          {loading ? "Memuat template reminder…" : `${templates.length} template reminder diatur`}
+        </p>
+
+        {loading ? (
+          <div className="flex h-32 items-center justify-center">
+            <RefreshCw className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {(["reminder_h7", "reminder_h3", "reminder_h1", "isolir"] as ReminderType[]).map((type) => {
+              const tpl = templates.find((t) => t.type === type)
+              const info = REMINDER_TYPE_INFO[type]
+              return (
+                <div
+                  key={type}
+                  className="rounded-lg border border-border p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">{info.label}</h3>
+                      <p className="text-xs text-muted-foreground">{info.description}</p>
+                    </div>
+                    {tpl && (
+                      <Badge variant="outline" className="text-[10px] font-normal shrink-0">
+                        Kustom
+                      </Badge>
+                    )}
+                  </div>
+
+                  {tpl ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground font-medium">{tpl.name}</p>
+                      <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground bg-muted/40 rounded p-2">
+                        {tpl.body}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-auto px-2 py-1"
+                          onClick={() => openEdit(tpl)}
+                        >
+                          <Pencil className="mr-1 size-3" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-auto px-2 py-1"
+                          onClick={() => copyTemplate(tpl.body)}
+                        >
+                          <Copy className="mr-1 size-3" />
+                          Salin
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Menggunakan template default</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Template Reminder</DialogTitle>
+              <DialogDescription>
+                {editing && REMINDER_TYPE_INFO[editing.type]?.label} - {editing && REMINDER_TYPE_INFO[editing.type]?.description}
+              </DialogDescription>
+            </DialogHeader>
+            {editing && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reminderName">Nama Template</Label>
+                  <Input
+                    id="reminderName"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="Misal: Pengingat Tagihan H-7"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reminderBody">
+                    Isi Pesan
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formBody.length} karakter)
+                    </span>
+                  </Label>
+                  <Textarea
+                    id="reminderBody"
+                    rows={6}
+                    value={formBody}
+                    onChange={(e) => setFormBody(e.target.value)}
+                    placeholder="Tulis template pesan…"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
+                  </p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+                Batal
+              </Button>
+              <Button onClick={handleSaveTemplate} disabled={saving}>
+                {saving ? "Menyimpan…" : "Simpan Perubahan"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  )
+}
+
+
 
 function PesanOfflineTab() {
   const [body, setBody] = useState("")
@@ -1201,6 +1417,11 @@ export function WAGatewayPage() {
             <span className="hidden sm:inline">Template Pesan</span>
             <span className="sm:hidden">Template</span>
           </TabsTrigger>
+          <TabsTrigger value="template-reminder" className="whitespace-nowrap">
+            <Clock className="mr-1.5 size-3.5" />
+            <span className="hidden sm:inline">Template Reminder</span>
+            <span className="sm:hidden">Reminder</span>
+          </TabsTrigger>
           <TabsTrigger value="pesan-offline" className="whitespace-nowrap">
             <AlertTriangle className="mr-1.5 size-3.5" />
             <span className="hidden sm:inline">Pesan Offline</span>
@@ -1218,6 +1439,10 @@ export function WAGatewayPage() {
 
         <TabsContent value="template-pesan" className="mt-4">
           <TemplatePesanTab />
+        </TabsContent>
+
+        <TabsContent value="template-reminder" className="mt-4">
+          <ReminderTemplateTab />
         </TabsContent>
 
         <TabsContent value="pesan-offline" className="mt-4">

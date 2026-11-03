@@ -170,9 +170,20 @@ CREATE TABLE IF NOT EXISTS wa_templates (
   code VARCHAR(20) NOT NULL UNIQUE, -- TPL-001
   name VARCHAR(120) NOT NULL,
   body TEXT NOT NULL,
+  type ENUM('general', 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') NULL COMMENT 'Tipe template: general atau reminder_*',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- Idempoten: tambah kolom type bila DB lama belum punya
+SET @col_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wa_templates' AND COLUMN_NAME = 'type'
+);
+SET @sql = IF(@col_exists = 0,
+  "ALTER TABLE wa_templates ADD COLUMN type ENUM('general', 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') NULL AFTER body",
+  "SELECT 1");
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ------------------------------------------------------------
 -- wa_api_config — konfigurasi GO WhatsApp API (single-row)

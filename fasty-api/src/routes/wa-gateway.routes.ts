@@ -151,6 +151,153 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     }
   })
 
+  // ---- Reminder Templates (h7, h3, h1, isolir) ----
+  app.get("/wa-gateway/reminder-templates", superOnly, async (req, reply) => {
+    const rows = (await app.db.query(
+      "SELECT id, code, name, body, type FROM wa_templates WHERE type IN ('reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') ORDER BY FIELD(type, 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir'), id ASC",
+    )) as Record<string, unknown>[]
+    return reply.send({
+      data: rows.map((r) => ({
+        id: r.id,
+        code: r.code,
+        name: String(r.name ?? "").slice(0, 120),
+        body: String(r.body ?? "").slice(0, 4096),
+        type: r.type,
+        createdAt: String(r.created_at ?? ""),
+        updatedAt: String(r.updated_at ?? ""),
+      })),
+    })
+  })
+
+  app.post(
+    "/wa-gateway/reminder-templates",
+    superOnly,
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const body = z
+          .object({
+            name: z.string().min(1, "Nama template wajib diisi"),
+            bodyText: z.string().min(1, "Isi pesan wajib diisi"),
+            type: z.enum(["reminder_h7", "reminder_h3", "reminder_h1", "isolir"]),
+          })
+          .parse(req.body)
+
+        if (body.name.length > 120) {
+          return reply.code(400).send({
+            error: { code: "VALIDATION_ERROR", message: "Nama template terlalu panjang (maks 120 karakter)" },
+          })
+        }
+        if (body.bodyText.length > 4096) {
+          return reply.code(400).send({
+            error: { code: "VALIDATION_ERROR", message: "Isi pesan terlalu panjang (maks 4096 karakter)" },
+          })
+        }
+
+        const code = await app.db.transaction(async (q) => {
+          return nextCode(q.query, "wa_templates", "TPL-", { minStart: 1, pad: 3 })
+        })
+        const result = (await app.db.query(
+          "INSERT INTO wa_templates (code, name, body, type) VALUES (?, ?, ?, ?)",
+          [code, body.name.trim(), body.bodyText.trim(), body.type],
+        )) as unknown as { insertId: number }
+        return reply.code(201).send({
+          data: {
+            id: result.insertId,
+            code,
+            name: body.name,
+            body: body.bodyText,
+            type: body.type,
+          },
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Validasi gagal"
+        app.log.warn({ error: msg }, "Reminder template creation validation failed")
+        return reply.code(400).send({
+          error: { code: "VALIDATION_ERROR", message: msg },
+        })
+      }
+    },
+  )
+
+  app.put(
+    "/wa-gateway/reminder-templates/:id",
+    superOnly,
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { id } = req.params as { id: string }
+        const templateId = parseInt(id, 10)
+        if (!Number.isInteger(templateId) || templateId <= 0) {
+          return reply.code(400).send({
+            error: { code: "INVALID_ID", message: "ID template tidak valid" },
+          })
+        }
+
+        const body = z
+          .object({
+            name: z.string().min(1).optional(),
+            bodyText: z.string().min(1).optional(),
+          })
+          .parse(req.body)
+
+        if (body.name && body.name.length > 120) {
+          return reply.code(400).send({
+            error: { code: "VALIDATION_ERROR", message: "Nama template terlalu panjang" },
+          })
+        }
+        if (body.bodyText && body.bodyText.length > 4096) {
+          return reply.code(400).send({
+            error: { code: "VALIDATION_ERROR", message: "Isi pesan terlalu panjang" },
+          })
+        }
+
+        await app.db.query(
+          "UPDATE wa_templates SET name = COALESCE(?, name), body = COALESCE(?, body) WHERE id = ? AND type IN ('reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir')",
+          [body.name?.trim() ?? null, body.bodyText?.trim() ?? null, templateId],
+        )
+        return reply.send({ data: { message: "Template reminder diperbarui" } })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Update gagal"
+        app.log.warn({ error: msg }, "Reminder template update failed")
+        return reply.code(400).send({
+          error: { code: "UPDATE_ERROR", message: msg },
+        })
+      }
+    },
+  )
+
+  app.delete(
+    "/wa-gateway/reminder-templates/:id",
+    superOnly,
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { id } = req.params as { id: string }
+        const templateId = parseInt(id, 10)
+        if (!Number.isInteger(templateId) || templateId <= 0) {
+          return reply.code(400).send({
+            error: { code: "INVALID_ID", message: "ID template tidak valid" },
+          })
+        }
+
+        const result = await app.db.query(
+          "DELETE FROM wa_templates WHERE id = ? AND type IN ('reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir')",
+          [templateId],
+        )
+        if ((result as unknown as { affectedRows: number }).affectedRows === 0) {
+          return reply.code(404).send({
+            error: { code: "NOT_FOUND", message: "Template reminder tidak ditemukan" },
+          })
+        }
+        return reply.send({ data: { message: "Template reminder dihapus" } })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Delete gagal"
+        app.log.warn({ error: msg }, "Reminder template delete failed")
+        return reply.code(400).send({
+          error: { code: "DELETE_ERROR", message: msg },
+        })
+      }
+    },
+  )
+
   // ---- Templates (TPL-00X) ----
   app.get("/wa-gateway/templates", superOnly, async (req, reply) => {
     const rows = (await app.db.query("SELECT * FROM wa_templates ORDER BY id ASC")) as Record<
