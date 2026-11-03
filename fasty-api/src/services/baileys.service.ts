@@ -53,8 +53,10 @@ export async function initBaileysSock(app: FastifyInstance): Promise<void> {
       auth: state,
       printQRInTerminal: false,
       logger: app.log.child({ level: "fatal" }),
-      browser: ["Fastify Billing", "Chrome", "5.0"],
+      browser: ["Ubuntu", "Chrome", "120.0.6099.230"],
+      agent: "WhatsApp/2.23.16 Mozilla/5.0",
       syncFullHistory: false,
+      markOnlineOnConnect: true,
     })
 
     baileysSocket.ev.on("connection.update", async (update) => {
