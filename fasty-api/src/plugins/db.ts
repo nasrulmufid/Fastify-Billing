@@ -63,6 +63,43 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
     },
   }
 
+  // Ensure required columns exist (idempotent migrations)
+  try {
+    app.log.info("Running database migrations...")
+
+    // Ensure wa_templates.type column exists
+    const [typeColExists] = await db.query<Record<string, unknown>[]>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'wa_templates' AND COLUMN_NAME = 'type'`,
+      [config.db.database],
+    )
+    if (!typeColExists || typeColExists.length === 0) {
+      app.log.info("Adding 'type' column to wa_templates...")
+      await db.query(
+        `ALTER TABLE wa_templates ADD COLUMN type ENUM('general', 'reminder_h7', 'reminder_h3', 'reminder_h1', 'isolir') NULL AFTER body COMMENT 'Tipe template: general atau reminder_*'`,
+      )
+      app.log.info("✓ Column 'type' added")
+    }
+
+    // Ensure wa_api_config.offline_message column exists
+    const [offlineColExists] = await db.query<Record<string, unknown>[]>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'wa_api_config' AND COLUMN_NAME = 'offline_message'`,
+      [config.db.database],
+    )
+    if (!offlineColExists || offlineColExists.length === 0) {
+      app.log.info("Adding 'offline_message' column to wa_api_config...")
+      await db.query(
+        `ALTER TABLE wa_api_config ADD COLUMN offline_message TEXT NULL COMMENT 'Pesan WA saat Mikrotik offline saat transaksi (custom WA Gateway)' AFTER auto_reconnect`,
+      )
+      app.log.info("✓ Column 'offline_message' added")
+    }
+
+    app.log.info("✓ All migrations completed")
+  } catch (err) {
+    app.log.warn(err, "Migration warning (may already exist)")
+  }
+
   app.decorate("db", db)
   app.addHook("onClose", async () => {
     await pool.end()
