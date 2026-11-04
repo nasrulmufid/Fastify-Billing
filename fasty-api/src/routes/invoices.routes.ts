@@ -5,7 +5,7 @@ import { completePaymentFlow } from "../services/payment.service.js"
 import { nextCode, nextDailyCode } from "../utils/codegen.js"
 import { fromISODate, toISODate, toDbDateTime } from "../utils/date.js"
 
-const INVOICE_STATUS_ENUM = z.enum(["Paid", "Unpaid", "Overdue"])
+const INVOICE_STATUS_ENUM = z.enum(["Paid", "Unpaid", "Overdue", "Cancelled"])
 const METHOD_ENUM = z.enum(["QRIS", "Tunai"])
 
 const listQuerySchema = z.object({

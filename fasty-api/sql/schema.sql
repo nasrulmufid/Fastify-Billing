@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   code VARCHAR(20) NOT NULL UNIQUE,
   customer_id BIGINT UNSIGNED NOT NULL,
   amount DECIMAL(12,0) NOT NULL,
-  status ENUM('Paid','Unpaid','Overdue') NOT NULL DEFAULT 'Unpaid',
+  status ENUM('Paid','Unpaid','Overdue','Cancelled') NOT NULL DEFAULT 'Unpaid',
   period VARCHAR(30) NOT NULL, -- "Agustus 2026"
   payment_method ENUM('QRIS','Tunai') NULL,
   payment_code VARCHAR(20) NULL,
