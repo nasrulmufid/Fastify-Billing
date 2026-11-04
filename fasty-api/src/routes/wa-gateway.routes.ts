@@ -614,13 +614,14 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         const vars = { ...(varsByPhone.get(phone) ?? {}) }
         
         // Query customer + invoice data
+        const phonePattern = phone.startsWith("62") ? phone.slice(2) : phone.replace(/^0/, "")
         const [customerData] = (await app.db.query(
           `SELECT c.id AS customer_id, c.name, c.expiry_at, p.name AS package_name
            FROM customers c
            LEFT JOIN packages p ON p.id = c.package_id
-           WHERE c.phone LIKE ?
+           WHERE c.phone LIKE ? OR c.phone LIKE ?
            LIMIT 1`,
-          [`%${phone.replace(/^62/, "0")}%`],
+          [`%62${phonePattern}%`, `%0${phonePattern}%`],
         )) as Record<string, unknown>[]
 
         app.log.info({ phone, hasCustomerData: !!customerData, customerId: customerData?.customer_id, expiryAt: customerData?.expiry_at, packageName: customerData?.package_name }, "WA Gateway: customer data loaded")
@@ -669,8 +670,8 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         const ntCode = await app.db.transaction(async (q) => {
           return nextCode(q.query, "notification_logs", "NT-", { minStart: 1000 })
         })
-        const [cust] = (await app.db.query("SELECT id FROM customers WHERE phone LIKE ? LIMIT 1", [
-          `%${phone.replace(/^62/, "0")}%`,
+        const [cust] = (await app.db.query("SELECT id FROM customers WHERE phone LIKE ? OR phone LIKE ? LIMIT 1", [
+          `%62${phonePattern}%`, `%0${phonePattern}%`,
         ])) as Record<string, unknown>[]
 
         if (result.ok) {
