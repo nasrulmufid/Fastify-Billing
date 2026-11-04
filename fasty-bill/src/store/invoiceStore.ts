@@ -4,7 +4,7 @@ import type { PaymentMethod } from "@/lib/paymentData"
 import api from "@/lib/axios"
 import { usePaymentStore } from "./paymentStore"
 
-export type InvoiceStatus = "Paid" | "Unpaid" | "Overdue"
+export type InvoiceStatus = "Paid" | "Unpaid" | "Overdue" | "Cancelled"
 
 export interface Invoice {
   id: string
@@ -25,12 +25,14 @@ export const statusLabel: Record<InvoiceStatus, string> = {
   Paid: "Lunas",
   Unpaid: "Belum Bayar",
   Overdue: "Jatuh Tempo",
+  Cancelled: "Dibatalkan",
 }
 
 export const statusBadgeClass: Record<InvoiceStatus, string> = {
   Paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   Unpaid: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   Overdue: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+  Cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300",
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

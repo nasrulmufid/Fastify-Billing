@@ -55,7 +55,7 @@ import { useInvoiceStore } from "@/store/invoiceStore"
 
 const PAGE_SIZE = 8
 
-const STATUS_OPTIONS: InvoiceStatus[] = ["Paid", "Unpaid", "Overdue"]
+const STATUS_OPTIONS: InvoiceStatus[] = ["Paid", "Unpaid", "Overdue", "Cancelled"]
 
 const methodIcon: Record<PaymentMethod, typeof Banknote> = {
   QRIS: Banknote,

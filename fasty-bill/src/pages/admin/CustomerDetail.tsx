@@ -66,6 +66,7 @@ import {
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog"
 import api from "@/lib/axios"
 import { useAuthStore } from "@/store/useAppStore"
+import { statusLabel as invoiceStatusLabel, statusBadgeClass as invoiceStatusBadgeClass, type InvoiceStatus } from "@/store/invoiceStore"
 import { useCustomerActions, useCustomers, refreshCustomers } from "@/lib/customerStore"
 import { expiryToInputValue, inputToExpiry } from "@/lib/dateUtils"
 import { formatPrice } from "@/lib/paymentData"
@@ -635,14 +636,8 @@ export function CustomerDetailPage() {
                         <TableCell className="text-sm text-muted-foreground">{inv.due}</TableCell>
                         <TableCell className="text-sm">{inv.amount}</TableCell>
                         <TableCell>
-                          <Badge
-                            className={
-                              inv.status === "Paid"
-                                ? "bg-emerald-100 text-emerald-800 text-xs dark:bg-emerald-900/40 dark:text-emerald-300"
-                                : "bg-amber-100 text-amber-800 text-xs dark:bg-amber-900/40 dark:text-amber-300"
-                            }
-                          >
-                            {inv.status === "Paid" ? "Lunas" : "Belum Bayar"}
+                          <Badge className={`text-xs ${invoiceStatusBadgeClass[inv.status as InvoiceStatus]}`}>
+                            {invoiceStatusLabel[inv.status as InvoiceStatus]}
                           </Badge>
                         </TableCell>
                         <TableCell>
