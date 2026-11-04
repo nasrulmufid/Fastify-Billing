@@ -70,6 +70,8 @@ export async function webhookRoutes(app: FastifyInstance) {
     const eventType = event.event_type ?? ""
     const paymentId = String(event.data?.payment_id ?? "")
 
+    req.log.info({ eventType, paymentId, eventData: event.data }, "Webhook event received")
+
     switch (eventType) {
       case "payment.completed": {
         const result = await app.db.transaction(async (q) => {
@@ -97,7 +99,12 @@ export async function webhookRoutes(app: FastifyInstance) {
           const [payment] = (await q.query("SELECT * FROM payments WHERE gateway_ref = ? LIMIT 1 FOR UPDATE", [
             paymentId,
           ])) as Record<string, unknown>[]
-          if (!payment) return
+          if (!payment) {
+            req.log.warn({ paymentId, gateway_ref: paymentId }, "Payment not found for failed/expired webhook")
+            return
+          }
+
+          req.log.info({ paymentId, paymentCode: payment.code, invoiceId: payment.invoice_id }, "Processing failed/expired payment")
 
           // Mark payment rejected
           await q.query("UPDATE payments SET status = 'Ditolak' WHERE id = ? AND status = 'Pending'", [payment.id])
