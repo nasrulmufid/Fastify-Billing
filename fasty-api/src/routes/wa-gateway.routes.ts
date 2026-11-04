@@ -703,6 +703,17 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     }
   })
 
+  // DEBUG: lookup customer by phone
+  app.get("/debug/phones", async (req: FastifyRequest, reply: FastifyReply) => {
+    const q = z.object({ phone: z.string() }).parse(req.query)
+    const phones = (await app.db.query(
+      `SELECT id, name, phone, expiry_at, package_id, status FROM customers 
+       WHERE phone LIKE ? OR phone LIKE ? OR phone LIKE ?`,
+      [`%${q.phone}%`, `%62${q.phone}%`, `%0${q.phone}%`],
+    )) as Record<string, unknown>[]
+    return reply.send({ phones, queryPhone: q.phone })
+  })
+
   // GET /wa-gateway/logs
   app.get("/wa-gateway/logs", superOnly, async (req: FastifyRequest, reply: FastifyReply) => {
     const q = z.object({ status: z.enum(["Terkirim", "Gagal"]).optional() }).parse(req.query)
