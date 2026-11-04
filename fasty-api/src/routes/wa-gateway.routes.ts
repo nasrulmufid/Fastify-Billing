@@ -632,14 +632,22 @@ export async function waGatewayRoutes(app: FastifyInstance) {
             )) as Record<string, unknown>[])
           : []
 
+        // Helper format date ke DD/MM/YYYY
+        const formatDate = (d: unknown): string => {
+          if (!d) return ""
+          const date = new Date(d as string | number)
+          if (isNaN(date.getTime())) return ""
+          return date.toLocaleDateString("id-ID", { year: "numeric", month: "2-digit", day: "2-digit" })
+        }
+
         // Fill vars dari customer data (selalu ada jika customer found)
         vars.nama ||= String(customerData?.name ?? "").slice(0, 200)
         vars.paket ||= String(customerData?.package_name ?? "").slice(0, 100)
-        vars.expired ||= String(customerData?.expiry_at ?? "").slice(0, 100)
+        vars.expired ||= formatDate(customerData?.expiry_at).slice(0, 100)
         
         // Fill vars dari invoice data (hanya jika ada invoice Unpaid/Overdue)
         vars.jumlah ||= invoiceData?.amount == null ? "" : String(invoiceData.amount).slice(0, 100)
-        vars.tanggal ||= String(invoiceData?.due_at ?? "").slice(0, 100)
+        vars.tanggal ||= formatDate(invoiceData?.due_at).slice(0, 100)
         vars.no_invoice ||= String(invoiceData?.invoice_code ?? "").slice(0, 100)
 
         if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
