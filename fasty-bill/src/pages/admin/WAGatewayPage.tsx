@@ -684,7 +684,7 @@ function KirimPesanTab() {
               placeholder="Tulis pesan WhatsApp di sini…"
             />
             <p className="text-xs text-muted-foreground">
-              Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
+              Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{expired}"}, {"{payment_link}"}
             </p>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Pratinjau</Label>
@@ -1315,7 +1315,7 @@ function ReminderTemplateTab() {
                     placeholder="Tulis template pesan…"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{payment_link}"}
+                    Variabel: {"{nama}"}, {"{jumlah}"}, {"{tanggal}"}, {"{no_invoice}"}, {"{paket}"}, {"{expired}"}, {"{payment_link}"}
                   </p>
                 </div>
               </div>

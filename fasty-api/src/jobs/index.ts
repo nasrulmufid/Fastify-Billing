@@ -175,7 +175,7 @@ export function registerJobs(app: FastifyInstance) {
     try {
       const invoices = (await app.db.query(
         `SELECT i.id AS invoice_id, i.code AS invoice_code, i.amount, i.due_at,
-                c.id AS customer_id, c.name AS customer_name, c.phone, p.name AS package_name
+                c.id AS customer_id, c.name AS customer_name, c.phone, c.expired_at, p.name AS package_name
          FROM invoices i
          JOIN customers c ON c.id = i.customer_id
          LEFT JOIN packages p ON p.id = c.package_id
@@ -202,6 +202,7 @@ export function registerJobs(app: FastifyInstance) {
           tanggal: String(inv.due_at ?? ""),
           no_invoice: String(inv.invoice_code ?? ""),
           paket: String(inv.package_name ?? ""),
+          expired: String(inv.expired_at ?? ""),
         }
         // Buat payment link per-invoice bila template membutuhkannya
         if (needsPaymentLink) {
