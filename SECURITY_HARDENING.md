@@ -181,6 +181,24 @@ Server will fail to start if secrets are missing or weak.
 6. **Email enumeration possible** via login error messages
 7. **No account lockout** after failed login attempts (only rate limit)
 
+## ✅ Recent Security Fixes (2026-11-04)
+
+### 11. Timing-safe webhook verification
+- ✅ `verifyWebhookToken` now uses `crypto.timingSafeEqual()` instead of `===`
+- ✅ Prevents timing side-channel attacks on webhook token validation
+- ✅ Handles buffer length mismatch gracefully (try/catch)
+
+### 12. Database transaction locks for payment flows
+- ✅ Webhook handler: `SELECT ... FOR UPDATE` on payment row before status update
+- ✅ Invoice mark-paid: `SELECT ... FOR UPDATE` on invoice row before payment creation
+- ✅ Prevents race conditions from duplicate webhooks or concurrent payment operations
+- ✅ `completePaymentFlow` already locks customer row (existing fix)
+
+**Files changed:**
+- `fasty-api/src/utils/sumopod.ts` — timing-safe token comparison
+- `fasty-api/src/routes/webhook.routes.ts` — transaction + FOR UPDATE locks
+- `fasty-api/src/routes/invoices.routes.ts` — FOR UPDATE lock on invoice SELECT
+
 ## 📊 Vulnerability Summary
 
 ### Before fixes:

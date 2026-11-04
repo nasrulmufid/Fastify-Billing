@@ -70,45 +70,53 @@ export async function webhookRoutes(app: FastifyInstance) {
     const eventType = event.event_type ?? ""
     const paymentId = String(event.data?.payment_id ?? "")
 
-    // Idempotent: cari payment berdasarkan gateway_ref
-    const [payment] = (await app.db.query("SELECT * FROM payments WHERE gateway_ref = ? LIMIT 1", [
-      paymentId,
-    ])) as Record<string, unknown>[]
-    if (!payment) {
-      req.log.warn({ eventType, paymentId }, "Webhook utk payment yang tidak dikenal")
-      return reply.send({ data: { ok: true, matched: false } })
-    }
-
     switch (eventType) {
       case "payment.completed": {
-        const result = await app.db.transaction(async (q) =>
-          completePaymentFlow(q, String(payment.id), "QRIS", "Sistem", app),
-        )
+        const result = await app.db.transaction(async (q) => {
+          // Lock payment row to prevent duplicate webhook race
+          const [payment] = (await q.query("SELECT * FROM payments WHERE gateway_ref = ? LIMIT 1 FOR UPDATE", [
+            paymentId,
+          ])) as Record<string, unknown>[]
+          if (!payment) {
+            req.log.warn({ eventType, paymentId }, "Webhook utk payment yang tidak dikenal")
+            return null
+          }
+          return completePaymentFlow(q, String(payment.id), "QRIS", "Sistem", app)
+        })
+        if (!result) {
+          return reply.send({ data: { ok: true, matched: false } })
+        }
         // Notifikasi Telegram "Transaksi Sukses" dikirim dari completePaymentFlow
         // (single source of truth utk semua metode: QRIS & Tunai) — tidak di sini.
         return reply.send({ data: { ok: true, matched: true, payment: result.payment.code } })
       }
       case "payment.failed":
       case "payment.expired": {
-        await app.db.query("UPDATE payments SET status = 'Ditolak' WHERE id = ? AND status = 'Pending'", [payment.id])
-        // Notifikasi Telegram: gagal / kadaluarsa (fire-and-forget)
         const isExpired = eventType === "payment.expired"
-        setImmediate(() => {
-          void (async () => {
-            const ctx = await loadNotifyContext(payment.customer_id)
-            await notifyTelegram(app, {
-              type: isExpired ? "paymentExpired" : "paymentFailed",
-              vars: {
-                customerId: String(payment.customer_id ?? ""),
-                nama: String(ctx.customer_name ?? ""),
-                paket: String(ctx.package_name ?? ""),
-                kode: String(payment.code ?? ""),
-                jumlah: String(payment.amount ?? ""),
-                metode: "QRIS",
-                tanggal: new Date().toLocaleString("id-ID"),
-              },
-            })
-          })().catch(() => {})
+        await app.db.transaction(async (q) => {
+          const [payment] = (await q.query("SELECT * FROM payments WHERE gateway_ref = ? LIMIT 1 FOR UPDATE", [
+            paymentId,
+          ])) as Record<string, unknown>[]
+          if (!payment) return
+          await q.query("UPDATE payments SET status = 'Ditolak' WHERE id = ? AND status = 'Pending'", [payment.id])
+          // Notifikasi Telegram: gagal / kadaluarsa (fire-and-forget)
+          setImmediate(() => {
+            void (async () => {
+              const ctx = await loadNotifyContext(payment.customer_id)
+              await notifyTelegram(app, {
+                type: isExpired ? "paymentExpired" : "paymentFailed",
+                vars: {
+                  customerId: String(payment.customer_id ?? ""),
+                  nama: String(ctx.customer_name ?? ""),
+                  paket: String(ctx.package_name ?? ""),
+                  kode: String(payment.code ?? ""),
+                  jumlah: String(payment.amount ?? ""),
+                  metode: "QRIS",
+                  tanggal: new Date().toLocaleString("id-ID"),
+                },
+              })
+            })().catch(() => {})
+          })
         })
         return reply.send({
           data: { ok: true, matched: true, status: isExpired ? "Expired" : "Ditolak" },

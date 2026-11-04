@@ -119,8 +119,14 @@ export function verifyWebhookSignature(
   })
 }
 
-/** Verifikasi webhook token sederhana — bandingkan header X-Webhook-Token */
+/** Verifikasi webhook token sederhana — timing-safe comparison */
 export function verifyWebhookToken(token: string | undefined, expected: string | undefined): boolean {
   if (!token || !expected) return false
-  return token === expected
+  const a = Buffer.from(token)
+  const b = Buffer.from(expected)
+  try {
+    return a.length === b.length && crypto.timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
 }

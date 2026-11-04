@@ -107,7 +107,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     const body = markPaidSchema.parse(req.body)
 
     const result = await app.db.transaction(async (q) => {
-      const [invoice] = (await q.query("SELECT * FROM invoices WHERE id = ?", [
+      const [invoice] = (await q.query("SELECT * FROM invoices WHERE id = ? FOR UPDATE", [
         id,
       ])) as Record<string, unknown>[]
       if (!invoice) {
