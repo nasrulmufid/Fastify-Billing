@@ -622,6 +622,8 @@ export async function waGatewayRoutes(app: FastifyInstance) {
           [`%${phone.replace(/^62/, "0")}%`],
         )) as Record<string, unknown>[]
 
+        app.log.info({ phone, customerData }, "WA Gateway: customer data loaded")
+
         const [invoiceData] = customerData
           ? ((await app.db.query(
               `SELECT id AS invoice_id, code AS invoice_code, amount, due_at
@@ -631,6 +633,8 @@ export async function waGatewayRoutes(app: FastifyInstance) {
               [customerData.customer_id],
             )) as Record<string, unknown>[])
           : []
+
+        app.log.info({ phone, invoiceData }, "WA Gateway: invoice data loaded")
 
         // Helper format date ke DD/MM/YYYY
         const formatDate = (d: unknown): string => {
