@@ -98,7 +98,27 @@ export async function webhookRoutes(app: FastifyInstance) {
             paymentId,
           ])) as Record<string, unknown>[]
           if (!payment) return
+
+          // Mark payment rejected
           await q.query("UPDATE payments SET status = 'Ditolak' WHERE id = ? AND status = 'Pending'", [payment.id])
+
+          // Mark original invoice as Cancelled
+          const [invoice] = (await q.query("SELECT * FROM invoices WHERE id = ? FOR UPDATE", [
+            payment.invoice_id,
+          ])) as Record<string, unknown>[]
+          if (invoice && invoice.status !== "Paid") {
+            await q.query("UPDATE invoices SET status = 'Cancelled' WHERE id = ?", [invoice.id])
+
+            // Create new invoice for retry
+            const { nextCode } = await import("../utils/codegen.js")
+            const newInvCode = await nextCode(q.query, "invoices", "INV-")
+            const res = (await q.query(
+              "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(NOW(), INTERVAL 1 MONTH))",
+              [newInvCode, payment.customer_id, invoice.amount, invoice.period ?? "monthly"],
+            )) as unknown as { insertId: number }
+            payment.invoice_id = res.insertId // for telegram notification
+          }
+
           // Notifikasi Telegram: gagal / kadaluarsa (fire-and-forget)
           setImmediate(() => {
             void (async () => {

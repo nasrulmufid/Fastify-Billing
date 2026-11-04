@@ -252,6 +252,14 @@ export async function portalRoutes(app: FastifyInstance) {
     if (invoice.status === "Paid") {
       return reply.code(400).send({ error: { code: "ALREADY_PAID", message: "Tagihan ini sudah lunas" } })
     }
+    if (invoice.status === "Cancelled") {
+      return reply.code(400).send({
+        error: {
+          code: "INVOICE_CANCELLED",
+          message: "Tagihan ini sudah dibatalkan. Silakan gunakan tagihan baru yang tersedia.",
+        },
+      })
+    }
 
     // Pakai payment Pending yang sudah ada utk invoice ini, atau buat baru
     const [existing] = (await app.db.query(
