@@ -703,15 +703,23 @@ export async function waGatewayRoutes(app: FastifyInstance) {
     }
   })
 
-  // DEBUG: lookup customer by phone
+  // DEBUG: lookup customer by phone or name
   app.get("/debug/phones", async (req: FastifyRequest, reply: FastifyReply) => {
-    const q = z.object({ phone: z.string() }).parse(req.query)
-    const phones = (await app.db.query(
-      `SELECT id, name, phone, expiry_at, package_id, status FROM customers 
-       WHERE phone LIKE ? OR phone LIKE ? OR phone LIKE ?`,
-      [`%${q.phone}%`, `%62${q.phone}%`, `%0${q.phone}%`],
-    )) as Record<string, unknown>[]
-    return reply.send({ phones, queryPhone: q.phone })
+    const q = z.object({ phone: z.string().optional(), name: z.string().optional() }).parse(req.query)
+    let phones: Record<string, unknown>[] = []
+    if (q.phone) {
+      phones = (await app.db.query(
+        `SELECT id, name, phone, expiry_at, package_id, status FROM customers 
+         WHERE phone LIKE ? OR phone LIKE ? OR phone LIKE ?`,
+        [`%${q.phone}%`, `%62${q.phone}%`, `%0${q.phone}%`],
+      )) as Record<string, unknown>[]
+    } else if (q.name) {
+      phones = (await app.db.query(
+        `SELECT id, name, phone, expiry_at, package_id, status FROM customers WHERE name LIKE ?`,
+        [`%${q.name}%`],
+      )) as Record<string, unknown>[]
+    }
+    return reply.send({ phones, query: q })
   })
 
   // GET /wa-gateway/logs
