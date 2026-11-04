@@ -141,6 +141,23 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
       app.log.info(`✓ Auto-hashed ${unhashedCustomers.length} customer passwords`)
     }
 
+    // Ensure invoices.status ENUM includes 'Cancelled'
+    const invoiceStatusCol = await db.query<Record<string, unknown>[]>(
+      `SELECT COLUMN_TYPE FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'invoices' AND COLUMN_NAME = 'status'`,
+      [config.db.database],
+    )
+    if (invoiceStatusCol && invoiceStatusCol.length > 0) {
+      const columnType = String(invoiceStatusCol[0].COLUMN_TYPE || "")
+      if (!columnType.includes("Cancelled")) {
+        app.log.info("Adding 'Cancelled' to invoices.status ENUM...")
+        await db.query(
+          `ALTER TABLE invoices MODIFY COLUMN status ENUM('Paid','Unpaid','Overdue','Cancelled') NOT NULL DEFAULT 'Unpaid'`,
+        )
+        app.log.info("✓ invoices.status ENUM updated")
+      }
+    }
+
     app.log.info("✓ All migrations completed")
   } catch (err) {
     app.log.warn(err, "Migration warning (may already exist)")
