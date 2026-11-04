@@ -108,17 +108,24 @@ export function registerJobs(app: FastifyInstance) {
         ])
         // Buat notifikasi untuk setiap customer yang terisolir + ubah profile ke ISOLIR di router
         const isolated = (await app.db.query(
-          `SELECT c.id AS customer_id, c.name AS customer_name, c.phone, c.router_id, c.pppoe_username, c.pppoe_password
-           FROM customers WHERE status = 'Isolated' AND expiry_at < DATE_SUB(CURRENT_DATE(), INTERVAL ? DAY)`,
+          `SELECT c.id AS customer_id, c.name AS customer_name, c.phone, c.router_id, c.pppoe_username, c.pppoe_password,
+                  c.expiry_at, i.code AS invoice_code
+           FROM customers c
+           LEFT JOIN invoices i ON c.id = i.customer_id AND i.status IN ('Unpaid', 'Overdue')
+           WHERE c.status = 'Isolated' AND c.expiry_at < DATE_SUB(CURRENT_DATE(), INTERVAL ? DAY)
+           ORDER BY i.due_at ASC`,
           [grace],
         )) as Record<string, unknown>[]
         for (const cust of isolated) {
           // Kirim pesan notifikasi isolir via template WA
           const isoTemplate = await getReminderTemplate(app, "isolir")
+          const paymentLink = cust.invoice_code
+            ? `${process.env.FRONTEND_URL || "https://bill.example.com"}/portal/invoice/${cust.invoice_code}`
+            : ""
           const isoVars: Record<string, string> = {
             nama: String(cust.customer_name ?? ""),
-            jumlah: "",
-            tanggal: "",
+            expired: cust.expiry_at ? new Date(cust.expiry_at as string).toLocaleDateString("id-ID") : "",
+            payment_link: paymentLink,
           }
           const isoMessage = fillPlaceholders(isoTemplate.body, isoVars)
           const isoResult = await sendWhatsAppMessage(app, { phone: String(cust.phone ?? ""), message: isoMessage })

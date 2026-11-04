@@ -80,7 +80,7 @@ const REMINDER_FALLBACK: Record<ReminderType, { name: string; body: string }> = 
   },
   isolir: {
     name: "Pemberitahuan Isolir",
-    body: "Yth {nama}, koneksi internet Anda telah diisolir karena belum melakukan pembayaran tagihan sebesar {jumlah} (jatuh tempo {tanggal}).\n\nLakukan pembayaran di: {payment_link}\n\nHubungi admin untuk bantuan. Terima kasih.",
+    body: "Yth {nama}, koneksi internet Anda telah diisolir karena masa aktif paket telah berakhir pada {expired}.\n\nLakukan pembayaran untuk mengaktifkan kembali di: {payment_link}\n\nHubungi admin untuk bantuan. Terima kasih.",
   },
 }
 
