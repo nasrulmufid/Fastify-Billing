@@ -16,6 +16,14 @@ const CUSTOMER_ROUTES = ["/portal", "/auth/customer-login"]
 
 // Request interceptor — attach Bearer token (customer utk portal, admin utk lainnya)
 api.interceptors.request.use((config) => {
+  const url = config.url ?? ""
+  const isCustomerRoute = CUSTOMER_ROUTES.some((p) => url.startsWith(p))
+  const token = isCustomerRoute
+    ? useCustomerStore.getState().token
+    : useAuthStore.getState().token
+  if (token && token !== "cookie") {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 

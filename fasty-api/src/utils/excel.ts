@@ -3,6 +3,7 @@
  * Menggunakan library exceljs.
  */
 import ExcelJS from "exceljs"
+import bcrypt from "bcryptjs"
 import type { FastifyInstance } from "fastify"
 
 /* ----------------------------------------------------------------
@@ -449,11 +450,12 @@ export async function executeImport(
       })
 
       const joinAt = new Date()
+      const loginHash = await bcrypt.hash(row.loginPassword, 10)
       const result = (await app.db.query(
         `INSERT INTO customers
           (code, name, email, phone, address, package_id, router_id, status, ip_address,
-           pppoe_username, pppoe_password, login_username, login_password, odp_id, gps, join_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'Isolated', ?, ?, ?, ?, ?, ?, ?, ?)`,
+           pppoe_username, pppoe_password, login_username, login_password, login_password_hash, odp_id, gps, join_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Isolated', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           code,
           row.name,
@@ -467,6 +469,7 @@ export async function executeImport(
           row.pppoePassword,
           row.loginUsername,
           row.loginPassword,
+          loginHash,
           row.odpId ?? "",
           row.gps ?? "",
           joinAt,

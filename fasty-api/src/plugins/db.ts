@@ -1,5 +1,6 @@
 import fp from "fastify-plugin"
 import mysql from "mysql2/promise"
+import bcrypt from "bcryptjs"
 import type { FastifyInstance } from "fastify"
 
 import { config } from "../config.js"
@@ -121,8 +122,23 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
         `ALTER TABLE customers ADD COLUMN login_password_hash VARCHAR(255) NULL AFTER login_password`,
       )
       app.log.info("✓ Column 'login_password_hash' added")
-      
-      app.log.info("✓ Customer password hash column added; legacy passwords require reset")
+    }
+
+    // Auto-hash legacy plaintext passwords into login_password_hash
+    const unhashedCustomers = (await db.query(
+      `SELECT id, login_password, login_password_hash FROM customers 
+       WHERE (login_password_hash IS NULL AND login_password IS NOT NULL)
+          OR (login_password_hash IS NOT NULL AND login_password_hash NOT LIKE '$2%')`,
+    )) as Record<string, unknown>[]
+    for (const cust of unhashedCustomers) {
+      const plain = String(cust.login_password || cust.login_password_hash || "").trim()
+      if (plain && !plain.startsWith("$2")) {
+        const hash = await bcrypt.hash(plain, 10)
+        await db.query("UPDATE customers SET login_password_hash = ? WHERE id = ?", [hash, cust.id])
+      }
+    }
+    if (unhashedCustomers.length > 0) {
+      app.log.info(`✓ Auto-hashed ${unhashedCustomers.length} customer passwords`)
     }
 
     app.log.info("✓ All migrations completed")

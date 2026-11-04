@@ -89,8 +89,8 @@ export async function authRoutes(app: FastifyInstance) {
       ])
 
       const token = app.jwt.sign({ sub: row.id, role: row.role })
-      reply.setCookie("access_token", token, { httpOnly: true, secure: req.protocol === "https", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
-      return reply.send({ data: { user: publicUser(row) } })
+      reply.setCookie("access_token", token, { httpOnly: true, secure: req.protocol === "https", sameSite: "lax", path: "/", maxAge: 8 * 60 * 60 })
+      return reply.send({ data: { token, user: publicUser(row) } })
     },
   )
 
@@ -100,13 +100,14 @@ export async function authRoutes(app: FastifyInstance) {
     { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const body = customerLoginSchema.parse(req.body)
+      const usernameInput = body.username.trim()
       const [row] = (await app.db.query(
         `SELECT c.*, p.name AS package_name, r.name AS router_name
          FROM customers c
          LEFT JOIN packages p ON p.id = c.package_id
          LEFT JOIN routers r ON r.id = c.router_id
-         WHERE c.login_username = ? LIMIT 1`,
-        [body.username.trim()],
+         WHERE c.login_username = ? OR c.email = ? OR c.code = ? LIMIT 1`,
+        [usernameInput, usernameInput, usernameInput],
       )) as Record<string, unknown>[]
 
       if (!row) {
@@ -115,17 +116,29 @@ export async function authRoutes(app: FastifyInstance) {
         })
       }
 
-      const passwordHash = String(row.login_password_hash ?? "")
-      let passwordMatches = Boolean(passwordHash) && await bcrypt.compare(body.password, passwordHash)
+      const passwordHash = String(row.login_password_hash ?? "").trim()
+      const plainPassword = String(row.login_password ?? "").trim()
 
-      // Upgrade legacy plaintext password after one successful login.
-      if (!passwordMatches && !passwordHash && row.login_password) {
-        passwordMatches = body.password === String(row.login_password)
-        if (passwordMatches) {
-          await app.db.query("UPDATE customers SET login_password_hash = ? WHERE id = ?", [
-            await bcrypt.hash(body.password, 12),
-            row.id,
-          ])
+      let passwordMatches = false
+      if (passwordHash && /^\$2[aby]\$\d{2}\$/.test(passwordHash)) {
+        passwordMatches = await bcrypt.compare(body.password, passwordHash)
+      }
+
+      // Upgrade legacy plaintext password after successful login
+      if (!passwordMatches) {
+        const matchesPlain = (plainPassword && body.password === plainPassword) ||
+          (passwordHash && !passwordHash.startsWith("$2") && body.password === passwordHash)
+        if (matchesPlain) {
+          passwordMatches = true
+          try {
+            const hash = await bcrypt.hash(body.password, 10)
+            await app.db.query("UPDATE customers SET login_password_hash = ? WHERE id = ?", [
+              hash,
+              row.id,
+            ])
+          } catch (err) {
+            app.log.warn(err, "Failed to auto-upgrade customer password hash")
+          }
         }
       }
 
@@ -137,8 +150,8 @@ export async function authRoutes(app: FastifyInstance) {
 
       // Active = layanan aktif; Isolated = akun aktif tapi layanan diisolir (bisa login & bayar).
       const token = app.jwt.sign({ sub: row.id, role: "customer" })
-      reply.setCookie("access_token", token, { httpOnly: true, secure: req.protocol === "https", sameSite: "strict", path: "/", maxAge: 8 * 60 * 60 })
-      return reply.send({ data: { customer: publicCustomer(row) } })
+      reply.setCookie("access_token", token, { httpOnly: true, secure: req.protocol === "https", sameSite: "lax", path: "/", maxAge: 8 * 60 * 60 })
+      return reply.send({ data: { token, customer: publicCustomer(row) } })
     },
   )
 

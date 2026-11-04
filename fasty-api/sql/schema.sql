@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS customers (
   pppoe_password VARCHAR(120) NOT NULL,
   login_username VARCHAR(80) NOT NULL,
   login_password VARCHAR(120) NOT NULL,
+  login_password_hash VARCHAR(255) NULL,
   odp_id VARCHAR(60) NULL,
   gps VARCHAR(80) NULL,
   last_payment_at DATETIME NULL,

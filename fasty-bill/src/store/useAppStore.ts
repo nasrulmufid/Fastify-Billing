@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import api from "@/lib/axios"
 
 type User = {
   id: string
@@ -41,15 +42,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       return null
     }
   })(),
-  token: localStorage.getItem("user") ? "cookie" : null,
+  token: localStorage.getItem("token") ?? (localStorage.getItem("user") ? "cookie" : null),
   isAuthenticated: !!localStorage.getItem("user"),
-  login: (user, _token) => {
-    localStorage.removeItem("token")
+  login: (user, token) => {
+    if (token && token !== "cookie") localStorage.setItem("token", token)
     localStorage.setItem("user", JSON.stringify(user))
-    set({ user, token: "cookie", isAuthenticated: true })
+    set({ user, token: token || "cookie", isAuthenticated: true })
   },
   logout: () => {
-    void fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    void api.post("/auth/logout").catch(() => {})
     localStorage.removeItem("token")
     localStorage.removeItem("user")
     set({ user: null, token: null, isAuthenticated: false })
