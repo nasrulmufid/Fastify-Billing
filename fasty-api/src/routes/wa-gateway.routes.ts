@@ -611,29 +611,42 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         }
 
         const vars = { ...(varsByPhone.get(phone) ?? {}) }
-        const [invoiceData] = (await app.db.query(
-          `SELECT c.name, p.name AS package_name, i.id AS invoice_id, i.code AS invoice_code,
-                  i.amount, i.due_at, c.expiry_at
+        
+        // Query customer + invoice data
+        const [customerData] = (await app.db.query(
+          `SELECT c.id AS customer_id, c.name, c.expiry_at, p.name AS package_name
            FROM customers c
            LEFT JOIN packages p ON p.id = c.package_id
-           LEFT JOIN invoices i ON i.customer_id = c.id AND i.status IN ('Unpaid', 'Overdue')
            WHERE c.phone LIKE ?
-           ORDER BY i.id DESC LIMIT 1`,
+           LIMIT 1`,
           [`%${phone.replace(/^62/, "0")}%`],
         )) as Record<string, unknown>[]
 
-        vars.nama ||= String(invoiceData?.name ?? "").slice(0, 200)
+        const [invoiceData] = customerData
+          ? ((await app.db.query(
+              `SELECT id AS invoice_id, code AS invoice_code, amount, due_at
+               FROM invoices
+               WHERE customer_id = ? AND status IN ('Unpaid', 'Overdue')
+               ORDER BY id DESC LIMIT 1`,
+              [customerData.customer_id],
+            )) as Record<string, unknown>[])
+          : []
+
+        // Fill vars dari customer data (selalu ada jika customer found)
+        vars.nama ||= String(customerData?.name ?? "").slice(0, 200)
+        vars.paket ||= String(customerData?.package_name ?? "").slice(0, 100)
+        vars.expired ||= String(customerData?.expiry_at ?? "").slice(0, 100)
+        
+        // Fill vars dari invoice data (hanya jika ada invoice Unpaid/Overdue)
         vars.jumlah ||= invoiceData?.amount == null ? "" : String(invoiceData.amount).slice(0, 100)
         vars.tanggal ||= String(invoiceData?.due_at ?? "").slice(0, 100)
         vars.no_invoice ||= String(invoiceData?.invoice_code ?? "").slice(0, 100)
-        vars.paket ||= String(invoiceData?.package_name ?? "").slice(0, 100)
-        vars.expired ||= String(invoiceData?.expiry_at ?? "").slice(0, 100)
 
         if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
           vars.payment_link =
             (await buildPaymentLinkForInvoice(app, {
               invoice_id: Number(invoiceData.invoice_id),
-              customer_id: Number(invoiceData.customer_id ?? 0),
+              customer_id: Number(customerData?.customer_id ?? 0),
               amount: Number(invoiceData.amount ?? 0),
             })) ?? ""
         }
