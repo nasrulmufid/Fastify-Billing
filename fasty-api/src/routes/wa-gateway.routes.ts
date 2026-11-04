@@ -613,7 +613,7 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         const vars = { ...(varsByPhone.get(phone) ?? {}) }
         const [invoiceData] = (await app.db.query(
           `SELECT c.name, p.name AS package_name, i.id AS invoice_id, i.code AS invoice_code,
-                  i.amount, i.due_at, c.expired_at
+                  i.amount, i.due_at, c.expiry_at
            FROM customers c
            LEFT JOIN packages p ON p.id = c.package_id
            LEFT JOIN invoices i ON i.customer_id = c.id AND i.status IN ('Unpaid', 'Overdue')
@@ -627,7 +627,7 @@ export async function waGatewayRoutes(app: FastifyInstance) {
         vars.tanggal ||= String(invoiceData?.due_at ?? "").slice(0, 100)
         vars.no_invoice ||= String(invoiceData?.invoice_code ?? "").slice(0, 100)
         vars.paket ||= String(invoiceData?.package_name ?? "").slice(0, 100)
-        vars.expired ||= String(invoiceData?.expired_at ?? "").slice(0, 100)
+        vars.expired ||= String(invoiceData?.expiry_at ?? "").slice(0, 100)
 
         if (!vars.payment_link && invoiceData?.invoice_id && paymentGatewayApiKey) {
           vars.payment_link =
