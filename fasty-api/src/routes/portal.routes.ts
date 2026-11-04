@@ -120,13 +120,13 @@ export async function portalRoutes(app: FastifyInstance) {
     return reply.send({ data: publicCustomer(row) })
   })
 
-  // GET /portal/invoices — tagihan milik pelanggan
+  // GET /portal/invoices — tagihan yang bisa dibayar (Unpaid/Overdue only)
   app.get("/portal/invoices", customerAuth, async (req: FastifyRequest, reply: FastifyReply) => {
     const rows = (await app.db.query(
       `SELECT i.*, c.name AS customer_name
        FROM invoices i
        LEFT JOIN customers c ON c.id = i.customer_id
-       WHERE i.customer_id = ? ORDER BY i.id DESC`,
+       WHERE i.customer_id = ? AND i.status IN ('Unpaid', 'Overdue') ORDER BY i.id DESC`,
       [customerId(req)],
     )) as Record<string, unknown>[]
     return reply.send({ data: rows.map(mapInvoice) })
