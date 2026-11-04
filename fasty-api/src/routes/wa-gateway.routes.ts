@@ -550,6 +550,7 @@ export async function waGatewayRoutes(app: FastifyInstance) {
   app.post("/wa-gateway/send", superOnly, async (req: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = sendSchema.parse(req.body)
+      app.log.info({ toCount: body.to.length, varsCount: body.vars?.length ?? 0, hasTemplate: !!body.template }, "WA Gateway: send request received")
 
       // Validate recipients count (prevent abuse)
       if (body.to.length > 1000) {
