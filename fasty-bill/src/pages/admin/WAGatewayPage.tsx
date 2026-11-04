@@ -738,9 +738,10 @@ function KirimPesanTab() {
             {[
               ["{nama}", "Nama pelanggan"],
               ["{jumlah}", "Jumlah tagihan"],
-              ["{tanggal}", "Tanggal jatuh tempo"],
+              ["{tanggal}", "Jatuh tempo tagihan"],
               ["{no_invoice}", "No. invoice"],
               ["{paket}", "Nama paket"],
+              ["{expired}", "Masa aktif berakhir"],
               ["{payment_link}", "Link QRIS"],
             ].map(([variable, description]) => (
               <div key={variable} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2">
