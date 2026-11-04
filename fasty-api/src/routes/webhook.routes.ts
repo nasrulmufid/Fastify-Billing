@@ -93,7 +93,9 @@ export async function webhookRoutes(app: FastifyInstance) {
         return reply.send({ data: { ok: true, matched: true, payment: result.payment.code } })
       }
       case "payment.failed":
-      case "payment.expired": {
+      case "payment.expired":
+      case "payment.cancelled": {
+        const isCancelled = eventType === "payment.cancelled"
         const isExpired = eventType === "payment.expired"
         await app.db.transaction(async (q) => {
           const [payment] = (await q.query("SELECT * FROM payments WHERE gateway_ref = ? LIMIT 1 FOR UPDATE", [
