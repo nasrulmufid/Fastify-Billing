@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
-import { fromISODate } from "../utils/date.js"
+import { fromISODateTime } from "../utils/date.js"
 
 const STATUS_ENUM = z.enum(["Terkirim", "Gagal"])
 const listQuerySchema = z.object({ status: STATUS_ENUM.optional() })
@@ -16,7 +16,7 @@ function mapLog(row: Record<string, unknown>) {
     channel: row.channel,
     status: row.status,
     seenAt: row.seen_at ?? null,
-    time: fromISODate(row.sent_at as string | undefined),
+    time: fromISODateTime(row.sent_at as string | undefined),
     error: row.error,
   }
 }

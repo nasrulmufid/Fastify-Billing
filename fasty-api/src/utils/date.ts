@@ -84,6 +84,18 @@ export function toDbDateTime(d: Date): string {
   return `${y}-${m}-${day} ${hh}:${mm}:${ss}`
 }
 
+/** "2026-09-10 14:30:45" -> "10 September 2026, 14:30:45" */
+export function fromISODateTime(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const dt = String(iso).trim()
+  const d = new Date(dt.includes("T") ? dt : dt.replace(" ", "T"))
+  if (Number.isNaN(d.getTime())) return ""
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  const ss = String(d.getSeconds()).padStart(2, "0")
+  return `${formatIdDate(d)}, ${hh}:${mm}:${ss}`
+}
+
 /** Hari ini format id-ID ("20 Agustus 2026") */
 export function todayId(): string {
   return formatIdDate(new Date())

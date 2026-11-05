@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { z } from "zod"
 
-import { fromISODate } from "../utils/date.js"
+import { fromISODateTime } from "../utils/date.js"
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -14,7 +14,7 @@ function mapLog(row: Record<string, unknown>) {
     actor: row.actor,
     action: row.action,
     target: row.target,
-    time: fromISODate(row.created_at as string | undefined),
+    time: fromISODateTime(row.created_at as string | undefined),
   }
 }
 
