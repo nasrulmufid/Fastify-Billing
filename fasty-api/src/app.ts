@@ -27,7 +27,6 @@ import { waGatewayRoutes } from "./routes/wa-gateway.routes.js"
 import { telegramRoutes } from "./routes/telegram.routes.js"
 import { acsRoutes } from "./routes/acs.routes.js"
 import { webhookRoutes } from "./routes/webhook.routes.js"
-import { testJobsRoutes } from "./routes/test-jobs.routes.js"
 import { registerJobs, registerAlwaysOnJobs } from "./jobs/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -89,9 +88,6 @@ export async function buildApp(): Promise<FastifyInstance> {
 
       // Portal pelanggan (role customer)
       await api.register(portalRoutes)
-
-      // Test jobs (dev only)
-      await api.register(testJobsRoutes)
     },
     { prefix: "/api" },
   )
