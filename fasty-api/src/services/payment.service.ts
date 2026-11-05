@@ -64,13 +64,24 @@ export async function completePaymentFlow(
   // 3) masa aktif customer +duration_days (dari packages) + Active
   // FOR UPDATE: kunci baris agar 2 pembayaran berurutan/bersamaan selalu
   // extend dari expiry terbaru (ter-commit), bukan nilai stale.
-  const [customer] = (await q.query("SELECT c.*, p.duration_days FROM customers c LEFT JOIN packages p ON c.package_id = p.id WHERE c.id = ? FOR UPDATE", [
+  const [customer] = (await q.query("SELECT c.* FROM customers c WHERE c.id = ? FOR UPDATE", [
     payment.customer_id,
   ])) as Record<string, unknown>[]
   if (customer) {
+    // Coba ambil duration_days dari packages, fallback 30 jika kolom belum ada
+    let durationDays = 30
+    try {
+      const [pkg] = (await q.query("SELECT duration_days FROM packages WHERE id = ?", [
+        customer.package_id,
+      ])) as Record<string, unknown>[]
+      durationDays = Number(pkg?.duration_days ?? 30)
+    } catch {
+      // Column belum ada, gunakan default
+      durationDays = 30
+    }
+    
     const current =
       fromISODate(customer.expiry_at as string | undefined) || formatIdDate(new Date())
-    const durationDays = Number(customer.duration_days ?? 30)
     const newExpiry = addDaysToExpiry(current, durationDays)
     const iso = toISODate(newExpiry) ?? newExpiry
     await q.query("UPDATE customers SET expiry_at = ?, status = 'Active' WHERE id = ?", [
