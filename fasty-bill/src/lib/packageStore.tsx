@@ -25,6 +25,7 @@ export interface ServicePackage {
   type: PackageType
   profileName: string
   status: PackageStatus
+  durationDays: number
   description: string
   createdAt: string
 }
@@ -91,6 +92,7 @@ function mapPackageFromApi(p: any): ServicePackage {
     type: p.type,
     profileName: p.profileName ?? "",
     status: p.status,
+    durationDays: Number(p.durationDays ?? 30),
     description: p.description ?? "",
     createdAt: p.createdAt ?? "",
   }

@@ -251,7 +251,7 @@ export async function customersRoutes(app: FastifyInstance) {
       const period = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`
       const invCode = await app.db.transaction(async (q) => nextDailyCode(q.query, "invoices", "INV-"))
       await app.db.query(
-        "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(NOW(), INTERVAL 1 MONTH))",
+        "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(CURRENT_DATE(), INTERVAL 1 DAY))",
         [invCode, newCustomerId, price, period],
       )
     }

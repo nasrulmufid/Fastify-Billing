@@ -497,7 +497,7 @@ export async function executeImport(
       const invCode = `INV-${maxInv + 1}`
 
       await app.db.query(
-        "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(NOW(), INTERVAL 1 MONTH))",
+        "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, DATE_ADD(CURRENT_DATE(), INTERVAL 1 DAY))",
         [invCode, result.insertId, price, period],
       )
     } catch (err: any) {

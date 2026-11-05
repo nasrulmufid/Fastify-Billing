@@ -88,6 +88,19 @@ async function main() {
     // Pastikan koneksi masih berada di database yang benar
     await conn.query(`USE \`${dbName}\`;`)
 
+    // 2.5. Menjalankan migration files
+    console.log("Menjalankan migration files...")
+    try {
+      await runSqlFile(conn, "migration_add_duration_days.sql")
+    } catch (migErr: any) {
+      // Jika migration sudah pernah dijalankan (column exists), abaikan error
+      if (migErr.message?.includes("Duplicate column")) {
+        console.log("⚠ Column duration_days sudah ada, skip migration")
+      } else {
+        throw migErr
+      }
+    }
+
     // 3. Membuat akun default super_admin (User: admin / Pass: admin)
     console.log("Membuat akun default super_admin...")
     const hash = await bcrypt.hash("admin", 10)

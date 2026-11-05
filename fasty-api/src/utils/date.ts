@@ -54,6 +54,18 @@ export function addMonthsToExpiry(expiryStr: string, months: number): string {
   return formatIdDate(new Date(d.getFullYear(), d.getMonth() + months, d.getDate()))
 }
 
+/** Tambah N hari ke expiry date */
+export function addDaysToExpiry(expiryStr: string, days: number): string {
+  const d = parseIdDate(expiryStr)
+  if (!d) {
+    const now = new Date()
+    return formatIdDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + days))
+  }
+  const newDate = new Date(d)
+  newDate.setDate(d.getDate() + days)
+  return formatIdDate(newDate)
+}
+
 /** "10 September 2026" -> "2026-09-10" (untuk input date / simpan DATETIME) */
 export function toISODate(dateStr: string): string | null {
   const d = parseIdDate(dateStr)

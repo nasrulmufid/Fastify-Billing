@@ -2,7 +2,7 @@ import type { DbQuery } from "../plugins/db.js"
 import type { FastifyInstance } from "fastify"
 
 import { nextCode } from "../utils/codegen.js"
-import { addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
+import { addDaysToExpiry, addMonthsToExpiry, formatIdDate, fromISODate, toISODate } from "../utils/date.js"
 import { enqueueRouterSync, recordRouterWarning, withRouter, type RouterWarning } from "./router.service.js"
 import { getOfflineMessage, sendWhatsAppMessage } from "./wa.service.js"
 import { notifyTelegram } from "./telegram.service.js"
@@ -61,16 +61,17 @@ export async function completePaymentFlow(
     invoice = inv ?? null
   }
 
-  // 3) masa aktif customer +1 bulan + Active
+  // 3) masa aktif customer +duration_days (dari packages) + Active
   // FOR UPDATE: kunci baris agar 2 pembayaran berurutan/bersamaan selalu
-  // extend dari expiry terbaru (ter-commit), bukan nilai stale -> +N bulan utk N pembayaran.
-  const [customer] = (await q.query("SELECT * FROM customers WHERE id = ? FOR UPDATE", [
+  // extend dari expiry terbaru (ter-commit), bukan nilai stale.
+  const [customer] = (await q.query("SELECT c.*, p.duration_days FROM customers c LEFT JOIN packages p ON c.package_id = p.id WHERE c.id = ? FOR UPDATE", [
     payment.customer_id,
   ])) as Record<string, unknown>[]
   if (customer) {
     const current =
       fromISODate(customer.expiry_at as string | undefined) || formatIdDate(new Date())
-    const newExpiry = addMonthsToExpiry(current, 1)
+    const durationDays = Number(customer.duration_days ?? 30)
+    const newExpiry = addDaysToExpiry(current, durationDays)
     const iso = toISODate(newExpiry) ?? newExpiry
     await q.query("UPDATE customers SET expiry_at = ?, status = 'Active' WHERE id = ?", [
       iso,

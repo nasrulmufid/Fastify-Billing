@@ -48,6 +48,7 @@ const formSchema = z.object({
   price: z.coerce.number().min(1000, "Harga minimal Rp 1.000"),
   type: z.enum(PACKAGE_TYPE_OPTIONS),
   profileName: z.string(),
+  durationDays: z.coerce.number().min(1, "Durasi minimal 1 hari"),
   description: z.string(),
 })
 
@@ -78,6 +79,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
         price: pkg.price,
         type: pkg.type,
         profileName: pkg.profileName,
+        durationDays: pkg.durationDays,
         description: pkg.description,
       }
     }
@@ -88,6 +90,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
       price: 150000,
       type: "PPPoE",
       profileName: "",
+      durationDays: 30,
       description: "",
     }
   }, [pkg])
@@ -121,6 +124,7 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
       price: values.price,
       type: values.type,
       profileName: values.profileName,
+      durationDays: values.durationDays,
       description: values.description,
     }
 
@@ -229,6 +233,22 @@ export function PackageFormDialog({ open, onOpenChange, pkg }: PackageFormDialog
                   />
                 </div>
                 {errors.price && <p className="text-xs text-rose-500">{errors.price.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="p-duration">Durasi Paket (hari) <span className="text-rose-500">*</span></Label>
+                <Input
+                  id="p-duration"
+                  type="number"
+                  min={1}
+                  placeholder="30"
+                  {...register("durationDays")}
+                  aria-invalid={!!errors.durationDays}
+                />
+                {errors.durationDays && <p className="text-xs text-rose-500">{errors.durationDays.message}</p>}
+                <p className="text-xs text-muted-foreground">
+                  Masa aktif yang diberikan setelah pembayaran (default: 30 hari)
+                </p>
               </div>
 
               <div className="space-y-2">

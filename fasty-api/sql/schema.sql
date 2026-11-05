@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS packages (
   price DECIMAL(12,0) NOT NULL,
   type ENUM('PPPoE') NOT NULL DEFAULT 'PPPoE',
   status ENUM('Aktif','Nonaktif') NOT NULL DEFAULT 'Aktif',
+  duration_days INT NOT NULL DEFAULT 30,
   description TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;

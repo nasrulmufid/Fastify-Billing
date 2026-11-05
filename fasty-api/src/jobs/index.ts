@@ -24,43 +24,35 @@ export function registerAlwaysOnJobs(app: FastifyInstance) {
 }
 
 export function registerJobs(app: FastifyInstance) {
-  // 1. Anniversary billing — buat invoice menjelang expiry_at masing-masing customer
-  //    (bukan serentak tgl 1). due_at = expiry_at (tanggal anniversary customer) agar
-  //    konsisten dengan job isolir (yang memakai expiry_at). Interval siklus (1/2/...
-  //    bulan) dari app_settings.billing_cycle menentukan rentang generate ke depan.
-  cron.schedule("0 0 1 * *", async () => {
+  // 1. Setiap hari 08:05 — buat invoice otomatis H-7 sebelum expiry_at customer
+  //    Invoice dibuat hanya jika belum ada invoice Unpaid/Overdue.
+  //    due_at = expiry_at customer, period = bulan dari expiry_at
+  cron.schedule("5 8 * * *", async () => {
     try {
-      const [settings] = (await app.db.query(
-        "SELECT billing_cycle FROM app_settings WHERE id = 1",
-      )) as Record<string, unknown>[]
-      const cycle = String(settings?.billing_cycle ?? "Setiap 1 bulan")
-      const m = cycle.match(/(\d+)/)
-      const months = m ? Math.max(1, Number(m[1])) : 1
-      // Generate invoice untuk customer yang jatuh tempo dalam N bulan ke depan
-      const lookAheadDays = months * 31
-
+      // Query: customer Active dengan expiry tepat 7 hari ke depan
       const customers = (await app.db.query(
-        `SELECT * FROM customers
-         WHERE status = 'Active' AND expiry_at IS NOT NULL
-           AND expiry_at BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)`,
-        [lookAheadDays],
+        `SELECT c.id, c.customer_name, c.expiry_at, c.package_id
+         FROM customers c
+         WHERE c.status IN ('Active', 'Isolated') 
+           AND c.expiry_at IS NOT NULL
+           AND c.expiry_at = DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)`,
       )) as Record<string, unknown>[]
 
       let created = 0
       for (const c of customers) {
-        const [pkg] = (await app.db.query("SELECT * FROM packages WHERE id = ?", [
+        const [pkg] = (await app.db.query("SELECT price FROM packages WHERE id = ?", [
           c.package_id,
         ])) as Record<string, unknown>[]
         if (!pkg) continue
 
-        // Sudah ada invoice terbuka (Unpaid/Overdue)? Jangan buat duplikat.
+        // Sudah ada invoice Unpaid/Overdue? Skip (prevent duplikat)
         const [open] = (await app.db.query(
           "SELECT id FROM invoices WHERE customer_id = ? AND status IN ('Unpaid','Overdue') LIMIT 1",
           [c.id],
         )) as Record<string, unknown>[]
         if (open) continue
 
-        // due_at = expiry_at customer (anniversary, preserve hari)
+        // Period = bulan dari expiry_at
         const expiryStr = fromISODate(c.expiry_at as string | undefined)
         if (!expiryStr) continue
         const dueISO = toISODate(expiryStr)
@@ -74,9 +66,9 @@ export function registerJobs(app: FastifyInstance) {
         )
         created++
       }
-      app.log.info({ count: created, cycle, months }, "Invoice anniversary dibuat")
+      app.log.info({ count: created }, "Invoice H-7 otomatis dibuat")
     } catch (err) {
-      app.log.error(err, "Gagal generate invoice anniversary")
+      app.log.error(err, "Gagal buat invoice H-7 otomatis")
     }
   })
 

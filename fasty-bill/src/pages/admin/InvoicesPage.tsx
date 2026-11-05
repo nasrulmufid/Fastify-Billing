@@ -343,6 +343,9 @@ export function InvoicesPage() {
                 <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                   Jumlah
                 </TableHead>
+                <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                  Jatuh Tempo
+                </TableHead>
                 <TableHead className="w-[60px] text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                   <span className="sr-only">Aksi</span>
                 </TableHead>
@@ -351,7 +354,7 @@ export function InvoicesPage() {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-28 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="h-28 text-center text-sm text-muted-foreground">
                     Tidak ada invoice ditemukan.
                   </TableCell>
                 </TableRow>
@@ -371,6 +374,15 @@ export function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-sm font-semibold tabular-nums">
                       {formatPrice(invoice.amount)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {invoice.dueAt
+                        ? new Date(invoice.dueAt).toLocaleString("id-ID", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })
+                        : "-"}
                     </TableCell>
                     <TableCell>
                       <InvoiceRowActions

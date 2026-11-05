@@ -292,6 +292,7 @@ const invoiceFormSchema = z.object({
   packageId: z.string().min(1, "Paket wajib dipilih"),
   period: z.string().min(1, "Periode wajib diisi"),
   amount: z.coerce.number().min(1, "Jumlah harus lebih dari 0"),
+  dueAt: z.string().optional(),
 })
 
 type InvoiceFormValues = z.infer<typeof invoiceFormSchema>
@@ -317,6 +318,7 @@ export function InvoiceCreatePage() {
       packageId: "",
       period: new Date().toLocaleString("id-ID", { month: "long", year: "numeric" }),
       amount: 0,
+      dueAt: "",
     },
   })
 
@@ -356,6 +358,7 @@ export function InvoiceCreatePage() {
         customerId: Number(values.customerId),
         amount: values.amount,
         period: values.period,
+        dueAt: values.dueAt || undefined,
       })
       await loadInvoices()
       toast.success("Invoice dibuat", {
@@ -482,6 +485,20 @@ export function InvoiceCreatePage() {
                   <p className="text-xs text-muted-foreground">
                     Harga paket: <span className="font-semibold text-foreground">{formatPrice(selectedPackage.price)}</span>
                   </p>
+                )}
+              </div>
+
+              {/* Jatuh Tempo */}
+              <div className="space-y-1.5">
+                <Label htmlFor="dueAt">Jatuh Tempo</Label>
+                <Input
+                  id="dueAt"
+                  type="datetime-local"
+                  className="h-9"
+                  {...register("dueAt")}
+                />
+                {errors.dueAt && (
+                  <p className="text-xs text-destructive">{errors.dueAt.message}</p>
                 )}
               </div>
             </div>

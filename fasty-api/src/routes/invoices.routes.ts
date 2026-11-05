@@ -18,6 +18,7 @@ const createInvoiceSchema = z.object({
   customerId: z.coerce.number().min(1),
   amount: z.coerce.number().min(1),
   period: z.string().min(1, "Periode wajib diisi"),
+  dueAt: z.string().datetime().optional(),
 })
 
 const markPaidSchema = z.object({ method: METHOD_ENUM.default("Tunai") })
@@ -39,6 +40,7 @@ function mapInvoice(row: Record<string, unknown>) {
     paymentMethod: row.payment_method,
     paymentCode: row.payment_code,
     due: fromISODate(row.due_at as string | undefined),
+    dueAt: row.due_at,
   }
 }
 
@@ -92,8 +94,8 @@ export async function invoicesRoutes(app: FastifyInstance) {
       return nextDailyCode(q.query, "invoices", "INV-")
     })
     const result = await app.db.query(
-      "INSERT INTO invoices (code, customer_id, amount, status, period) VALUES (?, ?, ?, 'Unpaid', ?)",
-      [code, body.customerId, body.amount, body.period],
+      "INSERT INTO invoices (code, customer_id, amount, status, period, due_at) VALUES (?, ?, ?, 'Unpaid', ?, ?)",
+      [code, body.customerId, body.amount, body.period, body.dueAt || null],
     ) as unknown as { insertId: number }
     const [row] = (await app.db.query(`${SQL_SELECT} WHERE i.id = ?`, [
       result.insertId,

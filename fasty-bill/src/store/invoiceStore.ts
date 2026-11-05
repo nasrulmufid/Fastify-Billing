@@ -17,6 +17,8 @@ export interface Invoice {
   paymentMethod?: PaymentMethod
   /** Kode pembayaran terkait (mis. PY-1011). */
   paymentCode?: string
+  /** Tanggal jatuh tempo (ISO string). */
+  dueAt?: string
 }
 
 export const initialInvoices: Invoice[] = []
@@ -46,6 +48,7 @@ function mapInvoiceFromApi(i: any): Invoice {
     period: i.period,
     paymentMethod: i.paymentMethod ?? undefined,
     paymentCode: i.paymentCode ?? undefined,
+    dueAt: i.dueAt ?? undefined,
   }
 }
 
