@@ -14,6 +14,8 @@
 import "dotenv/config"
 import Fastify from "fastify"
 import { buildApp } from "../app.js"
+import { sendWhatsAppMessage, buildPaymentLinkForInvoice } from "../services/wa.service.js"
+import { fillPlaceholders } from "../utils/template.js"
 
 const jobName = process.argv[2]
 
@@ -63,6 +65,62 @@ Available jobs:
       for (const inv of invoices) {
         console.log(`  [${inv.code}] ${inv.customer_name} (${inv.phone}) - Rp ${inv.amount}`)
       }
+      
+      // Send WA
+      if (invoices.length === 0) {
+        console.log("Tidak ada invoice")
+        process.exit(0)
+      }
+
+      const needsLink = template?.body?.includes("{payment_link}") ?? false
+      let sent = 0
+
+      for (const inv of invoices) {
+        const phone = String(inv.phone || "").replace(/\D/g, "")
+        if (!phone || phone.length < 10) {
+          console.log(`  ❌ ${inv.code} invalid phone`)
+          continue
+        }
+
+        const vars: Record<string, string> = {
+          nama: String(inv.customer_name || ""),
+          jumlah: String(inv.amount || ""),
+          tanggal: new Date(inv.due_at).toLocaleDateString("id-ID"),
+          no_invoice: String(inv.code),
+          paket: "-",
+          expired: "-",
+        }
+
+        if (needsLink) {
+          try {
+            const link = await buildPaymentLinkForInvoice(app, {
+              invoice_id: inv.id,
+              customer_id: inv.customer_id,
+              amount: inv.amount,
+            })
+            if (link) vars.payment_link = link
+          } catch (err) {
+            console.log(`  ⚠️ ${inv.code} payment link failed`)
+          }
+        }
+
+        const msg = fillPlaceholders(template?.body || "", vars)
+        console.log(`  Sending to ${phone}...`)
+
+        try {
+          const result = await sendWhatsAppMessage(app, { phone, message: msg })
+          if (result.ok) {
+            sent++
+            console.log(`  ✅ Sent`)
+          } else {
+            console.log(`  ❌ Failed: ${result.error}`)
+          }
+        } catch (err: any) {
+          console.log(`  ❌ Error: ${err.message}`)
+        }
+      }
+
+      console.log(`\nSent ${sent}/${invoices.length}`)
     } else if (jobName === "isolir") {
       const customers = (await app.db.query(
         "SELECT id, code, name, expiry_at FROM customers WHERE status = 'Active' AND expiry_at < CURRENT_DATE() LIMIT 10",
