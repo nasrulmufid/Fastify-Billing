@@ -49,11 +49,11 @@ Available jobs:
       console.log(`Template: ${template?.name || 'fallback'}`)
 
       const invoices = (await app.db.query(
-        `SELECT i.id, i.code, i.due_at, i.total_amount,
+        `SELECT i.id, i.code, i.due_at, i.amount,
                 c.id AS customer_id, c.name AS customer_name, c.phone
          FROM invoices i
          JOIN customers c ON i.customer_id = c.id
-         WHERE i.status = 'Belum Lunas'
+         WHERE i.status = 'Unpaid'
            AND i.due_at = DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)
          LIMIT 10`,
         [days],
@@ -61,7 +61,7 @@ Available jobs:
 
       console.log(`Found ${invoices.length} invoices due in ${days} days`)
       for (const inv of invoices) {
-        console.log(`  [${inv.code}] ${inv.customer_name} (${inv.phone}) - Rp ${inv.total_amount}`)
+        console.log(`  [${inv.code}] ${inv.customer_name} (${inv.phone}) - Rp ${inv.amount}`)
       }
     } else if (jobName === "isolir") {
       const customers = (await app.db.query(
@@ -74,10 +74,10 @@ Available jobs:
       }
     } else if (jobName === "retention") {
       const [result] = (await app.db.query(
-        "SELECT COUNT(*) AS total FROM invoices WHERE status = 'Lunas' AND paid_at < DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)",
+        "SELECT COUNT(*) AS total FROM invoices WHERE status = 'Paid' AND created_at < DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)",
       )) as any
 
-      console.log(`Old paid invoices to delete: ${(result as any).total}`)
+      console.log(`Old paid invoices (>90d) to delete: ${result[0].total}`)
     } else if (jobName === "invoice") {
       const [settings] = (await app.db.query("SELECT billing_cycle FROM app_settings WHERE id = 1")) as any
 
