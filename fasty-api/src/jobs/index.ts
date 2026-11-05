@@ -178,16 +178,17 @@ export function registerJobs(app: FastifyInstance) {
   })
 
   // Helper: kirim reminder tagihan massal berdasarkan tipe (H-7/H-3/H-1) dengan jeda tiap 5 pesan
-  async function sendReminderBatch(type: "h7" | "h3" | "h1", intervalDays: number) {
+  async function sendReminderBatch(type: "h7" | "h3" | "h1", targetDays: number) {
     try {
+      // Exact day match: due_at = hari ini + targetDays
       const invoices = (await app.db.query(
         `SELECT i.id AS invoice_id, i.code AS invoice_code, i.amount, i.due_at,
                 c.id AS customer_id, c.name AS customer_name, c.phone, c.expiry_at, p.name AS package_name
          FROM invoices i
          JOIN customers c ON c.id = i.customer_id
          LEFT JOIN packages p ON p.id = c.package_id
-         WHERE i.status = 'Unpaid' AND i.due_at BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)`,
-        [intervalDays],
+         WHERE i.status = 'Unpaid' AND i.due_at = DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)`,
+        [targetDays],
       )) as Record<string, unknown>[]
 
       if (invoices.length === 0) {
@@ -200,16 +201,24 @@ export function registerJobs(app: FastifyInstance) {
       let sent = 0
       let failed = 0
 
+      // Format date ke DD/MM/YYYY
+      const formatDate = (d: unknown): string => {
+        if (!d) return ""
+        const date = new Date(d as string | number)
+        if (isNaN(date.getTime())) return ""
+        return date.toLocaleDateString("id-ID", { year: "numeric", month: "2-digit", day: "2-digit" })
+      }
+
       for (let idx = 0; idx < invoices.length; idx++) {
         const inv = invoices[idx]
         const phone = String(inv.phone ?? "")
         const vars: Record<string, string> = {
           nama: String(inv.customer_name ?? ""),
           jumlah: inv.amount == null ? "" : String(inv.amount),
-          tanggal: String(inv.due_at ?? ""),
+          tanggal: formatDate(inv.due_at),
           no_invoice: String(inv.invoice_code ?? ""),
           paket: String(inv.package_name ?? ""),
-          expired: String(inv.expiry_at ?? ""),
+          expired: formatDate(inv.expiry_at),
         }
         // Buat payment link per-invoice bila template membutuhkannya
         if (needsPaymentLink) {
