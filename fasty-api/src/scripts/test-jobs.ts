@@ -42,14 +42,11 @@ Available jobs:
     if (days) {
       // Reminder job
       const [template] = (await app.db.query(
-        "SELECT * FROM reminder_templates WHERE days = ? LIMIT 1",
-        [days],
+        "SELECT * FROM wa_templates WHERE type = ? LIMIT 1",
+        [`reminder_h${days}`],
       )) as any
 
-      if (!template) {
-        console.log(`❌ No template found for H-${days}`)
-        process.exit(1)
-      }
+      console.log(`Template: ${template?.name || 'fallback'}`)
 
       const invoices = (await app.db.query(
         `SELECT i.id, i.code, i.due_at, i.total_amount,
